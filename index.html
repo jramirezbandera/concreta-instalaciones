@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // Pre-paint theme: set data-theme BEFORE first paint to avoid a flash.
+      // localStorage pref wins; else follow the OS; else light (the default).
+      (function () {
+        try {
+          var t = null;
+          try { t = localStorage.getItem('concreta-theme'); } catch (e) {}
+          if (t !== 'light' && t !== 'dark') {
+            t = (window.matchMedia &&
+                 window.matchMedia('(prefers-color-scheme: dark)').matches)
+              ? 'dark' : 'light';
+          }
+          document.documentElement.dataset.theme = t;
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Concreta Instalaciones" />
+    <!-- Light is the default; the theme store swaps this to #0b1220 for dark. -->
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Predimensionado de instalaciones y ficha justificativa CTE para arquitectos. Desk tool, no CYPE."
+    />
+    <title>Concreta Instalaciones</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

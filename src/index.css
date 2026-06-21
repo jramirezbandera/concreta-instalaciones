@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+/* Geist — misma familia que "Concreta estructura" (paridad de tipografía).
+   Vendorizada en /public/fonts (precache PWA). */
+@font-face {
+  font-family: "Geist Sans";
+  src: url("/fonts/Geist-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Sans";
+  src: url("/fonts/Geist-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Sans";
+  src: url("/fonts/Geist-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Cambio de tema instantáneo y uniforme: mientras <html> lleva .theme-switching,
+   ningún elemento transiciona, así los que tienen `transition-colors` no laguean
+   respecto a los que no. ThemeProvider añade la clase, cambia data-theme y la
+   quita en el siguiente frame (patrón disableTransitionOnChange). */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
+/* dot-grid canvas — "mesa de trabajo del ingeniero" */
+.canvas-dot-grid {
+  background-image: radial-gradient(circle, var(--color-dot-grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* ── Collapsible section reveal ── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── RouteProgressBar shimmer ── */
+@keyframes routeProgress {
+  0%   { background-position: -40% 0; }
+  100% { background-position: 140% 0; }
+}
+.animate-route-progress { animation: routeProgress 1.1s linear infinite; }
+
+/* ── Scrollbar styling ── */
+::-webkit-scrollbar       { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-scrollbar); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-hover); }
+
+.scroll-hide                    { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) transparent; }
+.scroll-hide::-webkit-scrollbar { width: 6px; }
+.scroll-hide::-webkit-scrollbar-thumb { background: var(--color-scrollbar); border-radius: 3px; }
+.scroll-hide::-webkit-scrollbar-track { background: transparent; }
+
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  nav, aside, header { display: none !important; }
+  * { color-scheme: light !important; }
+}
+
+/* ── Theme tokens ──
+   `@theme` (NOT `inline`) so utilities emit var(--color-*) and switch per theme.
+   Light values are the default; dark overrides live in html[data-theme="dark"].
+   chart-* tokens drive the SVG screen palette (the PDF stays grayscale). */
+@theme {
+  --font-sans: "Geist Sans", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+
+  /* Light (default) */
+  --color-bg-primary: #ffffff;
+  --color-bg-surface: #f8fafc;
+  --color-bg-elevated: #f1f5f9;
+  --color-bg-canvas: #ffffff;
+  --color-border-main: #cbd5e1;
+  --color-border-sub: #e2e8f0;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-disabled: #64748b; /* slate-500 ~4.8:1 on white — stays AA */
+  --color-accent: #0284c7;
+  --color-accent-hover: #0369a1;
+  --color-btn-primary-bg: #0369a1;
+  --color-btn-primary-bg-hover: #075985;
+  --color-btn-primary-fg: #ffffff;
+
+  /* Verdict / state (CUMPLE / ADVERTENCIA / INCUMPLE / N/A) */
+  --color-state-ok: #15803d;
+  --color-state-warn: #b45309;
+  --color-state-fail: #dc2626;
+  --color-state-neutral: #64748b;
+
+  /* SVG chart palette (light). The critical element uses --color-chart-critical;
+     WCAG: never color-only — pair with stroke width + pattern + direct label. */
+  --color-chart-section: #475569;
+  --color-chart-section-fill: #f1f5f9;
+  --color-chart-flow: #0284c7;
+  --color-chart-critical: #dc2626;
+  --color-chart-dim: #64748b;
+  --color-chart-dim-text: #475569;
+  --color-chart-label: #0f172a;
+  --color-dot-grid: #e2e8f0;
+  --color-scrollbar: #94a3b8;
+  --color-scrollbar-hover: #64748b;
+
+  /* Translucent tints — declared in @theme so `bg-tint-*` utilities generate.
+     They color-mix from the themed accent/state vars, so they track light/dark
+     automatically at runtime with no dark override. */
+  --color-tint-accent: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  --color-tint-ok: color-mix(in srgb, var(--color-state-ok) 10%, transparent);
+  --color-tint-warn: color-mix(in srgb, var(--color-state-warn) 10%, transparent);
+  --color-tint-fail: color-mix(in srgb, var(--color-state-fail) 10%, transparent);
+  --color-tint-neutral: color-mix(in srgb, var(--color-state-neutral) 10%, transparent);
+}
+
+:root {
+  color-scheme: light;
+}
+
+/* Dark — the "firma". Higher specificity than :root so it always wins. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg-primary: #0b1220;
+  --color-bg-surface: #111a2d;
+  --color-bg-elevated: #1a2540;
+  --color-bg-canvas: #0b1220;
+  --color-border-main: #22304d;
+  --color-border-sub: #1a2540;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-disabled: #64748b;
+  --color-accent: #38bdf8;
+  --color-accent-hover: #0ea5e9;
+  --color-btn-primary-bg: #38bdf8;
+  --color-btn-primary-bg-hover: #0ea5e9;
+  --color-btn-primary-fg: #052238;
+
+  --color-state-ok: #22c55e;
+  --color-state-warn: #f59e0b;
+  --color-state-fail: #ef4444;
+  --color-state-neutral: #64748b;
+
+  --color-chart-section: #334155;
+  --color-chart-section-fill: #1e293b;
+  --color-chart-flow: #38bdf8;
+  --color-chart-critical: #f87171;
+  --color-chart-dim: #94a3b8;
+  --color-chart-dim-text: #94a3b8;
+  --color-chart-label: #e2e8f0;
+  --color-dot-grid: #253147;
+  --color-scrollbar: #22304d;
+  --color-scrollbar-hover: #2c3d63;
+}
