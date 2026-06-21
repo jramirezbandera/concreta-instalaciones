@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router";
+import { createHashRouter, RouterProvider, Navigate, Outlet } from "react-router";
 import { HelmetProvider } from "react-helmet-async";
 import { AppShell } from "./components/layout/AppShell";
 import { RouteFallback } from "./components/layout/RouteFallback";
@@ -27,7 +27,12 @@ const lazyComponent =
   () =>
     loader().then((m) => ({ Component: m[name] as React.ComponentType }));
 
-const router = createBrowserRouter([
+// HashRouter (no BrowserRouter): GitHub Pages es hosting estático sin fallback
+// de servidor; con rutas tras el # toda URL carga index.html (sin 404 al
+// recargar /hs/ventilacion). El base de Vite solo afecta a los assets, no a
+// estas rutas. El query string (?numDormitorios=…&estancias=…) viaja intacto
+// tras el #, sin re-encodear, preservando el "Compartir".
+const router = createHashRouter([
   {
     element: <RootLayout />,
     HydrateFallback: RouteFallback,
