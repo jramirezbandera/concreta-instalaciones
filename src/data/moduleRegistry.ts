@@ -68,7 +68,7 @@ export const moduleRegistry: ModuleEntry[] = [
     group: "Energía (DB-HE)",
     icon: Thermometer,
     edicionDB: "DB-HE 2019 (consolidado 2022)",
-    shipped: false,
+    shipped: true,
   },
 ];
 
@@ -80,6 +80,7 @@ export const MODULE_SCHEMA_VERSIONS: Record<string, string> = {
   hs3: "1",
   hs5: "1",
   hs4: "1",
+  he1: "1",
 };
 
 export function getModuleSchemaVersion(moduleKey: string): string {

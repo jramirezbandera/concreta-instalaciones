@@ -58,6 +58,10 @@ const router = createHashRouter([
             path: "hs/fontaneria",
             lazy: lazyComponent(() => import("./modules/hs4/ui"), "Hs4Module"),
           },
+          {
+            path: "he/envolvente",
+            lazy: lazyComponent(() => import("./modules/he1/ui"), "He1Module"),
+          },
         ],
       },
       { path: "*", element: <Navigate to="/_smoke" replace /> },
