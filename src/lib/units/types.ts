@@ -16,6 +16,9 @@ export type UnidadCanonica =
   | "kPa" // presiones de agua
   | "m/s" // velocidades
   | "UD" // unidades de desagüe (HS5)
+  | "dm³/s" // caudal de evacuación de aguas (HS5, desagües continuos)
+  | "%" // pendiente de ramales/colectores (HS5)
+  | "Pa" // presión/depresión en bajantes (HS5)
   | "W/m²K" // transmitancia térmica U
   | "m²K/W" // resistencia térmica
   | "ppm"; // concentración CO₂
