@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Wind, Droplets, Waves, Thermometer, FlaskConical } from "lucide-react";
+import { Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation } from "lucide-react";
 
 // Manifest central de módulos (SPEC §11). Alimenta a la vez la navegación
 // (Sidebar), el router (App.tsx mapea route→import lazy) y el pie/cita de la
@@ -62,6 +62,15 @@ export const moduleRegistry: ModuleEntry[] = [
     shipped: true,
   },
   {
+    key: "concreta-inst-hs6",
+    route: "/hs/radon",
+    label: "HS6 Radón",
+    group: "Salubridad (DB-HS)",
+    icon: Radiation,
+    edicionDB: "DB-HS6 (RD 732/2019)",
+    shipped: true,
+  },
+  {
     key: "concreta-inst-he1",
     route: "/he/envolvente",
     label: "HE1 Envolvente",
@@ -80,6 +89,7 @@ export const MODULE_SCHEMA_VERSIONS: Record<string, string> = {
   hs3: "1",
   hs5: "1",
   hs4: "1",
+  hs6: "1",
   he1: "1",
 };
 

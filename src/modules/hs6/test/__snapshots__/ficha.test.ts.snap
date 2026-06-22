@@ -1,0 +1,140 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`toFichaData HS6 — snapshot (SPEC §5) > defaults (Zona II, sótano habitable: barrera + cámara → CUMPLE) 1`] = `
+{
+  "datosPartida": [
+    {
+      "concepto": "Zona de radón del edificio",
+      "origen": "Apéndice B (consultada por el proyectista por su municipio) · DB-HS6 Apéndice B (zonificación)",
+      "valor": "Zona II (potencial alto)",
+    },
+    {
+      "concepto": "Municipio",
+      "origen": "Entrada del usuario — informativo (no condiciona el cálculo; la zona es el dato efectivo)",
+      "valor": "Cáceres",
+    },
+    {
+      "concepto": "Local habitable en contacto con el terreno",
+      "origen": "Entrada del usuario (condición de ámbito) · DB-HS6 art. 1 (Ámbito de aplicación)",
+      "valor": "Sí",
+    },
+    {
+      "concepto": "Nivel de protección exigido por la zona",
+      "origen": "DB-HS6 art. 3.1 (Niveles de protección frente al radón) — Zona II (potencial alto): barrera de protección OBLIGATORIA + una medida adicional (espacio de contención ventilado O despresurización del terreno).",
+      "valor": "2 medida(s) · barrera obligatoria",
+    },
+    {
+      "concepto": "Solución propuesta — Barrera de protección (lámina-tipo sellada) (barrera-lamina)",
+      "origen": "Entrada del usuario · DB-HS6 art. 3.2 (barrera de protección)",
+      "valor": "Vía lámina-tipo · coef. difusión 8e-12 m²/s · espesor 2,5 mm",
+    },
+    {
+      "concepto": "Solución propuesta — Espacio de contención ventilado (cámara, ventilación natural) (camara-ventilada)",
+      "origen": "Entrada del usuario · DB-HS6 art. 3.2 (espacio de contención ventilado)",
+      "valor": "Ventilación natural · perímetro 40 m · aberturas 480 cm² · altura 80 mm",
+    },
+  ],
+  "edicionDB": "DB-HS6 (RD 732/2019)",
+  "engineVersion": "0.1.0",
+  "inputs": {
+    "localHabitableEnContactoConTerreno": true,
+    "municipio": "Cáceres",
+    "soluciones": [
+      {
+        "coefDifusion_m2_s": 8e-12,
+        "continuidadSellada": true,
+        "espesor_mm": 2.5,
+        "id": "barrera-lamina",
+        "nombre": "Barrera de protección (lámina-tipo sellada)",
+        "penetracionesSelladas": true,
+        "puertasEstancas": true,
+        "tipo": "barrera",
+        "via": "lamina_tipo",
+      },
+      {
+        "alturaCamara_mm": 80,
+        "areaAberturas_cm2": 480,
+        "id": "camara-ventilada",
+        "nombre": "Espacio de contención ventilado (cámara, ventilación natural)",
+        "perimetro_m": 40,
+        "tipo": "espacio_contencion",
+        "ventilacion": "natural",
+      },
+    ],
+    "zona": "II",
+  },
+  "normativa": [
+    {
+      "articulo": "art. 2 (Caracterización y cuantificación de la exigencia)",
+      "db": "DB-HS6",
+      "edicion": "RD 732/2019",
+    },
+    {
+      "articulo": "art. 1 (Ámbito de aplicación)",
+      "db": "DB-HS6",
+      "edicion": "RD 732/2019",
+    },
+    {
+      "articulo": "art. 3.1 (Niveles de protección frente al radón)",
+      "db": "DB-HS6",
+      "edicion": "RD 732/2019",
+    },
+    {
+      "articulo": "Apéndice B (zonificación por municipio)",
+      "db": "DB-HS6",
+      "edicion": "RD 732/2019",
+      "exigencia": "Zonas de radón I / II / sin clasificar — INPUT consultado por el proyectista",
+    },
+    {
+      "articulo": "art. 3.2 / 3.3 (Barrera de protección · Espacio de contención · Despresurización)",
+      "db": "DB-HS6",
+      "edicion": "RD 732/2019",
+      "exigencia": "Soluciones (vía simplificada): umbrales cuantitativos PENDIENTES de verificación literal del PDF maquetado (confianza MEDIA-ALTA)",
+    },
+  ],
+  "observaciones": [
+    "Barrera por cálculo de difusión (E < Elim, "Nivel B"): este predimensionado NO evalúa el sub-cálculo cuantitativo de la barrera por difusión (la fórmula de E diverge entre fuentes y no está verificada literalmente). La barrera se justifica por la vía simplificada "lámina-tipo" (coef. difusión ≤ 1e-11 m²/s y espesor ≥ 2 mm, art. 3.2); la vía por cálculo queda fuera del módulo y debe justificarse manualmente.",
+    "Parámetros de la vía simplificada (confianza MEDIA-ALTA): los umbrales cuantitativos de las soluciones (lámina-tipo coef. difusión ≤ 1e-11 m²/s y espesor ≥ 2 mm; ventilación natural ≥ 10 cm²/ml de perímetro; altura de cámara ≥ 50 mm) están transcritos por triangulación y PENDIENTES de auditoría literal contra el PDF maquetado del DB-HS6 (mismo procedimiento que HS4/HS5). La estructura de la exigencia (ámbito art. 1, nivel de referencia art. 2, niveles de protección por zona art. 3.1 y zonas del Apéndice B) es de confianza alta.",
+    "Alcance del cálculo: PREDIMENSIONADO de Nivel A (clasificación por zona, adecuación de la combinación de soluciones a la exigencia de la zona y checklist cualitativo/geométrico de cada solución). El motor NO calcula la concentración de radón resultante (eso exigiría un modelo de transporte fuera del predimensionado). Este predimensionado NO sustituye una medición de radón en el local terminado ni un cálculo de detalle.",
+  ],
+  "slug": "hs6-radon",
+  "svg": {
+    "caption": "Sección vertical del encuentro del local con el terreno: bandas apiladas (local protegido, solera, espacio de contención, barrera, terreno) con la medida crítica resaltada; tubo de despresurización si procede.",
+    "elementId": "hs6-svg-pdf",
+    "nativeH": 294,
+    "nativeW": 434,
+  },
+  "titulo": "HS6 — Protección frente al radón",
+  "veredictoGlobal": "ok",
+  "verificaciones": [
+    {
+      "concepto": "Nivel de referencia de radón (concentración media anual)",
+      "estado": "neutral",
+      "limite": "≤ 300 Bq/m³",
+      "referencia": "DB-HS6 art. 2 (Caracterización y cuantificación de la exigencia) (edición RD 732/2019)",
+      "valor": "límite ≤ 300 Bq/m³",
+    },
+    {
+      "concepto": "Combinación suficiente para la zona (barrera obligatoria + medidas)",
+      "estado": "ok",
+      "limite": "≥ 2 (con barrera)",
+      "referencia": "DB-HS6 art. 3.1 (Niveles de protección frente al radón) (edición RD 732/2019)",
+      "valor": "2 medida(s) válida(s)",
+    },
+    {
+      "concepto": "Barrera de protección (lámina-tipo sellada) (barrera-lamina) — válida (cuenta)",
+      "estado": "ok",
+      "limite": "cuenta como medida",
+      "referencia": "DB-HS6 art. 3.2 (barrera de protección) (edición RD 732/2019)",
+      "valor": "Barrera de protección (art. 3.2), vía lámina-tipo: VÁLIDA (cuenta como medida). Checklist: continuidad OK, penetraciones OK, puertas OK.",
+    },
+    {
+      "concepto": "Espacio de contención ventilado (cámara, ventilación natural) (camara-ventilada) — válida (cuenta)",
+      "estado": "ok",
+      "limite": "cuenta como medida",
+      "referencia": "DB-HS6 art. 3.2 (espacio de contención ventilado) (edición RD 732/2019)",
+      "valor": "Espacio de contención ventilado (art. 3.2), ventilación natural: VÁLIDO (cuenta como medida). Criterio geométrico 10 cm²/ml · perímetro.",
+    },
+  ],
+}
+`;

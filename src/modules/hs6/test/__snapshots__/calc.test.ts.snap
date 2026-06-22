@@ -1,0 +1,514 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`calcHS6 — snapshots (SPEC §5) > Zona I con UNA sola medida válida (barrera lámina-tipo) → CUMPLE 1`] = `
+{
+  "aplica": true,
+  "barreraObligatoria": false,
+  "combinacionSuficiente": true,
+  "elementoCritico": null,
+  "elementoCriticoId": null,
+  "localHabitableEnContactoConTerreno": true,
+  "motivoNoAplica": null,
+  "municipio": "Municipio Zona I",
+  "nMedidasMin": 1,
+  "nMedidasValidas": 1,
+  "nivelProteccion": "Zona I (potencial medio): una medida — barrera de protección O espacio de contención ventilado.",
+  "nivelReferencia_Bq_m3": 300,
+  "porMedida": [
+    {
+      "cuenta": true,
+      "estado": "ok",
+      "id": "barrera-zona-i",
+      "motivo": "Barrera de protección (art. 3.2), vía lámina-tipo: VÁLIDA (cuenta como medida). Checklist: continuidad OK, penetraciones OK, puertas OK.",
+      "nombre": "Barrera de protección",
+      "requisitos": [
+        {
+          "clave": "coef-difusion",
+          "detalle": "5e-12 m²/s ≤ 1e-11 m²/s (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Coeficiente de difusión del radón de la lámina",
+        },
+        {
+          "clave": "espesor-lamina",
+          "detalle": "2.5 mm ≥ 2 mm (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Espesor de la lámina",
+        },
+        {
+          "clave": "continuidad-sellada",
+          "detalle": "La barrera forma una capa continua y sellada (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Continuidad sellada de la barrera",
+        },
+        {
+          "clave": "penetraciones-selladas",
+          "detalle": "Las penetraciones (tuberías, juntas, arquetas) están selladas (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Penetraciones selladas",
+        },
+        {
+          "clave": "puertas-estancas",
+          "detalle": "Las puertas de comunicación con el espacio protegido son estancas (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Puertas de comunicación estancas",
+        },
+      ],
+      "tipo": "barrera",
+    },
+  ],
+  "veredictoGlobal": "ok",
+  "warnings": [],
+  "zona": "I",
+}
+`;
+
+exports[`calcHS6 — snapshots (SPEC §5) > Zona I: espacio de contención NATURAL infra-dimensionado (área < 10·perímetro) → falla el requisito 1`] = `
+{
+  "aplica": true,
+  "barreraObligatoria": false,
+  "combinacionSuficiente": false,
+  "elementoCritico": "Medida propuesta NO válida: "camara-infra" (Espacio de contención ventilado (art. 3.2), ventilación natural: NO válido (no cuenta como medida). Criterio geométrico 10 cm²/ml · perímetro.).",
+  "elementoCriticoId": "camara-infra",
+  "localHabitableEnContactoConTerreno": true,
+  "motivoNoAplica": null,
+  "municipio": null,
+  "nMedidasMin": 1,
+  "nMedidasValidas": 0,
+  "nivelProteccion": "Zona I (potencial medio): una medida — barrera de protección O espacio de contención ventilado.",
+  "nivelReferencia_Bq_m3": 300,
+  "porMedida": [
+    {
+      "cuenta": false,
+      "estado": "fail",
+      "id": "camara-infra",
+      "motivo": "Espacio de contención ventilado (art. 3.2), ventilación natural: NO válido (no cuenta como medida). Criterio geométrico 10 cm²/ml · perímetro.",
+      "nombre": "Espacio de contención ventilado",
+      "requisitos": [
+        {
+          "clave": "ventilacion-natural",
+          "detalle": "350 cm² < 400 cm² exigidos (10 cm²/ml · 40 m, art. 3.2) → NO CUMPLE.",
+          "estado": "fail",
+          "etiqueta": "Ventilación natural de la cámara (área de aberturas)",
+        },
+        {
+          "clave": "altura-camara",
+          "detalle": "70 mm ≥ 50 mm mínimos (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Altura libre de la cámara",
+        },
+      ],
+      "tipo": "espacio_contencion",
+    },
+  ],
+  "veredictoGlobal": "fail",
+  "warnings": [
+    "Espacio de contención "camara-infra": ventilación natural INSUFICIENTE (área de aberturas < 10 cm²/ml · perímetro, art. 3.2).",
+    "Combinación INSUFICIENTE (art. 3.1): la zona I exige 1 medida(s); solo 0 válida(s).",
+  ],
+  "zona": "I",
+}
+`;
+
+exports[`calcHS6 — snapshots (SPEC §5) > Zona II SIN barrera (solo espacio de contención) → NO CUMPLE (barrera obligatoria) 1`] = `
+{
+  "aplica": true,
+  "barreraObligatoria": true,
+  "combinacionSuficiente": false,
+  "elementoCritico": "FALTA la barrera de protección OBLIGATORIA en Zona II (art. 3.1).",
+  "elementoCriticoId": "__falta_medida__",
+  "localHabitableEnContactoConTerreno": true,
+  "motivoNoAplica": null,
+  "municipio": null,
+  "nMedidasMin": 2,
+  "nMedidasValidas": 1,
+  "nivelProteccion": "Zona II (potencial alto): barrera de protección OBLIGATORIA + una medida adicional (espacio de contención ventilado O despresurización del terreno).",
+  "nivelReferencia_Bq_m3": 300,
+  "porMedida": [
+    {
+      "cuenta": true,
+      "estado": "ok",
+      "id": "solo-camara",
+      "motivo": "Espacio de contención ventilado (art. 3.2), ventilación natural: VÁLIDO (cuenta como medida). Criterio geométrico 10 cm²/ml · perímetro.",
+      "nombre": "Espacio de contención ventilado",
+      "requisitos": [
+        {
+          "clave": "ventilacion-natural",
+          "detalle": "400 cm² ≥ 300 cm² exigidos (10 cm²/ml · 30 m, art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Ventilación natural de la cámara (área de aberturas)",
+        },
+        {
+          "clave": "altura-camara",
+          "detalle": "80 mm ≥ 50 mm mínimos (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Altura libre de la cámara",
+        },
+      ],
+      "tipo": "espacio_contencion",
+    },
+  ],
+  "veredictoGlobal": "fail",
+  "warnings": [
+    "Zona II (art. 3.1): la barrera de protección es OBLIGATORIA y no hay ninguna barrera válida entre las soluciones propuestas.",
+  ],
+  "zona": "II",
+}
+`;
+
+exports[`calcHS6 — snapshots (SPEC §5) > Zona II con barrera válida pero SIN medida adicional → NO CUMPLE (nº insuficiente) 1`] = `
+{
+  "aplica": true,
+  "barreraObligatoria": true,
+  "combinacionSuficiente": false,
+  "elementoCritico": "Faltan medidas: la zona exige 2, válidas 1 (art. 3.1).",
+  "elementoCriticoId": "__falta_medida__",
+  "localHabitableEnContactoConTerreno": true,
+  "motivoNoAplica": null,
+  "municipio": null,
+  "nMedidasMin": 2,
+  "nMedidasValidas": 1,
+  "nivelProteccion": "Zona II (potencial alto): barrera de protección OBLIGATORIA + una medida adicional (espacio de contención ventilado O despresurización del terreno).",
+  "nivelReferencia_Bq_m3": 300,
+  "porMedida": [
+    {
+      "cuenta": true,
+      "estado": "ok",
+      "id": "barrera-sola",
+      "motivo": "Barrera de protección (art. 3.2), vía lámina-tipo: VÁLIDA (cuenta como medida). Checklist: continuidad OK, penetraciones OK, puertas OK.",
+      "nombre": "Barrera de protección",
+      "requisitos": [
+        {
+          "clave": "coef-difusion",
+          "detalle": "5e-12 m²/s ≤ 1e-11 m²/s (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Coeficiente de difusión del radón de la lámina",
+        },
+        {
+          "clave": "espesor-lamina",
+          "detalle": "2.5 mm ≥ 2 mm (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Espesor de la lámina",
+        },
+        {
+          "clave": "continuidad-sellada",
+          "detalle": "La barrera forma una capa continua y sellada (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Continuidad sellada de la barrera",
+        },
+        {
+          "clave": "penetraciones-selladas",
+          "detalle": "Las penetraciones (tuberías, juntas, arquetas) están selladas (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Penetraciones selladas",
+        },
+        {
+          "clave": "puertas-estancas",
+          "detalle": "Las puertas de comunicación con el espacio protegido son estancas (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Puertas de comunicación estancas",
+        },
+      ],
+      "tipo": "barrera",
+    },
+  ],
+  "veredictoGlobal": "fail",
+  "warnings": [
+    "Combinación INSUFICIENTE (art. 3.1): la zona II exige 2 medida(s); solo 1 válida(s).",
+  ],
+  "zona": "II",
+}
+`;
+
+exports[`calcHS6 — snapshots (SPEC §5) > Zona II: barrera con LÁMINA FUERA DE UMBRAL (coef alto + espesor bajo) → barrera no cuenta 1`] = `
+{
+  "aplica": true,
+  "barreraObligatoria": true,
+  "combinacionSuficiente": false,
+  "elementoCritico": "Barrera de protección OBLIGATORIA (Zona II) presente pero NO válida: "barrera-mala-lamina".",
+  "elementoCriticoId": "barrera-mala-lamina",
+  "localHabitableEnContactoConTerreno": true,
+  "motivoNoAplica": null,
+  "municipio": null,
+  "nMedidasMin": 2,
+  "nMedidasValidas": 1,
+  "nivelProteccion": "Zona II (potencial alto): barrera de protección OBLIGATORIA + una medida adicional (espacio de contención ventilado O despresurización del terreno).",
+  "nivelReferencia_Bq_m3": 300,
+  "porMedida": [
+    {
+      "cuenta": false,
+      "estado": "fail",
+      "id": "barrera-mala-lamina",
+      "motivo": "Barrera de protección (art. 3.2), vía lámina-tipo: NO válida (no cuenta como medida). Checklist: continuidad OK, penetraciones OK, puertas OK.",
+      "nombre": "Barrera de protección",
+      "requisitos": [
+        {
+          "clave": "coef-difusion",
+          "detalle": "9.999999999999999e-11 m²/s > 1e-11 m²/s (art. 3.2) → NO CUMPLE.",
+          "estado": "fail",
+          "etiqueta": "Coeficiente de difusión del radón de la lámina",
+        },
+        {
+          "clave": "espesor-lamina",
+          "detalle": "1 mm < 2 mm (art. 3.2) → NO CUMPLE.",
+          "estado": "fail",
+          "etiqueta": "Espesor de la lámina",
+        },
+        {
+          "clave": "continuidad-sellada",
+          "detalle": "La barrera forma una capa continua y sellada (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Continuidad sellada de la barrera",
+        },
+        {
+          "clave": "penetraciones-selladas",
+          "detalle": "Las penetraciones (tuberías, juntas, arquetas) están selladas (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Penetraciones selladas",
+        },
+        {
+          "clave": "puertas-estancas",
+          "detalle": "Las puertas de comunicación con el espacio protegido son estancas (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Puertas de comunicación estancas",
+        },
+      ],
+      "tipo": "barrera",
+    },
+    {
+      "cuenta": true,
+      "estado": "ok",
+      "id": "camara-adicional",
+      "motivo": "Espacio de contención ventilado (art. 3.2), ventilación natural: VÁLIDO (cuenta como medida). Criterio geométrico 10 cm²/ml · perímetro.",
+      "nombre": "Espacio de contención ventilado",
+      "requisitos": [
+        {
+          "clave": "ventilacion-natural",
+          "detalle": "400 cm² ≥ 300 cm² exigidos (10 cm²/ml · 30 m, art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Ventilación natural de la cámara (área de aberturas)",
+        },
+        {
+          "clave": "altura-camara",
+          "detalle": "80 mm ≥ 50 mm mínimos (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Altura libre de la cámara",
+        },
+      ],
+      "tipo": "espacio_contencion",
+    },
+  ],
+  "veredictoGlobal": "fail",
+  "warnings": [
+    "Barrera "barrera-mala-lamina": la lámina-tipo NO cumple la vía simplificada (coef. difusión ≤ 1e-11 m²/s y espesor ≥ 2 mm, art. 3.2).",
+    "Zona II (art. 3.1): la barrera de protección es OBLIGATORIA y no hay ninguna barrera válida entre las soluciones propuestas.",
+  ],
+  "zona": "II",
+}
+`;
+
+exports[`calcHS6 — snapshots (SPEC §5) > Zona II: barrera vía 'calculo' (Nivel B DIFERIDO) → no cuenta + warn de pendiente 1`] = `
+{
+  "aplica": true,
+  "barreraObligatoria": true,
+  "combinacionSuficiente": false,
+  "elementoCritico": "Barrera de protección OBLIGATORIA (Zona II) presente pero NO válida: "barrera-calculo".",
+  "elementoCriticoId": "barrera-calculo",
+  "localHabitableEnContactoConTerreno": true,
+  "motivoNoAplica": null,
+  "municipio": null,
+  "nMedidasMin": 2,
+  "nMedidasValidas": 1,
+  "nivelProteccion": "Zona II (potencial alto): barrera de protección OBLIGATORIA + una medida adicional (espacio de contención ventilado O despresurización del terreno).",
+  "nivelReferencia_Bq_m3": 300,
+  "porMedida": [
+    {
+      "cuenta": false,
+      "estado": "warn",
+      "id": "barrera-calculo",
+      "motivo": "Barrera de protección (art. 3.2), vía cálculo (DIFERIDA): NO válida (no cuenta como medida). Checklist: continuidad OK, penetraciones OK, puertas OK.",
+      "nombre": "Barrera de protección",
+      "requisitos": [
+        {
+          "clave": "via-calculo",
+          "detalle": "Vía por cálculo (Nivel B) DIFERIDA: el motor no evalúa E < Elim (fórmula no verificada literalmente). Justifíquela manualmente o use la vía lámina-tipo.",
+          "estado": "warn",
+          "etiqueta": "Justificación de la barrera por cálculo de difusión (E < Elim)",
+        },
+        {
+          "clave": "continuidad-sellada",
+          "detalle": "La barrera forma una capa continua y sellada (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Continuidad sellada de la barrera",
+        },
+        {
+          "clave": "penetraciones-selladas",
+          "detalle": "Las penetraciones (tuberías, juntas, arquetas) están selladas (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Penetraciones selladas",
+        },
+        {
+          "clave": "puertas-estancas",
+          "detalle": "Las puertas de comunicación con el espacio protegido son estancas (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Puertas de comunicación estancas",
+        },
+      ],
+      "tipo": "barrera",
+    },
+    {
+      "cuenta": true,
+      "estado": "ok",
+      "id": "camara-adicional",
+      "motivo": "Espacio de contención ventilado (art. 3.2), ventilación natural: VÁLIDO (cuenta como medida). Criterio geométrico 10 cm²/ml · perímetro.",
+      "nombre": "Espacio de contención ventilado",
+      "requisitos": [
+        {
+          "clave": "ventilacion-natural",
+          "detalle": "400 cm² ≥ 300 cm² exigidos (10 cm²/ml · 30 m, art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Ventilación natural de la cámara (área de aberturas)",
+        },
+        {
+          "clave": "altura-camara",
+          "detalle": "80 mm ≥ 50 mm mínimos (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Altura libre de la cámara",
+        },
+      ],
+      "tipo": "espacio_contencion",
+    },
+  ],
+  "veredictoGlobal": "fail",
+  "warnings": [
+    "Barrera "barrera-calculo": justificación por cálculo (E < Elim, Nivel B) NO soportada en esta versión (pendiente). Use la vía lámina-tipo (coef. difusión ≤ 1e-11 m²/s, espesor ≥ 2 mm).",
+    "Zona II (art. 3.1): la barrera de protección es OBLIGATORIA y no hay ninguna barrera válida entre las soluciones propuestas.",
+  ],
+  "zona": "II",
+}
+`;
+
+exports[`calcHS6 — snapshots (SPEC §5) > defaults (Zona II, sótano habitable: barrera lámina-tipo + cámara natural → CUMPLE) 1`] = `
+{
+  "aplica": true,
+  "barreraObligatoria": true,
+  "combinacionSuficiente": true,
+  "elementoCritico": null,
+  "elementoCriticoId": null,
+  "localHabitableEnContactoConTerreno": true,
+  "motivoNoAplica": null,
+  "municipio": "Cáceres",
+  "nMedidasMin": 2,
+  "nMedidasValidas": 2,
+  "nivelProteccion": "Zona II (potencial alto): barrera de protección OBLIGATORIA + una medida adicional (espacio de contención ventilado O despresurización del terreno).",
+  "nivelReferencia_Bq_m3": 300,
+  "porMedida": [
+    {
+      "cuenta": true,
+      "estado": "ok",
+      "id": "barrera-lamina",
+      "motivo": "Barrera de protección (art. 3.2), vía lámina-tipo: VÁLIDA (cuenta como medida). Checklist: continuidad OK, penetraciones OK, puertas OK.",
+      "nombre": "Barrera de protección (lámina-tipo sellada)",
+      "requisitos": [
+        {
+          "clave": "coef-difusion",
+          "detalle": "8e-12 m²/s ≤ 1e-11 m²/s (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Coeficiente de difusión del radón de la lámina",
+        },
+        {
+          "clave": "espesor-lamina",
+          "detalle": "2.5 mm ≥ 2 mm (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Espesor de la lámina",
+        },
+        {
+          "clave": "continuidad-sellada",
+          "detalle": "La barrera forma una capa continua y sellada (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Continuidad sellada de la barrera",
+        },
+        {
+          "clave": "penetraciones-selladas",
+          "detalle": "Las penetraciones (tuberías, juntas, arquetas) están selladas (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Penetraciones selladas",
+        },
+        {
+          "clave": "puertas-estancas",
+          "detalle": "Las puertas de comunicación con el espacio protegido son estancas (art. 3.2).",
+          "estado": "ok",
+          "etiqueta": "Puertas de comunicación estancas",
+        },
+      ],
+      "tipo": "barrera",
+    },
+    {
+      "cuenta": true,
+      "estado": "ok",
+      "id": "camara-ventilada",
+      "motivo": "Espacio de contención ventilado (art. 3.2), ventilación natural: VÁLIDO (cuenta como medida). Criterio geométrico 10 cm²/ml · perímetro.",
+      "nombre": "Espacio de contención ventilado (cámara, ventilación natural)",
+      "requisitos": [
+        {
+          "clave": "ventilacion-natural",
+          "detalle": "480 cm² ≥ 400 cm² exigidos (10 cm²/ml · 40 m, art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Ventilación natural de la cámara (área de aberturas)",
+        },
+        {
+          "clave": "altura-camara",
+          "detalle": "80 mm ≥ 50 mm mínimos (art. 3.2) → CUMPLE.",
+          "estado": "ok",
+          "etiqueta": "Altura libre de la cámara",
+        },
+      ],
+      "tipo": "espacio_contencion",
+    },
+  ],
+  "veredictoGlobal": "ok",
+  "warnings": [],
+  "zona": "II",
+}
+`;
+
+exports[`calcHS6 — snapshots (SPEC §5) > local sin contacto con el terreno (localHabitable...=false) → aplica=false, veredicto OK 1`] = `
+{
+  "aplica": false,
+  "barreraObligatoria": true,
+  "combinacionSuficiente": true,
+  "elementoCritico": null,
+  "elementoCriticoId": null,
+  "localHabitableEnContactoConTerreno": false,
+  "motivoNoAplica": "El local no es habitable o no está en contacto con el terreno (art. 1): HS6 no exige medidas.",
+  "municipio": null,
+  "nMedidasMin": 2,
+  "nMedidasValidas": 0,
+  "nivelProteccion": "Zona II (potencial alto): barrera de protección OBLIGATORIA + una medida adicional (espacio de contención ventilado O despresurización del terreno).",
+  "nivelReferencia_Bq_m3": 300,
+  "porMedida": [],
+  "veredictoGlobal": "ok",
+  "warnings": [],
+  "zona": "II",
+}
+`;
+
+exports[`calcHS6 — snapshots (SPEC §5) > zona 'sin_exigencia' → aplica=false, veredicto OK 'sin exigencia', sin requerir soluciones 1`] = `
+{
+  "aplica": false,
+  "barreraObligatoria": false,
+  "combinacionSuficiente": true,
+  "elementoCritico": null,
+  "elementoCriticoId": null,
+  "localHabitableEnContactoConTerreno": true,
+  "motivoNoAplica": "Municipio no clasificado en el Apéndice B (zona sin exigencia): HS6 no exige medidas.",
+  "municipio": null,
+  "nMedidasMin": 0,
+  "nMedidasValidas": 0,
+  "nivelProteccion": "Municipio no clasificado en el Apéndice B: HS6 no exige medidas de protección frente al radón.",
+  "nivelReferencia_Bq_m3": 300,
+  "porMedida": [],
+  "veredictoGlobal": "ok",
+  "warnings": [],
+  "zona": "sin_exigencia",
+}
+`;
