@@ -41,6 +41,7 @@ import {
   BANDA_TOTALES,
   SEC_AXIS_H,
   calcularLayout,
+  esCompacto,
   type CerramientoGeom,
   type SeccionGeom,
 } from "./svg-meta";
@@ -160,10 +161,13 @@ function PanelSeccion({
   cer,
   seccion,
   mode,
+  compact,
 }: {
   cer: ResultadoCerramientoHE1;
   seccion: SeccionGeom;
   mode: SvgMode;
+  /** Esquema compacto (móvil): oculta las microetiquetas densas por capa. */
+  compact: boolean;
 }) {
   const { bodyY, bodyH, capas } = seccion;
   const yEtiquetas = bodyY + bodyH + 8;
@@ -198,11 +202,33 @@ function PanelSeccion({
 
       {/* Etiquetas por capa (debajo de la franja): nombre, espesor, λ o R. La
           etiqueta «AISLANTE» refuerza el patrón rayado (multicanal). El texto se
-          alterna en dos alturas para que capas estrechas no se solapen. */}
+          alterna en dos alturas para que capas estrechas no se solapen.
+          En COMPACTO (móvil) las microetiquetas de espesor y λ/R encogen hasta
+          ser ilegibles: se ocultan (el dato fino vive en la tabla "Resultado").
+          Se CONSERVA la etiqueta «AISLANTE» (sin la λ fina) como refuerzo
+          multicanal del rayado. */}
       {capas.map((g) => {
         const capa = cer.capas[g.i];
         const aislante = esCapaAislante(capa);
         const dy = g.i % 2 === 0 ? 0 : 9;
+
+        // Esquema compacto: solo la marca «AISLANTE» de la capa aislante.
+        if (compact) {
+          if (!aislante) return null;
+          return (
+            <Tag
+              key={`lab-${capa.id}`}
+              x={g.cx}
+              y={yEtiquetas + dy}
+              mode={mode}
+              size={3.6}
+              critical
+            >
+              AISLANTE
+            </Tag>
+          );
+        }
+
         const espesorTxt = fmt(capa.espesor_m * 1000, "mm", 0);
         const propTxt =
           capa.lambda_W_mK != null
@@ -317,10 +343,13 @@ function PanelGlaser({
   glaser,
   box,
   mode,
+  compact,
 }: {
   glaser: ResultadoGlaserHE1;
   box: { x: number; y: number; w: number; h: number };
   mode: SvgMode;
+  /** Esquema compacto (móvil): oculta las etiquetas finas de ejes/escala. */
+  compact: boolean;
 }) {
   const pal = palette(mode);
   const { x, y, w, h } = box;
@@ -414,16 +443,23 @@ function PanelGlaser({
         ) : null,
       )}
 
-      {/* Marcas del eje X (interior / exterior) y leyenda de curvas. */}
-      <Tag x={plotX0} y={plotY1 + 8} mode={mode} anchor="start" size={3}>
-        int. (Sd 0)
-      </Tag>
-      <Tag x={plotX1} y={plotY1 + 8} mode={mode} anchor="end" size={3}>
-        ext. (Sd 1)
-      </Tag>
-      <Tag x={plotX0} y={plotY0 - 1} mode={mode} anchor="start" size={3}>
-        Psat / Pvapor
-      </Tag>
+      {/* Marcas del eje X (interior / exterior) y leyenda de curvas. En COMPACTO
+          (móvil) estas etiquetas finas (size 3) encogen hasta ser ilegibles: se
+          ocultan; el diagrama queda como esquema de tendencia. El título grande
+          «Glaser (vapor)» y las marcas de condensación se conservan siempre. */}
+      {!compact && (
+        <g>
+          <Tag x={plotX0} y={plotY1 + 8} mode={mode} anchor="start" size={3}>
+            int. (Sd 0)
+          </Tag>
+          <Tag x={plotX1} y={plotY1 + 8} mode={mode} anchor="end" size={3}>
+            ext. (Sd 1)
+          </Tag>
+          <Tag x={plotX0} y={plotY0 - 1} mode={mode} anchor="start" size={3}>
+            Psat / Pvapor
+          </Tag>
+        </g>
+      )}
 
       {/* Etiqueta de condensación intersticial (refuerzo textual del color). */}
       {condensa && (
@@ -452,7 +488,15 @@ const VEREDICTO_MARCA: Record<Veredicto, string> = {
   neutral: "· no aplica",
 };
 
-function FilaCerramiento({ fila, mode }: { fila: CerramientoGeom; mode: SvgMode }) {
+function FilaCerramiento({
+  fila,
+  mode,
+  compact,
+}: {
+  fila: CerramientoGeom;
+  mode: SvgMode;
+  compact: boolean;
+}) {
   const { cer, rowY, seccion, ubar, glaser } = fila;
   const critico = cer.estado === "fail";
   return (
@@ -462,9 +506,12 @@ function FilaCerramiento({ fila, mode }: { fila: CerramientoGeom; mode: SvgMode 
         {`${cer.nombre} — ${VEREDICTO_MARCA[cer.estado]}`}
       </Tag>
 
-      <PanelSeccion cer={cer} seccion={seccion} mode={mode} />
+      <PanelSeccion cer={cer} seccion={seccion} mode={mode} compact={compact} />
+      {/* PanelBarraU no recibe `compact`: todas sus etiquetas (título, «U …»,
+          línea/etiqueta del límite y veredicto) están en la lista de las que
+          deben permanecer SIEMPRE, así que no cambia entre modos. */}
       <PanelBarraU cer={cer} box={ubar} mode={mode} />
-      <PanelGlaser glaser={cer.glaser} box={glaser} mode={mode} />
+      <PanelGlaser glaser={cer.glaser} box={glaser} mode={mode} compact={compact} />
     </g>
   );
 }
@@ -498,6 +545,13 @@ function describir(result: HE1Result): string {
 export function He1SVG({ result, mode, width, height }: He1SVGProps) {
   const layout = calcularLayout(result);
 
+  // Esquema COMPACTO en pantallas estrechas (móvil): oculta las microetiquetas
+  // densas (espesor/λ por capa, ejes finos del Glaser) que encogen hasta ser
+  // ilegibles al escalar el viewBox. Nunca en PDF (se rasteriza a `nativeW`
+  // grande y debe llevar todo el detalle). Los datos finos viven en la tabla
+  // de la pestaña "Resultado". → ./svg-meta (esCompacto / COMPACT_WIDTH).
+  const compact = esCompacto(mode, width);
+
   // viewBox auto-encuadrado a partir de los DATOS (esquinas del contenido) +
   // padding (helper fitViewBox; no getBBox del DOM). Reserva extra abajo para la
   // banda de veredicto global. El contenido arranca en (0,0).
@@ -524,7 +578,7 @@ export function He1SVG({ result, mode, width, height }: He1SVGProps) {
     >
       {/* Una fila por cerramiento, apiladas verticalmente. */}
       {layout.filas.map((fila) => (
-        <FilaCerramiento key={fila.cer.id} fila={fila} mode={mode} />
+        <FilaCerramiento key={fila.cer.id} fila={fila} mode={mode} compact={compact} />
       ))}
 
       {/* Banda de totales (el dato numérico también va en texto, no solo SVG). */}

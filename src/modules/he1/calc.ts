@@ -787,7 +787,9 @@ function calcularCerramiento(
 //  - Temperatura: perfil proporcional a la R térmica ACUMULADA (Rsi + ΣR_capa).
 //  - Pvapor real: reparto LINEAL con el Sd ACUMULADO (las R superficiales al
 //    vapor se desprecian; convención del método).
-//  - condensa[k] = Pvapor[k] ≥ Psat[k] (con tolerancia IEEE-754).
+//  - condensa[k] = Pvapor[k] ≥ Psat[k] (con tolerancia IEEE-754), SOLO para k≥1.
+//    La cara interior (k=0) es condensación SUPERFICIAL (la cubre fRsi), no
+//    intersticial: condensa[0]=false para no duplicar el fenómeno ni el aspa.
 // -----------------------------------------------------------------------------
 function calcularGlaser(
   capas: ResultadoCapaHE1[],
@@ -840,7 +842,11 @@ function calcularGlaser(
     pvapor_Pa[k] = pvap;
     posicionSd_m[k] = sdAcum;
     posicionSd[k] = sdTotal_m > 0 ? sdAcum / sdTotal_m : k / (N - 1 || 1);
-    condensa[k] = pvap >= psatK + EPS;
+    // La cara INTERIOR (k=0) es condensación SUPERFICIAL — la cubre la
+    // verificación de fRsi, NO es intersticial. Se excluye del flag, del
+    // veredicto Glaser y de las marcas del SVG: solo las interfaces entre capas
+    // y la cara exterior (k≥1) cuentan como condensación intersticial (Glaser).
+    condensa[k] = k > 0 && pvap >= psatK + EPS;
   }
 
   const condensaIntersticial = condensa.some((b) => b);

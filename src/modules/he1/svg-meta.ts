@@ -17,6 +17,7 @@
 // el viewBox que `He1SVG` pinta vía `fitViewBox`, de modo que `scale = CW/nativeW`
 // del raster PDF no deforme nada.
 
+import type { SvgMode } from "../../lib/svg/helpers";
 import type { HE1Result, ResultadoCerramientoHE1 } from "./calc";
 
 // Id del clon oculto que la ficha PDF clona y pasa a svg2pdf. Se exporta aquí
@@ -31,6 +32,22 @@ export const HE1_PDF_SVG_ID = "he1-svg-pdf";
 // -----------------------------------------------------------------------------
 export const VB_PAD = 12; // padding de fitViewBox (única fuente de verdad)
 export const BANDA_TOTALES = 18; // franja inferior para la línea de veredicto global
+
+// -----------------------------------------------------------------------------
+// Render RESPONSIVE (fix legibilidad D1). Por debajo de este ancho de render en
+// px CSS (móvil ~360–390 px) las microetiquetas densas de la sección (espesor,
+// λ/R) y de los ejes del Glaser encogen al escalar el viewBox y quedan
+// ILEGIBLES. En "compacto" el SVG se reduce a ESQUEMA legible (formas + resaltado
+// crítico multicanal + títulos + cifras grandes) y oculta esas microetiquetas;
+// los datos finos NO se pierden (están en la tabla de la pestaña "Resultado").
+// CRITERIO: solo aplica en pantalla; el clon PDF se rasteriza a `nativeW` (grande)
+// y debe llevar SIEMPRE todo el detalle, así que nunca es compacto.
+export const COMPACT_WIDTH = 520; // umbral de ancho de render (px CSS) para compacto
+
+/** ¿Render compacto? Solo en pantalla y por debajo del umbral. PDF nunca. */
+export function esCompacto(mode: SvgMode, width: number): boolean {
+  return mode === "screen" && width < COMPACT_WIDTH;
+}
 
 // Fila por cerramiento.
 export const ROW_GAP = 24; // separación vertical entre cerramientos apilados
