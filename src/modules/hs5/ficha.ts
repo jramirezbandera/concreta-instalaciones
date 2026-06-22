@@ -25,7 +25,7 @@ import type {
   TipoTramo,
 } from "./calc";
 import type { TipoAparato } from "./tablas";
-import { HS5_PDF_SVG_ID, hs5NativeSize } from "./svg";
+import { HS5_PDF_SVG_ID, hs5NativeSize } from "./svg-meta";
 import {
   BAJANTES_TABLA_4_4,
   COLECTORES_TABLA_4_5,

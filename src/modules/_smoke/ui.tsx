@@ -109,7 +109,10 @@ export function SmokeModule() {
           </div>
         </div>
 
-        {/* Right: SVG + results */}
+        {/* Right: SVG + results. En lg se apila junto (banner → lienzo → tablas);
+            en móvil se reparte por pestaña: "diagramas" = solo el lienzo,
+            "results" = veredicto + tablas. Cada bloque se gatea por separado
+            manteniendo intacto el orden y el layout en lg (lg:flex / lg:block). */}
         <div
           className={[
             "scroll-hide flex min-w-0 flex-col overflow-y-auto",
@@ -118,8 +121,14 @@ export function SmokeModule() {
             "lg:flex",
           ].join(" ")}
         >
-          {/* Verdict banner (over the canvas, like the sibling) */}
-          <div className={`border-b px-6 py-2.5 ${STATE_TINT[result.estado]}`}>
+          {/* Verdict banner (parte del resultado: tab "results" en móvil). */}
+          <div
+            className={[
+              `border-b px-6 py-2.5 ${STATE_TINT[result.estado]}`,
+              tab === "results" ? "block" : "hidden",
+              "lg:block",
+            ].join(" ")}
+          >
             <span className="text-text-secondary text-[13px]">
               Extracción de cocción —{" "}
               <span className={`font-semibold ${STATE_TEXT[result.estado]}`}>
@@ -131,14 +140,26 @@ export function SmokeModule() {
             </span>
           </div>
 
+          {/* Lienzo del diagrama (tab "diagramas" en móvil; siempre en lg). */}
           <div
             ref={canvasRef}
-            className="border-border-main canvas-dot-grid flex items-center justify-center border-b px-4 py-6"
+            className={[
+              "border-border-main canvas-dot-grid items-center justify-center border-b px-4 py-6",
+              tab === "diagramas" ? "flex" : "hidden",
+              "lg:flex",
+            ].join(" ")}
           >
             <SmokeSVG result={result} mode="screen" width={svgW} height={svgH} />
           </div>
 
-          <div className="px-6 py-4">
+          {/* Tablas/resultados (tab "results" en móvil; siempre en lg). */}
+          <div
+            className={[
+              "px-6 py-4",
+              tab === "results" ? "block" : "hidden",
+              "lg:block",
+            ].join(" ")}
+          >
             <ResultsTable result={result} />
           </div>
         </div>

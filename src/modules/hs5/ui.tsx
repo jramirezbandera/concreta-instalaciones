@@ -37,7 +37,8 @@ import {
   type TramoInput,
 } from "./calc";
 import type { TipoAparato, UsoAparato } from "./tablas";
-import { HS5SVG, HS5_PDF_SVG_ID } from "./svg";
+import { HS5SVG } from "./svg";
+import { HS5_PDF_SVG_ID } from "./svg-meta";
 import { toFichaData } from "./ficha";
 
 // -----------------------------------------------------------------------------
@@ -341,7 +342,10 @@ export function Hs5Module() {
           </div>
         </div>
 
-        {/* Right: SVG + results */}
+        {/* Right: SVG + results. En lg se apila junto (banner → lienzo → tablas);
+            en móvil se reparte por pestaña: "diagramas" = solo el lienzo,
+            "results" = veredicto + tablas. Cada bloque se gatea por separado
+            manteniendo intacto el orden y el layout en lg (lg:flex / lg:block). */}
         <div
           className={[
             "scroll-hide flex min-w-0 flex-col overflow-y-auto",
@@ -350,8 +354,14 @@ export function Hs5Module() {
             "lg:flex",
           ].join(" ")}
         >
-          {/* Verdict banner sobre el lienzo. */}
-          <div className={`border-b px-6 py-2.5 ${STATE_TINT[result.veredictoGlobal]}`}>
+          {/* Verdict banner (parte del resultado: tab "results" en móvil). */}
+          <div
+            className={[
+              `border-b px-6 py-2.5 ${STATE_TINT[result.veredictoGlobal]}`,
+              tab === "results" ? "block" : "hidden",
+              "lg:block",
+            ].join(" ")}
+          >
             <span className="text-text-secondary text-[13px]">
               Red de evacuación ({result.uso === "privado" ? "uso privado" : "uso público"}) —{" "}
               <span className={`font-semibold ${STATE_TEXT[result.veredictoGlobal]}`}>
@@ -365,14 +375,26 @@ export function Hs5Module() {
             </span>
           </div>
 
+          {/* Lienzo del diagrama (tab "diagramas" en móvil; siempre en lg). */}
           <div
             ref={canvasRef}
-            className="border-border-main canvas-dot-grid flex items-center justify-center border-b px-4 py-6"
+            className={[
+              "border-border-main canvas-dot-grid items-center justify-center border-b px-4 py-6",
+              tab === "diagramas" ? "flex" : "hidden",
+              "lg:flex",
+            ].join(" ")}
           >
             <HS5SVG result={result} mode="screen" width={svgW} height={svgH} />
           </div>
 
-          <div className="px-6 py-4">
+          {/* Tablas/resultados (tab "results" en móvil; siempre en lg). */}
+          <div
+            className={[
+              "px-6 py-4",
+              tab === "results" ? "block" : "hidden",
+              "lg:block",
+            ].join(" ")}
+          >
             <ResultsTable result={result} />
           </div>
         </div>
@@ -596,11 +618,11 @@ function ResultsTable({ result }: { result: HS5Result }) {
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-text-disabled border-border-sub border-b text-left text-[11px] uppercase">
-            <th className="py-1.5 font-medium">Tramo</th>
-            <th className="py-1.5 text-right font-medium">Ø</th>
-            <th className="py-1.5 text-right font-medium">UD acum.</th>
-            <th className="py-1.5 text-right font-medium">Pendiente</th>
-            <th className="py-1.5 text-right font-medium">Estado</th>
+            <th scope="col" className="py-1.5 font-medium">Tramo</th>
+            <th scope="col" className="py-1.5 text-right font-medium">Ø</th>
+            <th scope="col" className="py-1.5 text-right font-medium">UD acum.</th>
+            <th scope="col" className="py-1.5 text-right font-medium">Pendiente</th>
+            <th scope="col" className="py-1.5 text-right font-medium">Estado</th>
           </tr>
         </thead>
         <tbody>
@@ -633,10 +655,10 @@ function ResultsTable({ result }: { result: HS5Result }) {
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-text-disabled border-border-sub border-b text-left text-[11px] uppercase">
-            <th className="py-1.5 font-medium">Aparato</th>
-            <th className="py-1.5 text-right font-medium">UD</th>
-            <th className="py-1.5 text-right font-medium">Ø mín.</th>
-            <th className="py-1.5 text-right font-medium">Estado</th>
+            <th scope="col" className="py-1.5 font-medium">Aparato</th>
+            <th scope="col" className="py-1.5 text-right font-medium">UD</th>
+            <th scope="col" className="py-1.5 text-right font-medium">Ø mín.</th>
+            <th scope="col" className="py-1.5 text-right font-medium">Estado</th>
           </tr>
         </thead>
         <tbody>

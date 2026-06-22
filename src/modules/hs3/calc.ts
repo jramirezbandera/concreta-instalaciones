@@ -14,6 +14,7 @@
 // =============================================================================
 
 import type { Veredicto } from "../../lib/pdf/renderFicha";
+import { peor } from "../../lib/cte/grafo";
 import type { ConductoSeccion, ZonaTermica } from "./tablas";
 import {
   AREA_EFECTIVA_ABERTURAS,
@@ -215,12 +216,6 @@ export function categoriaDeDormitorios(numDormitorios: number): CategoriaDormito
   if (numDormitorios <= 1) return "0-1";
   if (numDormitorios === 2) return "2";
   return "3+";
-}
-
-/** Peor (más restrictivo) de dos veredictos. neutral no degrada el resultado. */
-function peor(a: Veredicto, b: Veredicto): Veredicto {
-  const orden: Record<Veredicto, number> = { neutral: 0, ok: 1, warn: 2, fail: 3 };
-  return orden[a] >= orden[b] ? a : b;
 }
 
 /**

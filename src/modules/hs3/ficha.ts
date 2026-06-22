@@ -19,7 +19,7 @@ import { citaDe } from "../../lib/cte/tabla";
 import { fmt } from "../../lib/units/format";
 import { ENGINE_VERSION } from "../../lib/version";
 import type { HS3Inputs, HS3Result, TipoEstancia } from "./calc";
-import { HS3_PDF_SVG_ID, hs3NativeSize } from "./svg";
+import { HS3_PDF_SVG_ID, hs3NativeSize } from "./svg-meta";
 import {
   AREA_EFECTIVA_ABERTURAS,
   CAUDALES_LOCALES_HABITABLES,

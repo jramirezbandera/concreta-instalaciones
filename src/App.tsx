@@ -54,6 +54,10 @@ const router = createHashRouter([
             path: "hs/saneamiento",
             lazy: lazyComponent(() => import("./modules/hs5/ui"), "Hs5Module"),
           },
+          {
+            path: "hs/fontaneria",
+            lazy: lazyComponent(() => import("./modules/hs4/ui"), "Hs4Module"),
+          },
         ],
       },
       { path: "*", element: <Navigate to="/_smoke" replace /> },

@@ -59,7 +59,7 @@ export const moduleRegistry: ModuleEntry[] = [
     group: "Salubridad (DB-HS)",
     icon: Droplets,
     edicionDB: "DB-HS4 (2009)",
-    shipped: false,
+    shipped: true,
   },
   {
     key: "concreta-inst-he1",
@@ -79,6 +79,7 @@ export const MODULE_SCHEMA_VERSIONS: Record<string, string> = {
   smoke: "1",
   hs3: "1",
   hs5: "1",
+  hs4: "1",
 };
 
 export function getModuleSchemaVersion(moduleKey: string): string {

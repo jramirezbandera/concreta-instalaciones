@@ -16,11 +16,21 @@
 import { DiagramSvg, Seg, Dot, Tag, type SvgMode } from "../../lib/svg/primitives";
 import { fitViewBox } from "../../lib/svg/helpers";
 import { fmt } from "../../lib/units/format";
-import type { HS5Result, ResultadoTramo, TipoTramo } from "./calc";
-
-// Id del clon oculto que la ficha PDF clona y pasa a svg2pdf. Se exporta aquí
-// para que el toFichaData del módulo lo importe sin duplicar el literal.
-export const HS5_PDF_SVG_ID = "hs5-svg-pdf";
+import type { HS5Result, TipoTramo } from "./calc";
+// Id del clon PDF, constantes de layout, geometría del árbol y tamaño nativo del
+// viewBox: viven en ./svg-meta (módulo SIN JSX) para que este archivo exporte
+// SOLO componentes (react-refresh/only-export-components). ÚNICA fuente de
+// verdad de las medidas y de `calcularArbol`.
+import {
+  NODE_W,
+  VB_PAD,
+  BANDA_TOTALES,
+  NODE_TOP_DY,
+  NODE_BOX_H,
+  NODE_BOT_DY,
+  calcularArbol,
+  type Nodo,
+} from "./svg-meta";
 
 interface HS5SVGProps {
   result: HS5Result;
@@ -29,145 +39,12 @@ interface HS5SVGProps {
   height: number;
 }
 
-// -----------------------------------------------------------------------------
-// Layout determinista (sin Math.random, sin Date): diagrama jerárquico por
-// niveles. El árbol fluye aguas abajo de las hojas (ramales/derivaciones, en lo
-// alto) hacia la raíz (colector, en la base):
-//   • profundidad (depth) = distancia a la raíz → fija la FILA (y). La raíz va
-//     en la base; cuanto más aguas arriba, más alto.
-//   • orden de hojas (recorrido estable de hermanos) → fija la COLUMNA (x). Cada
-//     padre se centra sobre el rango de columnas de sus hijos.
-// La rejilla arranca en (0,0); el bbox es siempre [0,0]→(contentW, contentH).
-// -----------------------------------------------------------------------------
-const COL_W = 76; // ancho de columna (separación horizontal entre hojas)
-const ROW_H = 64; // alto de fila (separación vertical entre niveles)
-const NODE_W = 64; // ancho útil de la caja de etiquetas de un tramo
-const VB_PAD = 12; // padding de fitViewBox (única fuente de verdad)
-const BANDA_TOTALES = 18; // franja inferior para la línea de totales
-
-// -----------------------------------------------------------------------------
-// Estructura geométrica del árbol, derivada SOLO del resultado (determinista).
-// Se calcula una vez y la consumen tanto `HS5SVG` (para pintar) como
-// `hs5NativeSize` (para el tamaño nativo del viewBox del raster PDF), de modo
-// que `scale = CW / nativeW` no deforme nada.
-// -----------------------------------------------------------------------------
-interface Nodo {
-  t: ResultadoTramo;
-  depth: number; // distancia a la raíz (0 = raíz/colector)
-  col: number; // columna (índice de hoja o media de hijos)
-  cx: number; // centro x en unidades del dominio
-  cy: number; // centro y en unidades del dominio
-}
-
-interface ArbolGeom {
-  nodos: Nodo[];
-  porId: Map<string, Nodo>;
-  maxDepth: number;
-  nCols: number;
-  contentW: number;
-  contentH: number;
-}
-
-/**
- * Calcula la geometría del árbol de tramos de forma 100% determinista a partir
- * del resultado. Función pura compartida por el render y por `hs5NativeSize`.
- */
-function calcularArbol(result: HS5Result): ArbolGeom {
-  const tramos = result.porTramo;
-  const porTramoId = new Map<string, ResultadoTramo>();
-  for (const t of tramos) porTramoId.set(t.id, t);
-
-  // Raíces = tramos sin padre (o cuyo padre no existe en el resultado).
-  const raices = tramos.filter((t) => t.parentId === null || !porTramoId.has(t.parentId));
-
-  // Profundidad (distancia a la raíz) por recorrido descendente desde cada raíz.
-  const depthPorId = new Map<string, number>();
-  const asignarDepth = (id: string, depth: number, visto: Set<string>) => {
-    if (visto.has(id)) return; // corta ciclos (el motor ya los marca)
-    visto.add(id);
-    depthPorId.set(id, depth);
-    const t = porTramoId.get(id);
-    if (!t) return;
-    for (const c of t.childrenIds) {
-      if (porTramoId.has(c)) asignarDepth(c, depth + 1, visto);
-    }
-  };
-  for (const r of raices) asignarDepth(r.id, 0, new Set());
-  // Tramos no alcanzables (p.ej. por ciclo): profundidad 0 para no perderlos.
-  for (const t of tramos) if (!depthPorId.has(t.id)) depthPorId.set(t.id, 0);
-
-  const maxDepth = tramos.reduce((mx, t) => Math.max(mx, depthPorId.get(t.id) ?? 0), 0);
-
-  // Columna: recorrido en orden de las hojas (asigna columnas crecientes); cada
-  // padre se centra sobre el rango de columnas de sus hijos. Determinista por el
-  // orden estable de `childrenIds`.
-  const colPorId = new Map<string, number>();
-  let proximaHoja = 0;
-  const asignarCol = (id: string, visto: Set<string>): number => {
-    if (visto.has(id)) return colPorId.get(id) ?? proximaHoja;
-    visto.add(id);
-    const t = porTramoId.get(id);
-    const hijos = (t?.childrenIds ?? []).filter((c) => porTramoId.has(c));
-    let col: number;
-    if (hijos.length === 0) {
-      col = proximaHoja;
-      proximaHoja += 1;
-    } else {
-      const cols = hijos.map((c) => asignarCol(c, visto));
-      col = (Math.min(...cols) + Math.max(...cols)) / 2;
-    }
-    colPorId.set(id, col);
-    return col;
-  };
-  for (const r of raices) asignarCol(r.id, new Set());
-  for (const t of tramos) if (!colPorId.has(t.id)) asignarCol(t.id, new Set());
-
-  const nCols = Math.max(1, proximaHoja);
-
-  // y por profundidad: la raíz (depth 0) en la base, las hojas arriba.
-  const nodos: Nodo[] = tramos.map((t) => {
-    const depth = depthPorId.get(t.id) ?? 0;
-    const col = colPorId.get(t.id) ?? 0;
-    const cx = col * COL_W + NODE_W / 2;
-    const cy = (maxDepth - depth) * ROW_H + ROW_H / 2;
-    return { t, depth, col, cx, cy };
-  });
-
-  const porId = new Map<string, Nodo>();
-  for (const nd of nodos) porId.set(nd.t.id, nd);
-
-  const contentW = (nCols - 1) * COL_W + NODE_W;
-  const contentH = (maxDepth + 1) * ROW_H;
-
-  return { nodos, porId, maxDepth, nCols, contentW, contentH };
-}
-
-// -----------------------------------------------------------------------------
-// Tamaño NATIVO del viewBox (ÚNICA fuente de verdad, consumida por la ficha PDF
-// para `scale = CW / nativeW` del raster). Reproduce EXACTAMENTE lo que `HS5SVG`
-// calcula vía `fitViewBox(esquinas, VB_PAD)` + BANDA_TOTALES, derivado del árbol
-// del resultado. La rejilla arranca en (0,0).
-// -----------------------------------------------------------------------------
-export function hs5NativeSize(result: HS5Result): { nativeW: number; nativeH: number } {
-  const { contentW, contentH } = calcularArbol(result);
-  return {
-    nativeW: contentW + 2 * VB_PAD,
-    nativeH: contentH + 2 * VB_PAD + BANDA_TOTALES,
-  };
-}
-
 /** Nombre legible (es-ES) del tipo de tramo para la etiqueta. */
 const NOMBRE_TIPO: Record<TipoTramo, string> = {
   ramal: "Ramal",
   bajante: "Bajante",
   colector: "Colector",
 };
-
-// Geometría de la caja-tramo (relativa al centro `cy` del nodo), única fuente de
-// verdad compartida por `CajaTramo`, `Conexion` y el encuadre del viewBox.
-const NODE_TOP_DY = -ROW_H / 2 + 4; // borde superior de la caja respecto a cy
-const NODE_BOX_H = 40; // alto del recuadro de etiquetas
-const NODE_BOT_DY = NODE_TOP_DY + NODE_BOX_H; // borde inferior respecto a cy
 
 // -----------------------------------------------------------------------------
 // Conexión padre↔hijo: la "tubería" del esquema. Codo en L que NACE en el borde

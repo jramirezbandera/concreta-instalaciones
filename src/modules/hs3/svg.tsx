@@ -14,51 +14,26 @@ import { DiagramSvg, Seg, Arrow, Tag, type SvgMode } from "../../lib/svg/primiti
 import { fitViewBox } from "../../lib/svg/helpers";
 import { fmt } from "../../lib/units/format";
 import type { HS3Result, ResultadoEstancia, TipoEstancia } from "./calc";
-
-// Id del clon oculto que la ficha PDF clona y pasa a svg2pdf. Se exporta aquí
-// (en vez de en un ficha.ts aún inexistente) para que el futuro toFichaData lo
-// importe sin duplicar el literal.
-export const HS3_PDF_SVG_ID = "hs3-svg-pdf";
+// Geometría de la rejilla + tamaño nativo del viewBox: viven en ./svg-meta
+// (módulo SIN JSX) para que este archivo exporte SOLO componentes
+// (react-refresh/only-export-components). ÚNICA fuente de verdad de las medidas.
+import {
+  COLS,
+  BOX_W,
+  BOX_H,
+  GAP_X,
+  GAP_Y,
+  ORIGIN_X,
+  ORIGIN_Y,
+  VB_PAD,
+  BANDA_TOTALES,
+} from "./svg-meta";
 
 interface HS3SVGProps {
   result: HS3Result;
   mode: SvgMode;
   width: number;
   height: number;
-}
-
-// -----------------------------------------------------------------------------
-// Layout determinista (sin Math.random, sin Date): rejilla en unidades del
-// dominio (mm-ish), igual filosofía que _smoke. La caja de cada estancia se
-// coloca por su índice en una rejilla de COLS columnas.
-// -----------------------------------------------------------------------------
-const COLS = 3;
-const BOX_W = 60; // ancho de caja
-const BOX_H = 42; // alto de caja
-const GAP_X = 18; // separación horizontal (deja sitio a las flechas de flujo)
-const GAP_Y = 22; // separación vertical
-const ORIGIN_X = 0;
-const ORIGIN_Y = 0;
-const VB_PAD = 10; // padding de fitViewBox (única fuente de verdad)
-const BANDA_TOTALES = 16; // franja inferior para la línea de totales
-
-// -----------------------------------------------------------------------------
-// Tamaño NATIVO del viewBox (ÚNICA fuente de verdad, consumida por ./ficha.ts
-// para `scale = CW / nativeW` del raster PDF). Reproduce EXACTAMENTE lo que
-// `HS3SVG` calcula vía `fitViewBox(esquinas, VB_PAD)` + BANDA_TOTALES, derivado
-// del nº de estancias del resultado. La rejilla arranca en (0,0), así que el
-// bbox es siempre [0,0]→(contentW, contentH).
-// -----------------------------------------------------------------------------
-export function hs3NativeSize(result: HS3Result): { nativeW: number; nativeH: number } {
-  const n = Math.max(1, result.porEstancia.length);
-  const cols = Math.min(COLS, n);
-  const rows = Math.ceil(n / COLS);
-  const contentW = cols * BOX_W + (cols - 1) * GAP_X;
-  const contentH = rows * BOX_H + (rows - 1) * GAP_Y;
-  return {
-    nativeW: contentW + 2 * VB_PAD,
-    nativeH: contentH + 2 * VB_PAD + BANDA_TOTALES,
-  };
 }
 
 /** Nombre legible (es-ES) del tipo de estancia para la etiqueta. */

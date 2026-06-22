@@ -21,6 +21,7 @@
 // =============================================================================
 
 import type { Veredicto } from "../../lib/pdf/renderFicha";
+import { acumularAguasAbajo, peor, validarArbol } from "../../lib/cte/grafo";
 import {
   BAJANTES_TABLA_4_4,
   COLECTORES_TABLA_4_5,
@@ -232,12 +233,6 @@ export const hs5Defaults: HS5Inputs = {
 // HELPERS
 // -----------------------------------------------------------------------------
 
-/** Peor (más restrictivo) de dos veredictos. `neutral` no degrada el resultado. */
-function peor(a: Veredicto, b: Veredicto): Veredicto {
-  const orden: Record<Veredicto, number> = { neutral: 0, ok: 1, warn: 2, fail: 3 };
-  return orden[a] >= orden[b] ? a : b;
-}
-
 /** UD de un aparato según uso (privado/público). `null` = no contemplado. */
 export function udDeAparato(tipo: TipoAparato, uso: UsoAparato): number | null {
   const fila = APARATOS_4_1[tipo];
@@ -261,54 +256,19 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
   const warnings: string[] = [];
 
   // ===========================================================================
-  // 1. Validación del grafo y construcción del árbol.
+  // 1. Validación del grafo y construcción del árbol (kernel compartido).
+  //    Regla estricta: una sola raíz (el colector/acometida). El árbol queda
+  //    `arbolValido=false` ante id duplicado, ciclo, huérfano o multi-raíz.
   // ===========================================================================
   const tramoPorId = new Map<string, TramoInput>();
   for (const t of inp.tramos) {
-    if (tramoPorId.has(t.id)) {
-      warnings.push(`Tramo duplicado con id "${t.id}": se ignora la repetición.`);
-      continue;
-    }
-    tramoPorId.set(t.id, t);
+    if (!tramoPorId.has(t.id)) tramoPorId.set(t.id, t);
   }
 
-  // Hijos por padre (aguas arriba → aguas abajo). Orden de entrada (determinista).
-  const childrenIds = new Map<string, string[]>();
-  for (const t of inp.tramos) childrenIds.set(t.id, []);
-  for (const t of inp.tramos) {
-    if (t.parentId === null) continue;
-    if (!tramoPorId.has(t.parentId)) {
-      warnings.push(`El tramo "${t.id}" referencia un padre inexistente "${t.parentId}".`);
-      continue;
-    }
-    childrenIds.get(t.parentId)!.push(t.id);
-  }
-
-  // Detección de ciclos / árbol válido: recorremos desde cada nodo hacia la raíz
-  // siguiendo parentId; si superamos el nº de tramos, hay ciclo.
-  let arbolValido = true;
-  const n = inp.tramos.length;
-  for (const t of inp.tramos) {
-    let cur: string | null = t.id;
-    let pasos = 0;
-    const visto = new Set<string>();
-    while (cur !== null) {
-      if (visto.has(cur)) {
-        arbolValido = false;
-        warnings.push(`Ciclo detectado en la red de tramos en "${cur}": el grafo no es un árbol.`);
-        break;
-      }
-      visto.add(cur);
-      const node = tramoPorId.get(cur);
-      if (!node) break;
-      cur = node.parentId;
-      if (++pasos > n + 1) {
-        arbolValido = false;
-        break;
-      }
-    }
-    if (!arbolValido) break;
-  }
+  const arbol = validarArbol(inp.tramos);
+  const { childrenIds, orden } = arbol;
+  const arbolValido = arbol.arbolValido;
+  warnings.push(...arbol.warnings);
 
   // ===========================================================================
   // 2. UD por aparato (Tabla 4.1) y agregación de UD propias a cada tramo.
@@ -373,36 +333,10 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
 
   // ===========================================================================
   // 3. UD acumuladas aguas abajo (recorrido topológico: hojas → raíz).
-  //    Orden = post-orden estable de cada raíz (determinista, sin Date/random).
+  //    El `orden` post-orden y los hijos vienen del kernel (determinista). La
+  //    acumulación es la suma genérica parametrizada por las UD propias del tramo.
   // ===========================================================================
-  const orden: string[] = []; // post-orden (hijos antes que padre)
-  const visitadoOrden = new Set<string>();
-  const visitarPostorden = (id: string, pila: Set<string>) => {
-    if (visitadoOrden.has(id) || pila.has(id)) return;
-    pila.add(id);
-    for (const c of childrenIds.get(id) ?? []) visitarPostorden(c, pila);
-    pila.delete(id);
-    visitadoOrden.add(id);
-    orden.push(id);
-  };
-  for (const t of inp.tramos) {
-    if (t.parentId === null) visitarPostorden(t.id, new Set());
-  }
-  // Tramos no alcanzables desde una raíz (p.ej. por ciclo): se añaden al final
-  // para no perderlos del resultado.
-  for (const t of inp.tramos) {
-    if (!visitadoOrden.has(t.id)) {
-      visitadoOrden.add(t.id);
-      orden.push(t.id);
-    }
-  }
-
-  const udAcum = new Map<string, number>();
-  for (const id of orden) {
-    let suma = udPropiaTramo.get(id) ?? 0;
-    for (const c of childrenIds.get(id) ?? []) suma += udAcum.get(c) ?? 0;
-    udAcum.set(id, suma);
-  }
+  const udAcum = acumularAguasAbajo(orden, childrenIds, (id) => udPropiaTramo.get(id) ?? 0);
 
   // ===========================================================================
   // 4. Dimensionado por tramo + monotonía de Ø (Ø ≥ máx Ø de los hijos).
