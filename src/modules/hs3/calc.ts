@@ -14,8 +14,8 @@
 // =============================================================================
 
 import type { Veredicto } from "../../lib/pdf/renderFicha";
-import { peor } from "../../lib/cte/grafo";
-import type { ConductoSeccion, ZonaTermica } from "./tablas";
+import { acumularAguasAbajo, peor, validarArbol, type NodoArbol } from "../../lib/cte/grafo";
+import type { CeldaSeccion4_2, ConductoSeccion, ZonaTermica } from "./tablas";
 import {
   AREA_EFECTIVA_ABERTURAS,
   CAUDALES_LOCALES_HABITABLES,
@@ -62,6 +62,37 @@ export interface Estancia {
   caudalCoccion_l_s?: number;
 }
 
+/** Modo de dimensionado del conducto de extracción. */
+export type ModoConducto = "rapido" | "avanzado";
+
+/**
+ * Una planta que vierte en un conducto colectivo (modo avanzado). `nivel` es un
+ * índice de planta ENTERO; el span del colectivo (Tabla 4.3) = max−min+1 sobre
+ * los `nivel` de sus plantas. Agrupa las estancias húmedas que descargan en ella.
+ */
+export interface PlantaColectivo {
+  /** Índice de planta (entero; p.ej. 0 = baja, 1, 2…). */
+  nivel: number;
+  /**
+   * Ids de estancias HÚMEDAS (de `estancias`) cuya extracción GENERAL vierte en
+   * esta planta. El qvt propio de la planta = Σ de sus extracciones generales
+   * (la cocción NO cuenta, igual que en el modo rápido).
+   */
+  estanciasIds: string[];
+}
+
+/**
+ * Un conducto colectivo vertical (modo avanzado): pila de plantas que vierten
+ * hacia una boca de cubierta. El árbol de tramos se DERIVA de esta estructura
+ * (estados ilegales —huérfano, ciclo, doble conteo— son irrepresentables).
+ */
+export interface Colectivo {
+  /** Identificador estable (lo consumen el SVG y la ficha). */
+  id: string;
+  /** Plantas que vierten en este colectivo (el motor las ordena por `nivel`). */
+  plantas: PlantaColectivo[];
+}
+
 export interface HS3Inputs {
   /** Nº de dormitorios de la vivienda → deriva la CategoriaDormitorios. */
   numDormitorios: number;
@@ -72,9 +103,18 @@ export interface HS3Inputs {
   /**
    * Nº de plantas existentes entre la más baja que vierte al conducto y la
    * última (ambas incluidas). Junto con la zona térmica fija la clase de tiro
-   * (Tabla 4.3). Se satura en 8 ("8 o más").
+   * (Tabla 4.3). Se satura en 8 ("8 o más"). Solo modo rápido.
    */
   numPlantasConducto: number;
+  /**
+   * Modo de dimensionado del conducto. Por defecto `"rapido"` (tubo agregado,
+   * comportamiento histórico). `"avanzado"` usa `redColectivos`. El modo lo fija
+   * ESTE campo, NUNCA la presencia de `redColectivos`: así un estado persistido
+   * malformado no puede conmutar de modo por sorpresa.
+   */
+  modoConducto?: ModoConducto;
+  /** Red de conductos colectivos (modo avanzado). Ignorada en modo rápido. */
+  redColectivos?: Colectivo[];
 }
 
 // -----------------------------------------------------------------------------
@@ -158,6 +198,10 @@ export interface HS3Result {
   // Conducto de extracción (informativo, bajo gate de la 4.3) ---------------
   conducto: ResultadoConducto;
 
+  // Red colectiva (modo avanzado) — AUSENTE en modo rápido (no altera sus
+  // snapshots). Dimensionado por tramo + estado de validez de la red.
+  red?: ResultadoRed;
+
   // No ocupación (informativo) ----------------------------------------------
   /** 1,5 l/s × nº de locales habitables [l/s]. */
   noOcupacion_l_s: number;
@@ -166,6 +210,70 @@ export interface HS3Result {
   veredictoGlobal: Veredicto;
   /** Avisos de rango/normativos (mensajes en español, sin Zod). */
   warnings: string[];
+}
+
+// -----------------------------------------------------------------------------
+// FORMA DEL RESULTADO — MODO RED (avanzado)
+// -----------------------------------------------------------------------------
+
+/** Dimensionado de un tramo del árbol derivado de un colectivo (modo red). */
+export interface ResultadoTramoRed {
+  /** Id del nodo en el árbol derivado (`<colectivoId>:boca` o `:<nivel>`). */
+  id: string;
+  parentId: string | null;
+  childrenIds: string[];
+  /** Colectivo al que pertenece el tramo. */
+  colectivoId: string;
+  /** Nivel de planta; `null` en el nodo boca/raíz del colectivo. */
+  nivel: number | null;
+  /** Caudal acumulado aguas arriba hacia la boca [l/s]. */
+  qvtAcum_l_s: number;
+  /** Clase de tiro del colectivo (constante a lo largo del tubo). */
+  claseTiro: ClaseTiro;
+  /** Sección mínima exigida (Tabla 4.2) para este tramo [cm²]. */
+  seccionRequerida_cm2: number;
+  /** Desglose nº × sección de la celda elegida. */
+  conductos: ConductoSeccion[];
+  /** Tramo dimensionante de SU colectivo (mayor sección exigida). */
+  esDimensionante: boolean;
+  /** Tramo que MANDA en toda la red (◆): el dimensionante más exigido. */
+  esManda: boolean;
+  /** Veredicto del tramo: `neutral` (es dimensionado, no cumple/incumple). */
+  estado: Veredicto;
+}
+
+/** Resultado por colectivo (modo red). */
+export interface ResultadoColectivo {
+  id: string;
+  /** Span de plantas servidas = max(nivel) − min(nivel) + 1 (la boca no cuenta). */
+  plantasServidas: number;
+  /** Clase de tiro del colectivo (Tabla 4.3, por span + zona). */
+  claseTiro: ClaseTiro;
+  /** Caudal total que evacúa el colectivo (qvt acumulado en la boca) [l/s]. */
+  qvtBoca_l_s: number;
+  /** Tramos del colectivo, en orden topológico (hojas → boca). */
+  tramos: ResultadoTramoRed[];
+}
+
+/**
+ * Validez de la red colectiva. Los `bloqueos` son ERRORES DUROS (red vacía,
+ * colectivo sin estancias, nivel no entero…) que impiden exportar la ficha; van
+ * en su PROPIO canal, no en `warnings`, y NO degradan `veredictoGlobal`
+ * (normativo). Coherente con el patrón `arbolValido` de HS4/HS5.
+ */
+export interface EstadoRed {
+  /** `true` si la red es dimensionable (sin bloqueos). */
+  valida: boolean;
+  /** Errores duros que bloquean la exportación de la ficha. */
+  bloqueos: string[];
+}
+
+/** Sub-resultado del modo red (presente solo en modo avanzado). */
+export interface ResultadoRed {
+  colectivos: ResultadoColectivo[];
+  estadoRed: EstadoRed;
+  /** qvt total de la red = Σ extracción general de los húmedos asignados [l/s]. */
+  qvtRedTotal_l_s: number;
 }
 
 // -----------------------------------------------------------------------------
@@ -209,7 +317,8 @@ const HUMEDOS: ReadonlySet<TipoEstancia> = new Set<TipoEstancia>([
   "aseo",
 ]);
 
-const esHumedo = (tipo: TipoEstancia): boolean => HUMEDOS.has(tipo);
+/** `true` si la estancia es un local húmedo (extracción): cocina, baño o aseo. */
+export const esHumedo = (tipo: TipoEstancia): boolean => HUMEDOS.has(tipo);
 
 /** numDormitorios → categoría de la Tabla 2.1. */
 export function categoriaDeDormitorios(numDormitorios: number): CategoriaDormitorios {
@@ -395,12 +504,29 @@ export function calcHS3(inp: HS3Inputs): HS3Result {
   );
 
   // --- Conducto de extracción (SIMPLIFICADO, Tablas 4.2/4.3 verificadas) ---
+  // Se calcula siempre (modo rápido). El modo avanzado lo conserva pero la UI
+  // muestra la red; no degrada el veredicto (es dimensionado).
   const conducto = calcularConducto(
     totalExtraccion_l_s,
     inp.numPlantasConducto,
     inp.zonaTermica,
     warnings,
   );
+
+  // --- Modo red (avanzado): dimensionado de la red colectiva multiplanta -----
+  let red: ResultadoRed | undefined;
+  if (inp.modoConducto === "avanzado") {
+    red = calcularRed(inp.redColectivos ?? [], inp.estancias, inp.zonaTermica);
+    // Reconciliación: la red debe evacuar TODA la extracción general húmeda.
+    const dif = totalExtraccion_l_s - red.qvtRedTotal_l_s;
+    if (red.estadoRed.valida && Math.abs(dif) > 1e-9) {
+      warnings.push(
+        dif > 0
+          ? `La red colectiva evacúa ${red.qvtRedTotal_l_s} l/s pero el total de extracción de húmedos es ${totalExtraccion_l_s} l/s: hay húmedos sin asignar a ningún colectivo.`
+          : `La red colectiva evacúa ${red.qvtRedTotal_l_s} l/s, más que el total verificado de húmedos (${totalExtraccion_l_s} l/s): revisa las asignaciones.`,
+      );
+    }
+  }
 
   // --- No ocupación (informativo) -----------------------------------------
   const numLocalesHabitables = inp.estancias.length;
@@ -430,10 +556,37 @@ export function calcHS3(inp: HS3Inputs): HS3Result {
     estadoHumedosTotal,
     areaPaso_cm2,
     conducto,
+    // `red` solo presente en modo avanzado: en modo rápido no se añade la clave
+    // (mantiene los snapshots de modo rápido byte-idénticos).
+    ...(red ? { red } : {}),
     noOcupacion_l_s,
     veredictoGlobal,
     warnings,
   };
+}
+
+// -----------------------------------------------------------------------------
+// Selección de sección de la Tabla 4.2 — helper PURO compartido por el modo
+// rápido (`calcularConducto`) y el modo red (dimensionado por tramo). Elige el
+// primer tramo de caudal cuyo `qvtMax_l_s` ≥ qvt (o el último, sin tope, con
+// `fueraDeRango=true` si qvt supera el último límite). NO empuja warnings: el
+// llamante decide el mensaje (difiere entre modo rápido y modo red).
+// -----------------------------------------------------------------------------
+export function seccionPorTramo(
+  qvt_l_s: number,
+  claseTiro: ClaseTiro,
+): { celda: CeldaSeccion4_2; fueraDeRango: boolean; ultimoTope: number | null } {
+  const tramos = SECCION_CONDUCTO_TABLA_4_2.datos.tramos;
+  let tramoElegido = tramos[tramos.length - 1];
+  for (const tr of tramos) {
+    if (tr.qvtMax_l_s !== null && qvt_l_s <= tr.qvtMax_l_s) {
+      tramoElegido = tr;
+      break;
+    }
+  }
+  const ultimoTope = tramos[tramos.length - 1].qvtMax_l_s;
+  const fueraDeRango = ultimoTope !== null && qvt_l_s > ultimoTope;
+  return { celda: tramoElegido.secciones[claseTiro], fueraDeRango, ultimoTope };
 }
 
 // -----------------------------------------------------------------------------
@@ -461,24 +614,13 @@ function calcularConducto(
     );
   }
 
-  // Sección requerida: primer tramo de la Tabla 4.2 cuyo qvtMax ≥ qvt
-  // (o el último, sin tope, con aviso de fuera de rango si qvt supera 1000).
-  const tramos = SECCION_CONDUCTO_TABLA_4_2.datos.tramos;
-  let tramoElegido = tramos[tramos.length - 1];
-  for (const tr of tramos) {
-    if (tr.qvtMax_l_s !== null && qvt_l_s <= tr.qvtMax_l_s) {
-      tramoElegido = tr;
-      break;
-    }
-  }
-  const ultimoTope = tramos[tramos.length - 1].qvtMax_l_s;
-  if (ultimoTope !== null && qvt_l_s > ultimoTope) {
+  // Sección requerida (Tabla 4.2), vía el helper compartido con el modo red.
+  const { celda, fueraDeRango, ultimoTope } = seccionPorTramo(qvt_l_s, claseTiro);
+  if (fueraDeRango) {
     warnings.push(
       `El caudal total de extracción (${qvt_l_s} l/s) supera el último tramo de la Tabla 4.2 (${ultimoTope} l/s): sección extrapolada del último tramo.`,
     );
   }
-
-  const celda = tramoElegido.secciones[claseTiro];
 
   const nPlantasSat = Math.min(Math.max(Math.trunc(numPlantasConducto), 1), 8);
   const aviso =
@@ -493,5 +635,180 @@ function calcularConducto(
     conductoVerificado: true,
     estado: "neutral",
     aviso,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// MODO RED (avanzado) — dimensionado del conducto colectivo multiplanta.
+//
+// De cada `Colectivo` se DERIVA un árbol de tramos; el modelo estructurado hace
+// IRREPRESENTABLES los estados ilegales (huérfano, ciclo, árbol roto):
+//
+//        boca (raíz, qvt = Σ todas las plantas)   ← tramo más cargado = «manda»
+//          │
+//        planta nivel N   (qvt = N + inferiores)
+//          │
+//        planta nivel …
+//          │
+//        planta nivel 0   (hoja, qvt = solo su planta)
+//
+// El caudal se acumula AGUAS ARRIBA hacia la boca (`acumularAguasAbajo`, raíz =
+// boca): un tramo transporta la extracción de su planta + la de las inferiores.
+// La clase de tiro es ÚNICA por colectivo (span de plantas = max−min+1, Tabla
+// 4.3); la sección se dimensiona por tramo con su qvt acumulado (Tabla 4.2, vía
+// `seccionPorTramo`, compartido con el modo rápido).
+//
+// La COCCIÓN nunca entra: el qvt propio de una planta es Σ de la extracción
+// GENERAL (`caudalPropuesto_l_s`) de sus húmedos, jamás `caudalCoccion_l_s`.
+//
+// Los errores duros (red vacía, colectivo sin estancias, nivel no entero, doble
+// asignación, estancia inexistente) van en `estadoRed.bloqueos` (canal propio,
+// NO `warnings`) y NO degradan `veredictoGlobal`.
+// -----------------------------------------------------------------------------
+function calcularRed(
+  colectivos: readonly Colectivo[],
+  estancias: readonly Estancia[],
+  zona: ZonaTermica,
+): ResultadoRed {
+  const bloqueos: string[] = [];
+  const porId = new Map(estancias.map((e) => [e.id, e]));
+
+  // --- Validación estructural (errores duros) -------------------------------
+  if (colectivos.length === 0) {
+    bloqueos.push("La red colectiva no tiene ningún colectivo definido.");
+  }
+  // Recuento de asignaciones para detectar doble conteo de una misma estancia.
+  const asignaciones = new Map<string, number>();
+  for (const col of colectivos) {
+    if (col.plantas.length === 0) {
+      bloqueos.push(`El colectivo "${col.id}" no tiene plantas.`);
+    }
+    let recogeAlguna = false;
+    for (const p of col.plantas) {
+      if (!Number.isInteger(p.nivel)) {
+        bloqueos.push(
+          `El colectivo "${col.id}" tiene una planta con nivel no entero (${p.nivel}).`,
+        );
+      }
+      for (const eid of p.estanciasIds) {
+        asignaciones.set(eid, (asignaciones.get(eid) ?? 0) + 1);
+        if (porId.has(eid)) recogeAlguna = true;
+      }
+    }
+    if (col.plantas.length > 0 && !recogeAlguna) {
+      bloqueos.push(`El colectivo "${col.id}" no recoge ninguna estancia existente.`);
+    }
+  }
+  for (const [eid, n] of asignaciones) {
+    if (!porId.has(eid)) {
+      bloqueos.push(`La red referencia una estancia inexistente "${eid}".`);
+    } else if (n > 1) {
+      bloqueos.push(`La estancia "${eid}" está asignada a ${n} plantas (doble conteo).`);
+    }
+  }
+
+  // qvt propio de una planta = Σ extracción GENERAL de sus húmedos (sin cocción).
+  const qvtPlanta = (p: PlantaColectivo): number =>
+    p.estanciasIds.reduce((acc, eid) => {
+      const e = porId.get(eid);
+      return acc + (e && esHumedo(e.tipo) ? e.caudalPropuesto_l_s : 0);
+    }, 0);
+
+  const colectivosOut: ResultadoColectivo[] = [];
+  let qvtRedTotal = 0;
+
+  for (const col of colectivos) {
+    if (col.plantas.length === 0) continue;
+
+    // Plantas por nivel ascendente: la más alta cuelga de la boca; cada planta
+    // cuelga de la de encima (cadena hacia la raíz).
+    const plantas = [...col.plantas].sort((a, b) => a.nivel - b.nivel);
+    const bocaId = `${col.id}:boca`;
+    const nodoId = (nivel: number) => `${col.id}:${nivel}`;
+
+    const nodos: NodoArbol[] = [{ id: bocaId, parentId: null }];
+    plantas.forEach((p, k) => {
+      const parent = k < plantas.length - 1 ? nodoId(plantas[k + 1].nivel) : bocaId;
+      nodos.push({ id: nodoId(p.nivel), parentId: parent });
+    });
+
+    const { childrenIds, orden, arbolValido } = validarArbol(nodos);
+    if (!arbolValido) {
+      // Defensivo: la derivación siempre da un árbol válido (niveles únicos por
+      // construcción del editor). Si no, es un bug; se bloquea por seguridad.
+      bloqueos.push(`No se pudo derivar un árbol válido del colectivo "${col.id}".`);
+    }
+
+    const qvtPropio = new Map<string, number>([[bocaId, 0]]);
+    for (const p of plantas) qvtPropio.set(nodoId(p.nivel), qvtPlanta(p));
+    const qvtAcum = acumularAguasAbajo(orden, childrenIds, (id) => qvtPropio.get(id) ?? 0);
+
+    // Clase de tiro (Tabla 4.3): span de plantas = max−min+1 (la boca no cuenta).
+    const niveles = plantas.map((p) => p.nivel);
+    const span = Math.max(...niveles) - Math.min(...niveles) + 1;
+    const claseTiro = claseTiroDe(span, zona);
+
+    // Sección por tramo (incluida la boca: es el más cargado → dimensionante).
+    const seccion = new Map<string, { area: number; conductos: ConductoSeccion[] }>();
+    for (const id of orden) {
+      const { celda } = seccionPorTramo(qvtAcum.get(id) ?? 0, claseTiro);
+      seccion.set(id, { area: celda.area_cm2, conductos: celda.conductos.map((cc) => ({ ...cc })) });
+    }
+    let maxArea = -1;
+    for (const id of orden) maxArea = Math.max(maxArea, seccion.get(id)!.area);
+
+    const parentDe = new Map(nodos.map((n) => [n.id, n.parentId]));
+    const nivelDe = new Map(plantas.map((p) => [nodoId(p.nivel), p.nivel]));
+
+    const tramos: ResultadoTramoRed[] = orden.map((id) => {
+      const sec = seccion.get(id)!;
+      return {
+        id,
+        parentId: parentDe.get(id) ?? null,
+        childrenIds: [...(childrenIds.get(id) ?? [])],
+        colectivoId: col.id,
+        nivel: id === bocaId ? null : (nivelDe.get(id) ?? null),
+        qvtAcum_l_s: qvtAcum.get(id) ?? 0,
+        claseTiro,
+        seccionRequerida_cm2: sec.area,
+        conductos: sec.conductos,
+        esDimensionante: sec.area === maxArea,
+        esManda: false, // se fija globalmente más abajo
+        estado: "neutral" as Veredicto,
+      };
+    });
+
+    const qvtBoca = qvtAcum.get(bocaId) ?? 0;
+    qvtRedTotal += qvtBoca;
+    colectivosOut.push({
+      id: col.id,
+      plantasServidas: span,
+      claseTiro,
+      qvtBoca_l_s: qvtBoca,
+      tramos,
+    });
+  }
+
+  // Tramo que MANDA en toda la red = mayor sección entre los dimensionantes.
+  // En empate de sección preferimos el ÚLTIMO en orden topológico (la boca, que
+  // va al final del `orden` post-orden) usando `>=`: en el caso trivial de 1
+  // planta —donde boca y planta cargan lo mismo— el ◆ cae en la boca, no en la
+  // planta. Sigue habiendo exactamente un tramo con `esManda`.
+  let mandaArea = -1;
+  let mandaRef: ResultadoTramoRed | null = null;
+  for (const c of colectivosOut) {
+    for (const t of c.tramos) {
+      if (t.esDimensionante && t.seccionRequerida_cm2 >= mandaArea) {
+        mandaArea = t.seccionRequerida_cm2;
+        mandaRef = t;
+      }
+    }
+  }
+  if (mandaRef) mandaRef.esManda = true;
+
+  return {
+    colectivos: colectivosOut,
+    estadoRed: { valida: bloqueos.length === 0, bloqueos },
+    qvtRedTotal_l_s: qvtRedTotal,
   };
 }

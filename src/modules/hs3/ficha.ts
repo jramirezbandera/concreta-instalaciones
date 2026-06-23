@@ -105,12 +105,24 @@ export function toFichaData(inputs: HS3Inputs, result: HS3Result): FichaData {
       valor: ZONA_TERMICA_LABEL[inputs.zonaTermica],
       origen: "Entrada del usuario (Tabla 4.4)",
     },
-    {
+  ];
+  // Plantas servidas: en modo rápido es entrada directa; en modo red se DERIVA
+  // del span de cada colectivo (Tabla 4.3).
+  if (!result.red) {
+    datosPartida.push({
       concepto: "Nº de plantas servidas por el conducto",
       valor: String(inputs.numPlantasConducto),
       origen: "Entrada del usuario (Tabla 4.3)",
-    },
-  ];
+    });
+  } else {
+    for (const c of result.red.colectivos) {
+      datosPartida.push({
+        concepto: `Colectivo ${c.id} — plantas servidas (span)`,
+        valor: String(c.plantasServidas),
+        origen: "Derivado de la red (Tabla 4.3)",
+      });
+    }
+  }
 
   // Una fila de caudal PROPUESTO (origen usuario) + una de caudal REQUERIDO
   // (origen Tabla 2.1) por cada estancia.
@@ -176,19 +188,44 @@ export function toFichaData(inputs: HS3Inputs, result: HS3Result): FichaData {
   // Conducto de extracción: sección mínima exigida (Tablas 4.2/4.3, verificadas),
   // estado NEUTRAL: es un resultado de DIMENSIONADO (no una verificación contra
   // un valor propuesto), por lo que no entra en el veredicto global.
-  verificaciones.push({
-    concepto: `Sección del conducto de extracción (clase ${result.conducto.claseTiro})`,
-    valor: fmt(result.conducto.seccionRequerida_cm2, "cm²", 0),
-    limite: `qvt ${fmt(result.conducto.qvt_l_s, "l/s")}`,
-    estado: result.conducto.estado, // "neutral"
-    referencia: refConducto,
-  });
+  if (result.red) {
+    // Modo red: una fila por colectivo con su sección dimensionante (boca).
+    for (const c of result.red.colectivos) {
+      const seccionMax = c.tramos.reduce((m, t) => Math.max(m, t.seccionRequerida_cm2), 0);
+      verificaciones.push({
+        concepto: `Conducto colectivo ${c.id} — sección dimensionante (clase ${c.claseTiro})`,
+        valor: fmt(seccionMax, "cm²", 0),
+        limite: `qvt boca ${fmt(c.qvtBoca_l_s, "l/s")}`,
+        estado: "neutral",
+        referencia: refConducto,
+      });
+    }
+  } else {
+    verificaciones.push({
+      concepto: `Sección del conducto de extracción (clase ${result.conducto.claseTiro})`,
+      valor: fmt(result.conducto.seccionRequerida_cm2, "cm²", 0),
+      limite: `qvt ${fmt(result.conducto.qvt_l_s, "l/s")}`,
+      estado: result.conducto.estado, // "neutral"
+      referencia: refConducto,
+    });
+  }
 
   // ── Observaciones ─────────────────────────────────────────────────────────
-  const observaciones: string[] = [
-    ...result.warnings,
-    `Conducto de extracción: ${result.conducto.aviso} La clase de tiro se obtiene de la Tabla 4.3 según el nº de plantas y la zona térmica; la sección es un resultado de dimensionado (Tabla 4.2) y NO entra en el veredicto global.`,
-  ];
+  const observaciones: string[] = [...result.warnings];
+  if (result.red) {
+    if (!result.red.estadoRed.valida) {
+      observaciones.push(
+        `Red colectiva NO válida (exportación bloqueada): ${result.red.estadoRed.bloqueos.join(" ")}`,
+      );
+    }
+    observaciones.push(
+      "Red colectiva: la sección de cada tramo se dimensiona con su caudal acumulado (Tabla 4.2) y la clase de tiro del colectivo (span de plantas servidas, Tabla 4.3). Es un resultado de dimensionado (neutral): no entra en el veredicto global. La extracción de cocción NO se incluye en el caudal de la red.",
+    );
+  } else {
+    observaciones.push(
+      `Conducto de extracción: ${result.conducto.aviso} La clase de tiro se obtiene de la Tabla 4.3 según el nº de plantas y la zona térmica; la sección es un resultado de dimensionado (Tabla 4.2) y NO entra en el veredicto global.`,
+    );
+  }
 
   return {
     titulo: "HS3 — Calidad del aire interior (Ventilación)",
@@ -202,7 +239,9 @@ export function toFichaData(inputs: HS3Inputs, result: HS3Result): FichaData {
     svg: {
       elementId: HS3_PDF_SVG_ID,
       ...hs3NativeSize(result),
-      caption: "Esquema de ventilación: admisión, paso y extracción de la vivienda",
+      caption: result.red
+        ? "Esquema de la red colectiva de extracción (tramo que manda resaltado)"
+        : "Esquema de ventilación: admisión, paso y extracción de la vivienda",
     },
     inputs,
     slug: "hs3-ventilacion",

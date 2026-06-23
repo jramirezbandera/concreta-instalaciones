@@ -13,7 +13,13 @@
 import { DiagramSvg, Seg, Arrow, Tag, type SvgMode } from "../../lib/svg/primitives";
 import { fitViewBox } from "../../lib/svg/helpers";
 import { fmt } from "../../lib/units/format";
-import type { HS3Result, ResultadoEstancia, TipoEstancia } from "./calc";
+import type {
+  HS3Result,
+  ResultadoColectivo,
+  ResultadoEstancia,
+  ResultadoTramoRed,
+  TipoEstancia,
+} from "./calc";
 // Geometría de la rejilla + tamaño nativo del viewBox: viven en ./svg-meta
 // (módulo SIN JSX) para que este archivo exporte SOLO componentes
 // (react-refresh/only-export-components). ÚNICA fuente de verdad de las medidas.
@@ -27,6 +33,14 @@ import {
   ORIGIN_Y,
   VB_PAD,
   BANDA_TOTALES,
+  R_ORIGIN_X,
+  R_ORIGIN_Y,
+  R_COL_W,
+  R_GAP_X,
+  R_NODE_W,
+  R_NODE_H,
+  R_GAP_Y,
+  R_PAD,
 } from "./svg-meta";
 
 interface HS3SVGProps {
@@ -142,7 +156,161 @@ function describir(result: HS3Result): string {
   );
 }
 
+// =============================================================================
+// MODO RED (avanzado) — esquema de la red colectiva de extracción.
+//
+// Columnas verticales, una por colectivo: la boca arriba y las plantas
+// descendiendo por nivel (el aire sube hacia la boca). El tramo DIMENSIONANTE
+// se resalta MULTICANAL (WCAG 1.4.1): color crítico + trazo grueso/discontinuo
+// (kind="critical") + etiqueta textual «◆ manda» — nunca solo color.
+//
+// Constantes de layout en ./svg-meta (única fuente de verdad del tamaño nativo,
+// que consume la ficha PDF). No reusa `calcularArbol` de HS4/HS5: esa dedup es
+// un TODO aparte, fuera del alcance de HS3 estructurado.
+// =============================================================================
+
+interface NodoRed {
+  t: ResultadoTramoRed;
+  x: number;
+  y: number;
+  cx: number;
+}
+
+/** Orden de pintado de un colectivo: boca arriba, luego plantas por nivel desc. */
+function ordenarColumna(col: ResultadoColectivo): ResultadoTramoRed[] {
+  const boca = col.tramos.filter((t) => t.nivel === null);
+  const plantas = col.tramos
+    .filter((t) => t.nivel !== null)
+    .sort((a, b) => (b.nivel ?? 0) - (a.nivel ?? 0));
+  return [...boca, ...plantas];
+}
+
+function describirRed(red: NonNullable<HS3Result["red"]>): string {
+  if (!red.estadoRed.valida) {
+    return (
+      "Esquema de la red colectiva de extracción. Red no válida, exportación " +
+      `bloqueada: ${red.estadoRed.bloqueos.join(" ")}`
+    );
+  }
+  const n = red.colectivos.length;
+  const manda = red.colectivos.flatMap((c) => c.tramos).find((t) => t.esManda);
+  const base = `Esquema de la red colectiva de extracción con ${n} colectivo${n === 1 ? "" : "s"}. `;
+  return manda
+    ? base +
+        `El tramo que manda exige una sección de ${fmt(manda.seccionRequerida_cm2, "cm²", 0)} ` +
+        `(clase de tiro ${manda.claseTiro}) en la boca, para un caudal acumulado de ` +
+        `${fmt(manda.qvtAcum_l_s, "l/s")}. Se resalta con color, trazo grueso ` +
+        `discontinuo y la etiqueta «◆ manda».`
+    : base;
+}
+
+function RedDiagram({
+  red,
+  mode,
+  width,
+  height,
+}: {
+  red: NonNullable<HS3Result["red"]>;
+  mode: SvgMode;
+  width: number;
+  height: number;
+}) {
+  const columnas = red.colectivos.map((col, j) => {
+    const x = R_ORIGIN_X + j * (R_COL_W + R_GAP_X);
+    const nodos: NodoRed[] = ordenarColumna(col).map((t, k) => ({
+      t,
+      x,
+      y: R_ORIGIN_Y + k * (R_NODE_H + R_GAP_Y),
+      cx: x + R_NODE_W / 2,
+    }));
+    return { col, nodos };
+  });
+
+  const esquinas = columnas.flatMap((c) =>
+    c.nodos.flatMap((n) => [
+      { x: n.x, y: n.y },
+      { x: n.x + R_NODE_W, y: n.y + R_NODE_H },
+    ]),
+  );
+  const [vbX, vbY, vbW, vbH] = fitViewBox(
+    esquinas.length
+      ? esquinas
+      : [
+          { x: 0, y: 0 },
+          { x: R_NODE_W, y: R_NODE_H },
+        ],
+    R_PAD,
+  );
+  const viewBox: [number, number, number, number] = [vbX, vbY, vbW, vbH];
+
+  return (
+    <DiagramSvg
+      viewBox={viewBox}
+      width={width}
+      height={height}
+      mode={mode}
+      title="Esquema de la red colectiva de extracción (DB-HS3)"
+      desc={describirRed(red)}
+    >
+      {columnas.map(({ col, nodos }) => (
+        <g key={col.id}>
+          {/* Conducto vertical entre nodos consecutivos. */}
+          {nodos.slice(0, -1).map((n, k) => (
+            <Seg
+              key={`d-${col.id}-${k}`}
+              x1={n.cx}
+              y1={n.y + R_NODE_H}
+              x2={n.cx}
+              y2={nodos[k + 1].y}
+              mode={mode}
+              kind={n.t.esDimensionante || nodos[k + 1].t.esDimensionante ? "critical" : "flow"}
+            />
+          ))}
+          {/* Etiqueta de clase de tiro del colectivo (encima de la boca). */}
+          {nodos[0] && (
+            <Tag x={nodos[0].cx} y={R_ORIGIN_Y - 5} mode={mode} size={3.6}>
+              {`clase ${col.claseTiro} · ${col.plantasServidas} pl.`}
+            </Tag>
+          )}
+          {nodos.map((n) => {
+            const dim = n.t.esDimensionante;
+            const kind = dim ? "critical" : "normal";
+            const esBoca = n.t.nivel === null;
+            return (
+              <g key={n.t.id}>
+                <Seg x1={n.x} y1={n.y} x2={n.x + R_NODE_W} y2={n.y} mode={mode} kind={kind} />
+                <Seg x1={n.x + R_NODE_W} y1={n.y} x2={n.x + R_NODE_W} y2={n.y + R_NODE_H} mode={mode} kind={kind} />
+                <Seg x1={n.x + R_NODE_W} y1={n.y + R_NODE_H} x2={n.x} y2={n.y + R_NODE_H} mode={mode} kind={kind} />
+                <Seg x1={n.x} y1={n.y + R_NODE_H} x2={n.x} y2={n.y} mode={mode} kind={kind} />
+                <Tag x={n.cx} y={n.y + 9} mode={mode} size={4} critical={dim}>
+                  {esBoca ? `Boca · ${col.id}` : `Planta ${n.t.nivel}`}
+                </Tag>
+                <Tag x={n.cx} y={n.y + 17} mode={mode} size={3.6}>
+                  {`qvt ${fmt(n.t.qvtAcum_l_s, "l/s")}`}
+                </Tag>
+                <Tag x={n.cx} y={n.y + 25} mode={mode} size={3.6} critical={dim}>
+                  {fmt(n.t.seccionRequerida_cm2, "cm²", 0)}
+                </Tag>
+                {n.t.esManda && (
+                  <Tag x={n.cx} y={n.y + 33} mode={mode} size={3.8} critical>
+                    ◆ manda
+                  </Tag>
+                )}
+              </g>
+            );
+          })}
+        </g>
+      ))}
+    </DiagramSvg>
+  );
+}
+
 export function HS3SVG({ result, mode, width, height }: HS3SVGProps) {
+  // Modo avanzado: el diagrama es la red colectiva (árbol), no la rejilla.
+  if (result.red) {
+    return <RedDiagram red={result.red} mode={mode} width={width} height={height} />;
+  }
+
   const cajas = colocar(result.porEstancia);
 
   // viewBox auto-encuadrado a partir de los DATOS (esquinas de las cajas) +

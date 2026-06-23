@@ -674,3 +674,193 @@ describe("calcHS3 — invariantes (property-based)", () => {
     expect(calcHS3(inp)).toEqual(calcHS3(inp));
   });
 });
+
+// =============================================================================
+// MODO RED (avanzado) — red colectiva multiplanta sobre el kernel de grafo.
+// =============================================================================
+
+describe("calcHS3 — modo red (avanzado)", () => {
+  // Red de referencia: 1 colectivo, 2 plantas (niveles 0 y 1), cada planta con
+  // cocina(16) + baño(8) = 24 l/s de extracción general.
+  const mkRed = (over: Partial<HS3Inputs> = {}): HS3Inputs => ({
+    numDormitorios: 2,
+    estancias: [
+      { id: "coc0", tipo: "cocina", caudalPropuesto_l_s: 16 },
+      { id: "ba0", tipo: "bano", caudalPropuesto_l_s: 8 },
+      { id: "coc1", tipo: "cocina", caudalPropuesto_l_s: 16 },
+      { id: "ba1", tipo: "bano", caudalPropuesto_l_s: 8 },
+    ],
+    zonaTermica: "X",
+    numPlantasConducto: 1,
+    modoConducto: "avanzado",
+    redColectivos: [
+      {
+        id: "C1",
+        plantas: [
+          { nivel: 0, estanciasIds: ["coc0", "ba0"] },
+          { nivel: 1, estanciasIds: ["coc1", "ba1"] },
+        ],
+      },
+    ],
+    ...over,
+  });
+
+  it("modo rápido (por defecto) NO incluye sub-resultado de red", () => {
+    expect(calcHS3(hs3Defaults).red).toBeUndefined();
+  });
+
+  it("modo avanzado dimensiona la red: válida, span, qvt en boca y un único «manda»", () => {
+    const r = calcHS3(mkRed());
+    expect(r.red).toBeDefined();
+    const red = r.red!;
+    expect(red.estadoRed.valida).toBe(true);
+    expect(red.estadoRed.bloqueos).toHaveLength(0);
+    expect(red.colectivos).toHaveLength(1);
+    const col = red.colectivos[0];
+    expect(col.plantasServidas).toBe(2); // niveles {0,1} → span 2
+    expect(col.qvtBoca_l_s).toBeCloseTo(48, 9); // 24 + 24
+    // Todos los tramos son dimensionado (neutral) y hay exactamente un «manda».
+    const todos = red.colectivos.flatMap((c) => c.tramos);
+    expect(todos.every((t) => t.estado === "neutral")).toBe(true);
+    expect(todos.filter((t) => t.esManda)).toHaveLength(1);
+  });
+
+  it("qvt acumulado no decrece hacia la raíz (la boca lleva el máximo)", () => {
+    const red = calcHS3(mkRed()).red!;
+    for (const col of red.colectivos) {
+      const boca = col.tramos.find((t) => t.nivel === null)!;
+      for (const t of col.tramos) {
+        expect(boca.qvtAcum_l_s).toBeGreaterThanOrEqual(t.qvtAcum_l_s);
+      }
+    }
+  });
+
+  it("REGRESIÓN: la cocción (50 l/s) NO entra en el qvt de la red", () => {
+    // Una sola planta con una cocina: extracción general 16 + cocción 50 aparte.
+    const r = calcHS3(
+      mkRed({
+        estancias: [
+          { id: "c", tipo: "cocina", caudalPropuesto_l_s: 16, esCoccion: true, caudalCoccion_l_s: 50 },
+        ],
+        redColectivos: [{ id: "C1", plantas: [{ nivel: 0, estanciasIds: ["c"] }] }],
+      }),
+    );
+    // qvt de la boca = 16 (general), nunca 66 (no suma la cocción).
+    expect(r.red!.colectivos[0].qvtBoca_l_s).toBeCloseTo(16, 9);
+  });
+
+  it("red vacía bloquea la exportación sin tocar el veredicto normativo", () => {
+    const rRapido = calcHS3(mkRed({ modoConducto: "rapido" }));
+    const rVacia = calcHS3(mkRed({ redColectivos: [] }));
+    expect(rVacia.red!.estadoRed.valida).toBe(false);
+    expect(rVacia.red!.estadoRed.bloqueos.length).toBeGreaterThan(0);
+    // El veredicto normativo (por estancia) es el mismo: la red no lo degrada.
+    expect(rVacia.veredictoGlobal).toBe(rRapido.veredictoGlobal);
+  });
+
+  it("doble asignación de una estancia bloquea (doble conteo)", () => {
+    const r = calcHS3(
+      mkRed({
+        redColectivos: [
+          {
+            id: "C1",
+            plantas: [
+              { nivel: 0, estanciasIds: ["coc0"] },
+              { nivel: 1, estanciasIds: ["coc0"] }, // misma estancia dos veces
+            ],
+          },
+        ],
+      }),
+    );
+    expect(r.red!.estadoRed.valida).toBe(false);
+    expect(r.red!.estadoRed.bloqueos.some((b) => b.includes("doble conteo"))).toBe(true);
+  });
+
+  it("nivel no entero y estancia inexistente bloquean", () => {
+    const rNivel = calcHS3(
+      mkRed({ redColectivos: [{ id: "C1", plantas: [{ nivel: 1.5, estanciasIds: ["coc0"] }] }] }),
+    );
+    expect(rNivel.red!.estadoRed.valida).toBe(false);
+    const rFantasma = calcHS3(
+      mkRed({ redColectivos: [{ id: "C1", plantas: [{ nivel: 0, estanciasIds: ["noexiste"] }] }] }),
+    );
+    expect(rFantasma.red!.estadoRed.valida).toBe(false);
+  });
+
+  it("reconciliación: un húmedo sin asignar genera warning (no bloqueo)", () => {
+    // ba1 queda sin asignar a ningún colectivo.
+    const r = calcHS3(
+      mkRed({
+        redColectivos: [
+          {
+            id: "C1",
+            plantas: [
+              { nivel: 0, estanciasIds: ["coc0", "ba0"] },
+              { nivel: 1, estanciasIds: ["coc1"] },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(r.red!.estadoRed.valida).toBe(true); // no es bloqueo
+    expect(r.warnings.some((w) => w.includes("sin asignar"))).toBe(true);
+  });
+
+  // Property: span = max(nivel) − min(nivel) + 1, y qvt de la boca = Σ plantas.
+  test.prop([fc.uniqueArray(fc.integer({ min: 0, max: 20 }), { minLength: 1, maxLength: 8 })])(
+    "span = max−min+1 y qvt boca = Σ extracción de plantas",
+    (niveles) => {
+      const estancias: Estancia[] = niveles.map((n) => ({
+        id: `e${n}`,
+        tipo: "cocina" as TipoEstancia,
+        caudalPropuesto_l_s: 10,
+      }));
+      const r = calcHS3({
+        numDormitorios: 2,
+        estancias,
+        zonaTermica: "X",
+        numPlantasConducto: 1,
+        modoConducto: "avanzado",
+        redColectivos: [
+          { id: "C1", plantas: niveles.map((n) => ({ nivel: n, estanciasIds: [`e${n}`] })) },
+        ],
+      });
+      const col = r.red!.colectivos[0];
+      const span = Math.max(...niveles) - Math.min(...niveles) + 1;
+      expect(col.plantasServidas).toBe(span);
+      expect(col.qvtBoca_l_s).toBeCloseTo(niveles.length * 10, 9);
+    },
+  );
+
+  // Property: dentro de un colectivo, la sección del padre (más cargado) no
+  // decrece respecto a la del hijo (misma clase de tiro, qvt crece hacia la raíz).
+  test.prop([fc.uniqueArray(fc.integer({ min: 0, max: 15 }), { minLength: 2, maxLength: 6 })])(
+    "sección no decrece hacia la raíz (misma clase de tiro)",
+    (niveles) => {
+      const estancias: Estancia[] = niveles.map((n) => ({
+        id: `e${n}`,
+        tipo: "cocina" as TipoEstancia,
+        caudalPropuesto_l_s: 40,
+      }));
+      const r = calcHS3({
+        numDormitorios: 2,
+        estancias,
+        zonaTermica: "Z",
+        numPlantasConducto: 1,
+        modoConducto: "avanzado",
+        redColectivos: [
+          { id: "C1", plantas: niveles.map((n) => ({ nivel: n, estanciasIds: [`e${n}`] })) },
+        ],
+      });
+      const col = r.red!.colectivos[0];
+      const porId = new Map(col.tramos.map((t) => [t.id, t]));
+      for (const t of col.tramos) {
+        if (t.parentId && porId.has(t.parentId)) {
+          expect(porId.get(t.parentId)!.seccionRequerida_cm2).toBeGreaterThanOrEqual(
+            t.seccionRequerida_cm2,
+          );
+        }
+      }
+    },
+  );
+});

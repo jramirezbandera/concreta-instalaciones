@@ -26,10 +26,14 @@ import { STATE_TEXT, STATE_TINT } from "../../lib/ui/veredicto";
 import { fmt } from "../../lib/units/format";
 import {
   calcHS3,
+  esHumedo,
   hs3Defaults,
+  type Colectivo,
   type Estancia,
   type HS3Inputs,
   type HS3Result,
+  type ModoConducto,
+  type PlantaColectivo,
   type TipoEstancia,
 } from "./calc";
 import type { ZonaTermica } from "./tablas";
@@ -75,6 +79,19 @@ function nextEstanciaId(estancias: Estancia[]): string {
   return `estancia-${max + 1}`;
 }
 
+/** Id determinista para un nuevo colectivo: "C1", "C2"… (sufijo mayor + 1). */
+function nextColectivoId(cols: Colectivo[]): string {
+  let max = 0;
+  for (const c of cols) {
+    const m = /^C(\d+)$/.exec(c.id);
+    if (m) {
+      const n = Number(m[1]);
+      if (n > max) max = n;
+    }
+  }
+  return `C${max + 1}`;
+}
+
 export function Hs3Module() {
   const { state, setField, reset } = useModuleState<HS3Inputs>("hs3", hs3Defaults);
   const { openDrawer } = useDrawer();
@@ -91,7 +108,10 @@ export function Hs3Module() {
     state.estancias.length >= 1 &&
     state.estancias.every(
       (e) => Number.isFinite(e.caudalPropuesto_l_s) && e.caudalPropuesto_l_s > 0,
-    );
+    ) &&
+    // Modo avanzado: una red colectiva no válida bloquea la exportación de la
+    // ficha (errores duros), sin tocar el veredicto normativo.
+    (state.modoConducto !== "avanzado" || (result.red?.estadoRed.valida ?? false));
 
   const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } =
     usePdfPreview(() => renderFicha(toFichaData(deferredState, result)), valid);
@@ -128,6 +148,24 @@ export function Hs3Module() {
       state.estancias.map((e) => (e.id === id ? { ...e, ...patch } : e)),
     );
   };
+
+  // ── Modo del conducto + red colectiva (modo avanzado) ──────────────────────
+  const modo: ModoConducto = state.modoConducto ?? "rapido";
+  const redColectivos = state.redColectivos ?? [];
+  const humedos = state.estancias.filter((e) => esHumedo(e.tipo));
+
+  const setRed = (cols: Colectivo[]) => setField("redColectivos", cols);
+  // Siembra UN colectivo con todos los húmedos en la planta baja (editable).
+  const seedFromEstancias = () =>
+    setRed([{ id: "C1", plantas: [{ nivel: 0, estanciasIds: humedos.map((e) => e.id) }] }]);
+  const addColectivo = () =>
+    setRed([
+      ...redColectivos,
+      { id: nextColectivoId(redColectivos), plantas: [{ nivel: 0, estanciasIds: [] }] },
+    ]);
+  const removeColectivo = (id: string) => setRed(redColectivos.filter((c) => c.id !== id));
+  const patchColectivo = (id: string, plantas: PlantaColectivo[]) =>
+    setRed(redColectivos.map((c) => (c.id === id ? { ...c, plantas } : c)));
 
   const [canvasRef, canvasWidth] = useContainerWidth();
   const svgW =
@@ -189,21 +227,56 @@ export function Hs3Module() {
                   onChange={(v) => setField("zonaTermica", v)}
                 />
               </Field>
-              <Field
-                id="num-plantas-conducto"
-                label="Plantas (conducto)"
-                sub="nº"
-                help="Nº de plantas entre la más baja que vierte al conducto y la última (ambas incluidas). Con la zona térmica fija la clase de tiro (Tabla 4.3). Se satura en 8 (8 o más)."
-                refText="DB-HS3 Tabla 4.3"
-              >
-                <NumberInput
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              label="Conducto de extracción"
+              refNorma="DB-HS3 Tabla 4.2 / 4.3"
+            >
+              <ModoToggle modo={modo} onChange={(m) => setField("modoConducto", m)} />
+              {modo === "rapido" ? (
+                <Field
                   id="num-plantas-conducto"
-                  value={state.numPlantasConducto}
-                  onChange={(v) => setField("numPlantasConducto", v)}
-                  min={1}
-                  step={1}
+                  label="Plantas (conducto)"
+                  sub="nº"
+                  help="Nº de plantas entre la más baja que vierte al conducto y la última (ambas incluidas). Con la zona térmica fija la clase de tiro (Tabla 4.3). Se satura en 8 (8 o más)."
+                  refText="DB-HS3 Tabla 4.3"
+                >
+                  <NumberInput
+                    id="num-plantas-conducto"
+                    value={state.numPlantasConducto}
+                    onChange={(v) => setField("numPlantasConducto", v)}
+                    min={1}
+                    step={1}
+                  />
+                </Field>
+              ) : redColectivos.length === 0 ? (
+                <EmptyRed
+                  onAdd={addColectivo}
+                  onSeed={seedFromEstancias}
+                  hasHumedos={humedos.length > 0}
                 />
-              </Field>
+              ) : (
+                <div className="mt-3 flex flex-col gap-3">
+                  {redColectivos.map((c) => (
+                    <ColectivoCard
+                      key={c.id}
+                      colectivo={c}
+                      humedos={humedos}
+                      onPatch={(plantas) => patchColectivo(c.id, plantas)}
+                      onRemove={() => removeColectivo(c.id)}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addColectivo}
+                    className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-[13px] transition-colors"
+                  >
+                    <Plus size={14} />
+                    Añadir colectivo
+                  </button>
+                </div>
+              )}
             </CollapsibleSection>
 
             <CollapsibleSection label="Estancias" refNorma="DB-HS3 Tabla 2.1">
@@ -417,6 +490,201 @@ function EstanciaRow({
 }
 
 // -----------------------------------------------------------------------------
+// Conmutador de modo del conducto: rápido (tubo agregado) ↔ avanzado (red
+// colectiva). Segmentado, no destructivo: los datos de cada modo persisten en el
+// estado; solo el modo activo calcula/exporta.
+// -----------------------------------------------------------------------------
+function ModoToggle({
+  modo,
+  onChange,
+}: {
+  modo: ModoConducto;
+  onChange: (m: ModoConducto) => void;
+}) {
+  const opt = (m: ModoConducto, label: string, sub: string) => {
+    const active = modo === m;
+    return (
+      <button
+        type="button"
+        onClick={() => onChange(m)}
+        aria-pressed={active}
+        className={[
+          "flex-1 rounded px-2 py-1.5 text-[12px] transition-colors",
+          active
+            ? "bg-bg-surface text-text-primary font-semibold shadow-sm"
+            : "text-text-secondary hover:text-text-primary",
+        ].join(" ")}
+      >
+        {label}
+        <span className="text-text-disabled ml-1 text-[10px]">{sub}</span>
+      </button>
+    );
+  };
+  return (
+    <div className="border-border-sub bg-bg-primary mb-1 flex gap-1 rounded-md border p-1">
+      {opt("rapido", "Rápido", "1 conducto")}
+      {opt("avanzado", "Avanzado", "red colectiva")}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Estado vacío del modo avanzado: explica qué es un colectivo y ofrece sembrar
+// la red desde las estancias húmedas ya tecleadas (ahorra el primer paso).
+// -----------------------------------------------------------------------------
+function EmptyRed({
+  onAdd,
+  onSeed,
+  hasHumedos,
+}: {
+  onAdd: () => void;
+  onSeed: () => void;
+  hasHumedos: boolean;
+}) {
+  return (
+    <div className="border-border-sub mt-3 rounded-md border border-dashed px-3 py-4 text-center">
+      <p className="text-text-secondary text-[12px] leading-snug">
+        Define las columnas colectivas: cada colectivo agrupa las plantas que
+        vierten a una misma boca de cubierta.
+      </p>
+      <div className="mt-3 flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={onAdd}
+          className="border-border-main text-text-primary hover:bg-bg-elevated flex w-full items-center justify-center gap-1.5 rounded-md border py-2 text-[13px] font-medium transition-colors"
+        >
+          <Plus size={14} />
+          Añadir colectivo
+        </button>
+        {hasHumedos && (
+          <button
+            type="button"
+            onClick={onSeed}
+            className="border-border-sub text-text-secondary hover:text-text-primary flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-[13px] transition-colors"
+          >
+            Generar desde mis estancias
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Tarjeta de un colectivo (modo avanzado): pila de plantas. Cada planta lleva su
+// nivel y las estancias húmedas que vierten en ella (checkboxes). El árbol de
+// tramos se deriva de esta estructura en el motor (estados ilegales imposibles).
+// -----------------------------------------------------------------------------
+function ColectivoCard({
+  colectivo,
+  humedos,
+  onPatch,
+  onRemove,
+}: {
+  colectivo: Colectivo;
+  humedos: Estancia[];
+  onPatch: (plantas: PlantaColectivo[]) => void;
+  onRemove: () => void;
+}) {
+  const addPlanta = () => {
+    const maxNivel = colectivo.plantas.reduce((m, p) => Math.max(m, p.nivel), -1);
+    onPatch([...colectivo.plantas, { nivel: maxNivel + 1, estanciasIds: [] }]);
+  };
+  const removePlanta = (idx: number) =>
+    onPatch(colectivo.plantas.filter((_, k) => k !== idx));
+  const patchPlanta = (idx: number, patch: Partial<PlantaColectivo>) =>
+    onPatch(colectivo.plantas.map((p, k) => (k === idx ? { ...p, ...patch } : p)));
+  const toggleEstancia = (idx: number, eid: string) => {
+    const p = colectivo.plantas[idx];
+    const has = p.estanciasIds.includes(eid);
+    patchPlanta(idx, {
+      estanciasIds: has ? p.estanciasIds.filter((x) => x !== eid) : [...p.estanciasIds, eid],
+    });
+  };
+  return (
+    <div className="border-border-sub bg-bg-primary rounded-md border p-2.5">
+      <div className="flex items-center justify-between">
+        <span className="text-text-primary text-[13px] font-semibold">
+          Colectivo {colectivo.id}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Quitar colectivo ${colectivo.id}`}
+          className="text-text-disabled hover:text-state-fail rounded p-1 transition-colors"
+        >
+          <Trash2 size={15} />
+        </button>
+      </div>
+      <div className="mt-2 flex flex-col gap-2">
+        {colectivo.plantas.map((p, i) => (
+          <div key={i} className="border-border-sub rounded border border-dashed p-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <InputLabel htmlFor={`${colectivo.id}-nivel-${i}`} label="Planta" sub="nivel" />
+                <div className="w-16">
+                  <NumberInput
+                    id={`${colectivo.id}-nivel-${i}`}
+                    value={p.nivel}
+                    onChange={(v) => patchPlanta(i, { nivel: v })}
+                    min={0}
+                    step={1}
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removePlanta(i)}
+                disabled={colectivo.plantas.length <= 1}
+                aria-label="Quitar planta"
+                className="text-text-disabled hover:text-state-fail rounded p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+            {humedos.length === 0 ? (
+              <p className="text-text-disabled mt-1.5 text-[11px]">
+                No hay estancias húmedas que asignar.
+              </p>
+            ) : (
+              <fieldset className="mt-1.5">
+                <legend className="text-text-disabled text-[10px] tracking-[0.06em] uppercase">
+                  Húmedos que vierten
+                </legend>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                  {humedos.map((e) => (
+                    <label
+                      key={e.id}
+                      className="text-text-secondary flex cursor-pointer items-center gap-1.5 text-[12px]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={p.estanciasIds.includes(e.id)}
+                        onChange={() => toggleEstancia(i, e.id)}
+                        className="accent-accent h-3.5 w-3.5"
+                      />
+                      {TIPO_LABEL[e.tipo]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addPlanta}
+          className="border-border-sub text-text-secondary hover:text-text-primary flex items-center justify-center gap-1 rounded border border-dashed py-1.5 text-[12px] transition-colors"
+        >
+          <Plus size={12} />
+          Añadir planta
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
 // Tabla de resultados accesible (WCAG: el dato numérico SIEMPRE en texto/tabla,
 // no solo en el SVG). Por estancia: propuesto / requerido / cumple; más húmedos
 // total, balance, cocción y el conducto (estado neutral con su aviso).
@@ -504,17 +772,23 @@ function ResultsTable({ result }: { result: HS3Result }) {
               estado={e.cumpleCoccion ? "ok" : "fail"}
             />
           ))}
-        <SummaryRow
-          k={`Conducto de extracción (clase ${result.conducto.claseTiro})`}
-          v={`${fmt(result.conducto.seccionRequerida_cm2, "cm²", 0)} · qvt ${fmt(result.conducto.qvt_l_s, "l/s")}`}
-          estado="neutral"
-        />
+        {!result.red && (
+          <SummaryRow
+            k={`Conducto de extracción (clase ${result.conducto.claseTiro})`}
+            v={`${fmt(result.conducto.seccionRequerida_cm2, "cm²", 0)} · qvt ${fmt(result.conducto.qvt_l_s, "l/s")}`}
+            estado="neutral"
+          />
+        )}
       </dl>
 
-      <p className="text-text-disabled mt-2 text-[11px] leading-snug">
-        {result.conducto.aviso}. La sección del conducto se reporta a título
-        informativo y no entra en el veredicto global.
-      </p>
+      {!result.red && (
+        <p className="text-text-disabled mt-2 text-[11px] leading-snug">
+          {result.conducto.aviso}. La sección del conducto se reporta a título
+          informativo y no entra en el veredicto global.
+        </p>
+      )}
+
+      {result.red && <RedResults red={result.red} />}
 
       {result.warnings.length > 0 && (
         <ul className="text-state-warn mt-3 list-disc space-y-1 pl-5 text-[12px]">
@@ -539,6 +813,70 @@ function SummaryRow({ k, v, estado }: { k: string; v: string; estado?: Veredicto
           </span>
         )}
       </dd>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Resultados de la red colectiva (modo avanzado). Si la red no es válida, los
+// bloqueos van en un bloque propio (errores duros que impiden exportar) — mismo
+// patrón que el aviso de árbol inválido de HS4/HS5; NO degrada el veredicto.
+// -----------------------------------------------------------------------------
+function RedResults({ red }: { red: NonNullable<HS3Result["red"]> }) {
+  return (
+    <div className="mt-5">
+      <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
+        Red colectiva de extracción
+      </div>
+
+      {!red.estadoRed.valida && (
+        <div className={`mb-2 rounded-md border px-3 py-2 ${STATE_TINT.fail}`}>
+          <p className={`text-[12px] font-semibold ${STATE_TEXT.fail}`}>
+            Red no válida — exportación bloqueada
+          </p>
+          <ul className={`mt-1 list-disc space-y-0.5 pl-4 text-[11px] ${STATE_TEXT.fail}`}>
+            {red.estadoRed.bloqueos.map((b, i) => (
+              <li key={i}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <dl className="text-[13px]">
+        {red.colectivos.map((c) => {
+          const manda = c.tramos.find((t) => t.esManda);
+          const seccionMax = c.tramos.reduce(
+            (m, t) => Math.max(m, t.seccionRequerida_cm2),
+            0,
+          );
+          return (
+            <div key={c.id} className="border-border-sub border-b py-1.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-text-secondary">
+                  Colectivo {c.id}{" "}
+                  <span className="text-text-disabled text-[11px]">
+                    (clase {c.claseTiro} · {c.plantasServidas} plantas)
+                  </span>
+                </dt>
+                <dd className="text-text-primary tabular-nums">
+                  {fmt(c.qvtBoca_l_s, "l/s")} · {fmt(seccionMax, "cm²", 0)}
+                </dd>
+              </div>
+              {manda && (
+                <p className="text-text-disabled mt-0.5 text-[11px]">
+                  ◆ tramo que manda: {fmt(manda.seccionRequerida_cm2, "cm²", 0)} en la
+                  boca (qvt {fmt(manda.qvtAcum_l_s, "l/s")}).
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </dl>
+
+      <p className="text-text-disabled mt-2 text-[11px] leading-snug">
+        Secciones de la Tabla 4.2 por tramo (dimensionado, neutral): no entran en el
+        veredicto global.
+      </p>
     </div>
   );
 }
