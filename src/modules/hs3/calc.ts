@@ -71,7 +71,14 @@ export type ModoConducto = "rapido" | "avanzado";
  * los `nivel` de sus plantas. Agrupa las estancias húmedas que descargan en ella.
  */
 export interface PlantaColectivo {
-  /** Índice de planta (entero; p.ej. 0 = baja, 1, 2…). */
+  /**
+   * Índice de PLANTA FÍSICA del edificio (entero; p.ej. 0 = baja, 1, 2…), NO un
+   * ordinal de las plantas conectadas. El span de la Tabla 4.3 es max−min+1
+   * (DB-HS3 ap. 4.2.1: "número de plantas entre la más baja que vierte y la
+   * última, AMBAS INCLUIDAS"): las plantas intermedias que NO vierten también
+   * cuentan para la clase de tiro, así que sus niveles deben corresponder a
+   * plantas físicas reales (no reindexar saltando las que no vierten).
+   */
   nivel: number;
   /**
    * Ids de estancias HÚMEDAS (de `estancias`) cuya extracción GENERAL vierte en
@@ -525,6 +532,25 @@ export function calcHS3(inp: HS3Inputs): HS3Result {
           ? `La red colectiva evacúa ${red.qvtRedTotal_l_s} l/s pero el total de extracción de húmedos es ${totalExtraccion_l_s} l/s: hay húmedos sin asignar a ningún colectivo.`
           : `La red colectiva evacúa ${red.qvtRedTotal_l_s} l/s, más que el total verificado de húmedos (${totalExtraccion_l_s} l/s): revisa las asignaciones.`,
       );
+    }
+    // Aviso de plantas salteadas: la clase de tiro cuenta el span "ambas
+    // incluidas" (DB-HS3 ap. 4.2.1), así que un hueco de niveles infla la clase.
+    // Informativo (es legal y conservador): que el proyectista confirme que las
+    // plantas intermedias existen físicamente (premisa de `PlantaColectivo.nivel`).
+    if (red.estadoRed.valida) {
+      for (const col of inp.redColectivos ?? []) {
+        const niveles = col.plantas.map((p) => p.nivel).filter((n) => Number.isInteger(n));
+        const distintos = new Set(niveles);
+        if (distintos.size >= 2) {
+          const lo = Math.min(...niveles);
+          const hi = Math.max(...niveles);
+          if (hi - lo + 1 > distintos.size) {
+            warnings.push(
+              `Colectivo "${col.id}": plantas salteadas (niveles ${lo}–${hi} con huecos). La clase de tiro cuenta el span completo (DB-HS3 ap. 4.2.1, "ambas incluidas"); confirma que las plantas intermedias existen físicamente.`,
+            );
+          }
+        }
+      }
     }
   }
 

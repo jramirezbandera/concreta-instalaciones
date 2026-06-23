@@ -806,6 +806,31 @@ describe("calcHS3 — modo red (avanzado)", () => {
     expect(r.warnings.some((w) => w.includes("sin asignar"))).toBe(true);
   });
 
+  it("plantas salteadas: span cuenta 'ambas incluidas' y avisa (DB-HS3 ap. 4.2.1)", () => {
+    // Colectivo que vierte en planta 0 y planta 3 (1 y 2 no vierten pero existen).
+    const r = calcHS3(
+      mkRed({
+        estancias: [
+          { id: "a", tipo: "cocina", caudalPropuesto_l_s: 10 },
+          { id: "b", tipo: "bano", caudalPropuesto_l_s: 8 },
+        ],
+        redColectivos: [
+          {
+            id: "C1",
+            plantas: [
+              { nivel: 0, estanciasIds: ["a"] },
+              { nivel: 3, estanciasIds: ["b"] },
+            ],
+          },
+        ],
+      }),
+    );
+    // span = 3 − 0 + 1 = 4 aunque solo 2 plantas vierten.
+    expect(r.red!.colectivos[0].plantasServidas).toBe(4);
+    expect(r.red!.estadoRed.valida).toBe(true); // los huecos son legales
+    expect(r.warnings.some((w) => w.includes("salteadas"))).toBe(true);
+  });
+
   // Property: span = max(nivel) − min(nivel) + 1, y qvt de la boca = Σ plantas.
   test.prop([fc.uniqueArray(fc.integer({ min: 0, max: 20 }), { minLength: 1, maxLength: 8 })])(
     "span = max−min+1 y qvt boca = Σ extracción de plantas",
