@@ -6,6 +6,9 @@
 > determinista, trazabilidad de ficha, WCAG AA) siguen vigentes en su totalidad. En lo relativo
 > a layout y flujo de UX (§12 del I+D: layout inputs-izq / visual-der, módulos independientes)
 > **manda este documento**.
+>
+> **Enmendado por [REDISENO-V4.md](REDISENO-V4.md) (2026-10-03):** las decisiones 2, 3, 7 y 12
+> de §13 quedan sustituidas. Lo que se contradiga con aquel plan, manda aquel plan.
 
 ---
 
@@ -383,30 +386,40 @@ Pista transversal que arranca tras la Fase B (la extracción necesita schemas es
 ### Cerradas (sesión 2026-08-22)
 
 1. Proyecto-céntrico (no calculadoras sueltas ni híbrido).
-2. Tabla densa + outliner como input principal de colecciones.
-3. Esquema como soporte compacto sincronizado (no hero, no canvas editable).
+2. ~~Tabla densa + outliner como input principal de colecciones.~~ **Sustituida (v4):** la
+   entrada principal es El edificio + 3-4 decisiones por módulo; el editor de tramos queda como
+   modo avanzado «Ajustar a mano» en HS4/HS5. Ver REDISENO-V4 §2 y §7.
+3. ~~Esquema como soporte compacto sincronizado (no hero, no canvas editable).~~ **Sustituida
+   (v4):** el dibujo es lo principal, con las cifras encima y la franja de detalle debajo; en El
+   edificio la sección *es* el editor.
 4. Público inmediato: validación con arquitectos de confianza.
 5. Nomenclatura: **"justificaciones"**.
 6. Presets de aparatos en HS4/HS5: sí.
-7. Usos: vivienda unifamiliar + colectiva; hospitalario/pública concurrencia fuera.
+7. ~~Usos: vivienda unifamiliar + colectiva~~; hospitalario/pública concurrencia fuera.
+   **Ampliada (v4):** entran también local sin uso en PB (como previsión), oficinas, garaje,
+   trasteros e instalaciones. El modelo admite oficinas desde la fase 2; los módulos las
+   justifican desde la fase 5.
 8. Reformas dentro de la visión (ejes uso × intervención).
 9. REBT entra; ICT aparcado.
 10. Asistente de IA como capa transversal: **la IA propone, el motor calcula**; extracciones
     siempre como propuesta revisable con origen declarado en la ficha.
 11. Acceso IA: clave compartida (demo, validación) + BYOK Gemini (modo real); proxy propio +
     créditos como salida futura de monetización — decidido el destino, no se construye ahora.
-12. Lenguaje visual (§9) validado sobre maquetas (2026-08-22): dashboard, justificación
+12. **Sustituida (v4):** tokens de Concreta (acento #0369a1, oscuro «Ónice», radio 4 px, sin
+    sombras); las maquetas v4 (https://claude.ai/artifact/HS4vCeqgyM7Xozjzj9dnQg) son la
+    referencia. Lo que sigue queda como histórico.
+    ~~Lenguaje visual (§9) validado sobre maquetas (2026-08-22): dashboard, justificación
     HS5, checker SI4 y lámina de lenguaje —
     https://claude.ai/code/artifact/877b8b8c-6d1d-437d-a77e-228de6183c4e
     Extiende los tokens light existentes de `src/index.css` (Geist/Geist Mono, slate,
-    acento #0284c7, estados #15803d/#b45309/#dc2626).
+    acento #0284c7, estados #15803d/#b45309/#dc2626).~~
 
 ### Abiertas
 
 - Diseño exacto del asistente de alcance (lista de preguntas por DB) → requiere transcribir
   los ámbitos de aplicación de cada DB (misma disciplina que SPEC §6: verificar contra PDF
   oficial).
-- Detalle de interacción del outliner (¿drag además de Tab? ¿multiselección?) → prototipar en B.
+- ~~Detalle de interacción del outliner~~ → pierde prioridad: el outliner pasa a modo avanzado (v4).
 - ¿"Modo rápido" sin proyecto para SEO/landing de calculadoras? Descartado del producto; puede
   reconsiderarse solo como táctica de captación web (fuera de este doc).
 

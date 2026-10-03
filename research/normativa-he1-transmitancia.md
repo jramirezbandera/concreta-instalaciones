@@ -53,12 +53,18 @@ Valores en **W/m²K**.
 | Muros, suelos y cubiertas en contacto con espacios no habitables o con el terreno (**UT**) | 0,90 | 0,80 | 0,75 | 0,70 | 0,65 | 0,59 |
 | Huecos (marco + vidrio + cajón de persiana) (**UH**) | 3,2 | 2,7 | 2,3 | 2,1 | 1,8 | 1,80 |
 | Puertas con superficie semitransparente ≤ 50 % | **5,7** (valor único, todas las zonas) | | | | | |
-| Medianerías o particiones interiores de la envolvente (**UMD**) | **— (sin valor de Ulim en esta tabla)** | | | | | |
+| ~~Medianerías o particiones interiores de la envolvente (**UMD**)~~ | ~~— (sin valor de Ulim en esta tabla)~~ **incorrecto**, ver nota | | | | | |
+
+> **Corrección 2026-10-03 (verificación cte-normativa, REDISENO-V4 §6):** en la Tabla 3.1.1.a la
+> fila de **UT comparte valores con UMD** («muros, suelos y cubiertas en contacto con espacios no
+> habitables o con el terreno (UT) · medianerías o particiones interiores de la envolvente (UMD)»):
+> 0,90 / 0,80 / 0,75 / 0,70 / 0,65 / 0,59. UMD **sí** tiene Ulim. `he1/tablas.ts` ya lo modela así.
+> Las particiones entre unidades de **distinto uso** van por la Tabla 3.2 (zona C: 0,95).
 
 ### Correcciones aplicadas (§0 / A1-23 REFUTÓ la afirmación original)
 - **Huecos NO se limitan a 5,7.** Esa cifra es la de **PUERTAS**. La serie **3,2 / 2,7 / 2,3 / 2,1 /
   1,8 / 1,80 corresponde a HUECOS (UH)**, no a medianerías.
-- **Medianerías (UMD): NO llevan valor numérico de Ulim en la Tabla 3.1.1.a.** La limitación de
+- ~~**Medianerías (UMD): NO llevan valor numérico de Ulim en la Tabla 3.1.1.a.**~~ *(Incorrecto, ver la nota de arriba.)* La limitación de
   particiones interiores se trata aparte (Tabla 3.2-HE1, fuera del alcance de predimensionado por
   elemento de envolvente exterior). → En `tablas.ts`, modelar UMD como `null` y que el motor NO
   aplique veredicto de transmitancia a una medianería contra esta tabla.
@@ -72,8 +78,8 @@ Valores en **W/m²K**.
   usuario con origen "dato climático", no se calcula aquí.)
 - "Muros y suelos en contacto con el aire exterior" comparten fila (mismo Ulim para UM y US).
 - Estos son valores **límite** (techo): veredicto **CUMPLE si U_elemento ≤ Ulim(zona, tipo)**;
-  **NO CUMPLE si U > Ulim**. Para puertas, comparar contra 5,7 único. Para medianerías, no aplica
-  esta limitación (devolver "no aplica", no "cumple").
+  **NO CUMPLE si U > Ulim**. Para puertas, comparar contra 5,7 único. ~~Para medianerías, no aplica
+  esta limitación (devolver "no aplica", no "cumple").~~ Las medianerías se comparan con la fila de UT.
 
 ### ProcedenciaCTE sugerida
 ```ts

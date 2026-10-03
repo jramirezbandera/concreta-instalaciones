@@ -76,10 +76,16 @@ Guía de aplicación DB-HE 2019, dos apariciones coincidentes), Ulim [W/m²K] po
 |----------|---|---|---|---|---|---|
 | Muros y suelos en contacto con aire exterior (UM, US) | 0,80 | 0,70 | 0,56 | 0,49 | 0,41 | 0,37 |
 | Cubiertas en contacto con aire exterior (UC) | 0,55 | 0,50 | 0,44 | 0,40 | 0,35 | 0,33 |
-| Contacto con no habitables o terreno (UT) | 0,90 | 0,80 | 0,75 | 0,70 | 0,65 | 0,59 |
+| Contacto con no habitables o terreno (UT) · medianerías (UMD) | 0,90 | 0,80 | 0,75 | 0,70 | 0,65 | 0,59 |
 | **Huecos (UH)** | **3,2** | **2,7** | **2,3** | **2,1** | **1,8** | **1,80** |
 | **Puertas (sup. semitransparente ≤ 50 %)** | **5,7** (valor único) ||||||
-| **Medianerías (UMD)** | **sin valor de Ulim en esta tabla** ||||||
+| ~~**Medianerías (UMD)**~~ | ~~sin valor de Ulim en esta tabla~~ — **incorrecto**, ver nota ||||||
+
+> **Corrección 2026-10-03 (verificación cte-normativa, REDISENO-V4 §6):** en la Tabla 3.1.1.a la
+> fila de **UT comparte valores con UMD** («muros, suelos y cubiertas en contacto con espacios no
+> habitables o con el terreno (UT) · medianerías o particiones interiores de la envolvente (UMD)»):
+> 0,90 / 0,80 / 0,75 / 0,70 / 0,65 / 0,59. UMD **sí** tiene Ulim. `he1/tablas.ts` ya lo modela así.
+> Las particiones entre unidades de **distinto uso** van por la Tabla 3.2 (zona C: 0,95).
 
 ⚠️ Si se hubiera codificado la afirmación original (huecos limitados a 5,7), el filtro de huecos
 habría sido absurdamente permisivo. **Verificar siempre contra el PDF maquetado de

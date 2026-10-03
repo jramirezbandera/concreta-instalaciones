@@ -134,28 +134,28 @@ describe("calcHS5 — snapshots (SPEC §5)", () => {
         ],
         "porTramo": [
           {
-            "capacidad_ud": 11,
+            "capacidad_ud": 151,
             "childrenIds": [],
             "cumple": true,
-            "diametroMinPorAguasArriba_mm": 0,
-            "diametro_mm": 63,
+            "diametroMinPorAguasArriba_mm": 100,
+            "diametro_mm": 110,
             "estado": "ok",
             "id": "ramal-bano",
-            "motivo": "Ramal colector (Tabla 4.3): 7 UD a 2 % → Ø63 (cap. 11 UD).",
+            "motivo": "Ramal colector (Tabla 4.3): 7 UD a 2 % → Ø63 (cap. 11 UD). · Ø elevado a 110 mm: le vierte un aparato con desagüe Ø100 (Tabla 4.1) y el Ø no disminuye en el sentido del flujo.",
             "parentId": "bajante",
             "pendiente_pct": 2,
             "tipo": "ramal",
             "udAcumuladas": 7,
           },
           {
-            "capacidad_ud": 6,
+            "capacidad_ud": 151,
             "childrenIds": [],
             "cumple": true,
-            "diametroMinPorAguasArriba_mm": 0,
-            "diametro_mm": 50,
+            "diametroMinPorAguasArriba_mm": 100,
+            "diametro_mm": 110,
             "estado": "ok",
             "id": "ramal-aseo",
-            "motivo": "Ramal colector (Tabla 4.3): 6 UD a 2 % → Ø50 (cap. 6 UD).",
+            "motivo": "Ramal colector (Tabla 4.3): 6 UD a 2 % → Ø50 (cap. 6 UD). · Ø elevado a 110 mm: le vierte un aparato con desagüe Ø100 (Tabla 4.1) y el Ø no disminuye en el sentido del flujo.",
             "parentId": "bajante",
             "pendiente_pct": 2,
             "tipo": "ramal",
@@ -165,7 +165,7 @@ describe("calcHS5 — snapshots (SPEC §5)", () => {
             "capacidad_ud": 11,
             "childrenIds": [],
             "cumple": true,
-            "diametroMinPorAguasArriba_mm": 0,
+            "diametroMinPorAguasArriba_mm": 40,
             "diametro_mm": 63,
             "estado": "ok",
             "id": "ramal-cocina",
@@ -176,34 +176,34 @@ describe("calcHS5 — snapshots (SPEC §5)", () => {
             "udAcumuladas": 9,
           },
           {
-            "capacidad_ud": 135,
+            "capacidad_ud": 360,
             "childrenIds": [
               "ramal-bano",
               "ramal-aseo",
               "ramal-cocina",
             ],
             "cumple": true,
-            "diametroMinPorAguasArriba_mm": 63,
-            "diametro_mm": 90,
+            "diametroMinPorAguasArriba_mm": 110,
+            "diametro_mm": 110,
             "estado": "ok",
             "id": "bajante",
-            "motivo": "Bajante (Tabla 4.4): mayor de Ø por UD total (75) y Ø por UD/ramal de planta (90) con 1 planta(s) → Ø90.",
+            "motivo": "Bajante (Tabla 4.4): mayor de Ø por UD total (75) y Ø por UD/ramal de planta (90) con 1 planta(s) → Ø90. · Ø elevado a 110 mm por monotonía aguas abajo.",
             "parentId": "colector",
             "pendiente_pct": 0,
             "tipo": "bajante",
             "udAcumuladas": 22,
           },
           {
-            "capacidad_ud": 24,
+            "capacidad_ud": 321,
             "childrenIds": [
               "bajante",
             ],
             "cumple": true,
-            "diametroMinPorAguasArriba_mm": 90,
-            "diametro_mm": 90,
+            "diametroMinPorAguasArriba_mm": 110,
+            "diametro_mm": 110,
             "estado": "ok",
             "id": "colector",
-            "motivo": "Colector horizontal enterrado (Tabla 4.5): 22 UD a 2 % → Ø63 (cap. 24 UD). · Ø elevado a 90 mm por monotonía aguas abajo.",
+            "motivo": "Colector horizontal enterrado (Tabla 4.5): 22 UD a 2 % → Ø63 (cap. 24 UD). · Ø elevado a 110 mm por monotonía aguas abajo.",
             "parentId": null,
             "pendiente_pct": 2,
             "tipo": "colector",
@@ -215,7 +215,7 @@ describe("calcHS5 — snapshots (SPEC §5)", () => {
         "ventilacion": {
           "estado": "neutral",
           "primaria": {
-            "aviso": "Ventilación primaria = prolongación de la bajante (Ø90 mm) ≥ 1.3 m sobre cubierta no transitable (suficiente por sí sola, < 7 plantas).",
+            "aviso": "Ventilación primaria = prolongación de la bajante (Ø110 mm) ≥ 1.3 m sobre cubierta no transitable (suficiente por sí sola, < 7 plantas).",
             "estado": "neutral",
             "prolongacionMin_m": 1.3,
             "suficienteSola": true,
@@ -298,46 +298,46 @@ describe("calcHS5 — snapshots (SPEC §5)", () => {
         ],
         "porTramo": [
           {
-            "capacidad_ud": 60,
+            "capacidad_ud": 151,
             "childrenIds": [],
             "cumple": true,
-            "diametroMinPorAguasArriba_mm": 0,
-            "diametro_mm": 90,
+            "diametroMinPorAguasArriba_mm": 100,
+            "diametro_mm": 110,
             "estado": "ok",
             "id": "ramal-aseos",
-            "motivo": "Ramal colector (Tabla 4.3): 26 UD a 2 % → Ø90 (cap. 60 UD).",
+            "motivo": "Ramal colector (Tabla 4.3): 26 UD a 2 % → Ø90 (cap. 60 UD). · Ø elevado a 110 mm: le vierte un aparato con desagüe Ø100 (Tabla 4.1) y el Ø no disminuye en el sentido del flujo.",
             "parentId": "bajante",
             "pendiente_pct": 2,
             "tipo": "ramal",
             "udAcumuladas": 26,
           },
           {
-            "capacidad_ud": 38,
+            "capacidad_ud": 740,
             "childrenIds": [
               "ramal-aseos",
             ],
             "cumple": true,
-            "diametroMinPorAguasArriba_mm": 90,
-            "diametro_mm": 90,
+            "diametroMinPorAguasArriba_mm": 110,
+            "diametro_mm": 110,
             "estado": "ok",
             "id": "bajante",
-            "motivo": "Bajante (Tabla 4.4): mayor de Ø por UD total (63) y Ø por UD/ramal de planta (50) con 10 planta(s) → Ø63. · Ø elevado a 90 mm por monotonía aguas abajo.",
+            "motivo": "Bajante (Tabla 4.4): mayor de Ø por UD total (63) y Ø por UD/ramal de planta (50) con 10 planta(s) → Ø63. · Ø elevado a 110 mm por monotonía aguas abajo.",
             "parentId": "colector",
             "pendiente_pct": 0,
             "tipo": "bajante",
             "udAcumuladas": 26,
           },
           {
-            "capacidad_ud": 38,
+            "capacidad_ud": 321,
             "childrenIds": [
               "bajante",
             ],
             "cumple": true,
-            "diametroMinPorAguasArriba_mm": 90,
-            "diametro_mm": 90,
+            "diametroMinPorAguasArriba_mm": 110,
+            "diametro_mm": 110,
             "estado": "ok",
             "id": "colector",
-            "motivo": "Colector horizontal enterrado (Tabla 4.5): 26 UD a 2 % → Ø75 (cap. 38 UD). · Ø elevado a 90 mm por monotonía aguas abajo.",
+            "motivo": "Colector horizontal enterrado (Tabla 4.5): 26 UD a 2 % → Ø75 (cap. 38 UD). · Ø elevado a 110 mm por monotonía aguas abajo.",
             "parentId": null,
             "pendiente_pct": 2,
             "tipo": "colector",
@@ -349,14 +349,14 @@ describe("calcHS5 — snapshots (SPEC §5)", () => {
         "ventilacion": {
           "estado": "neutral",
           "primaria": {
-            "aviso": "Ventilación primaria = prolongación de la bajante (Ø90 mm) ≥ 2 m sobre cubierta transitable (se requiere además ventilación secundaria, ≥ 7 plantas).",
+            "aviso": "Ventilación primaria = prolongación de la bajante (Ø110 mm) ≥ 2 m sobre cubierta transitable (se requiere además ventilación secundaria, ≥ 7 plantas).",
             "estado": "neutral",
             "prolongacionMin_m": 2,
             "suficienteSola": false,
           },
           "secundaria": {
-            "aviso": "Ventilación secundaria obligatoria (10 ≥ 7 plantas), conexiones en plantas alternas (Tabla 4.10); Ø columna 45 mm (≥ ½ Ø bajante 90 mm).",
-            "diametroColumna_mm": 45,
+            "aviso": "Ventilación secundaria obligatoria (10 ≥ 7 plantas), conexiones en plantas alternas (Tabla 4.10); Ø columna 55 mm (≥ ½ Ø bajante 110 mm).",
+            "diametroColumna_mm": 55,
             "estado": "neutral",
             "modo": "alternas",
           },
@@ -407,7 +407,7 @@ describe("calcHS5 — snapshots (SPEC §5)", () => {
             "capacidad_ud": 2,
             "childrenIds": [],
             "cumple": true,
-            "diametroMinPorAguasArriba_mm": 0,
+            "diametroMinPorAguasArriba_mm": 40,
             "diametro_mm": 40,
             "estado": "ok",
             "id": "ramal",
@@ -537,6 +537,37 @@ describe("calcHS5 — casos límite (selección de Ø por tabla)", () => {
   });
 });
 
+describe("calcHS5 — Ø mínimo por el desagüe del aparato (Tabla 4.1)", () => {
+  it("un ramal con inodoro sube a Ø110 aunque por UD bastara Ø40", () => {
+    const r = calcHS5({
+      uso: "privado",
+      numPlantas: 1,
+      cubiertaTransitable: false,
+      aparatos: [{ id: "ino", tipo: "inodoro_cisterna", tramoId: "ramal" }],
+      tramos: [
+        { id: "ramal", tipo: "ramal", parentId: "colector", pendiente_pct: 2 },
+        { id: "colector", tipo: "colector", parentId: null, pendiente_pct: 2, disposicion: "colgado" },
+      ],
+    });
+    const ramal = r.porTramo.find((t) => t.id === "ramal")!;
+    expect(ramal.diametroMinPorAguasArriba_mm).toBe(100);
+    expect(ramal.diametro_mm).toBe(110);
+    expect(ramal.capacidad_ud).toBe(151); // la del Ø110 a 2 %, no la del Ø de tabla
+    expect(r.porTramo.find((t) => t.id === "colector")!.diametro_mm).toBe(110);
+  });
+
+  it("un ramal sin inodoro conserva el Ø de tabla", () => {
+    const r = calcHS5({
+      uso: "privado",
+      numPlantas: 1,
+      cubiertaTransitable: false,
+      aparatos: [{ id: "lav", tipo: "lavabo", tramoId: "ramal" }],
+      tramos: [{ id: "ramal", tipo: "ramal", parentId: null, pendiente_pct: 2 }],
+    });
+    expect(r.porTramo[0].diametro_mm).toBe(32);
+  });
+});
+
 describe("calcHS5 — validación del árbol", () => {
   it("detecta un ciclo en el grafo de tramos", () => {
     const r = calcHS5({
@@ -613,6 +644,25 @@ describe("calcHS5 — invariantes (property-based)", () => {
           if (hijo?.diametro_mm != null) {
             expect(tramo.diametro_mm).toBeGreaterThanOrEqual(hijo.diametro_mm);
           }
+        }
+      }
+    },
+  );
+
+  // (b') Ningún tramo es menor que el desagüe de los aparatos que le vierten
+  //      (Tabla 4.1: el inodoro exige Ø100, que en tabla es Ø110).
+  test.prop([fc.array(arbAparatoPrivado, { minLength: 1, maxLength: 8 }), fc.integer({ min: 1, max: 20 })])(
+    "ningún tramo queda por debajo del Ø de desagüe de sus aparatos",
+    (tipos, numPlantas) => {
+      const inp = arbolLineal(
+        tipos.map((t, i) => ({ id: `a${i}`, tipo: t, tramoId: "ramal" })),
+        numPlantas,
+      );
+      const r = calcHS5(inp);
+      const minAparatos = Math.max(...r.porAparato.map((a) => a.diametroMin_mm ?? 0));
+      for (const tramo of r.porTramo) {
+        if (tramo.diametro_mm != null) {
+          expect(tramo.diametro_mm).toBeGreaterThanOrEqual(minAparatos);
         }
       }
     },

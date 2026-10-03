@@ -24,6 +24,7 @@ import type { Veredicto } from "../../lib/pdf/renderFicha";
 import { acumularAguasAbajo, peor, validarArbol } from "../../lib/cte/grafo";
 import {
   BAJANTES_TABLA_4_4,
+  capacidadAPendiente,
   COLECTORES_TABLA_4_5,
   RAMALES_COLECTORES_TABLA_4_3,
   seleccionarDiametroPorPendiente,
@@ -127,9 +128,13 @@ export interface ResultadoTramo {
   pendiente_pct: number;
   /** Ø resultante del tramo [mm] (`null` si no se pudo dimensionar). */
   diametro_mm: number | null;
-  /** Ø mínimo impuesto por la monotonía (≥ máx Ø de los hijos) [mm]. */
+  /**
+   * Ø mínimo impuesto por lo que vierte al tramo [mm]: el mayor Ø de los tramos
+   * hijos y del desagüe de los aparatos que descargan directamente en él (Tabla
+   * 4.1: el inodoro exige Ø100). El Ø no disminuye en el sentido del flujo.
+   */
   diametroMinPorAguasArriba_mm: number;
-  /** Capacidad en UD del Ø elegido a la pendiente del tramo (`null` si N/A). */
+  /** Capacidad en UD del Ø final del tramo a su pendiente (`null` si N/A). */
   capacidad_ud: number | null;
   cumple: boolean;
   estado: Veredicto;
@@ -282,6 +287,8 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
   /** UD que cada aparato vierte directamente a su tramo. */
   const udPropiaTramo = new Map<string, number>();
   for (const id of tramoPorId.keys()) udPropiaTramo.set(id, 0);
+  /** Mayor Ø mínimo de desagüe (Tabla 4.1) de los aparatos que vierten a cada tramo. */
+  const diametroMinAparatosTramo = new Map<string, number>();
 
   let veredictoAparatos: Veredicto = "neutral";
 
@@ -320,6 +327,9 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
       estado = peor(estado, "fail");
     } else {
       udPropiaTramo.set(ap.tramoId, udPropiaTramo.get(ap.tramoId)! + ud);
+      if (diametroMin_mm != null && diametroMin_mm > (diametroMinAparatosTramo.get(ap.tramoId) ?? 0)) {
+        diametroMinAparatosTramo.set(ap.tramoId, diametroMin_mm);
+      }
     }
 
     veredictoAparatos = peor(veredictoAparatos, estado);
@@ -343,8 +353,10 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
   const udAcum = acumularAguasAbajo(orden, childrenIds, (id) => udPropiaTramo.get(id) ?? 0);
 
   // ===========================================================================
-  // 4. Dimensionado por tramo + monotonía de Ø (Ø ≥ máx Ø de los hijos).
-  //    Se recorre en post-orden: los hijos ya están dimensionados.
+  // 4. Dimensionado por tramo + Ø no decreciente en el sentido del flujo.
+  //    Se recorre en post-orden: los hijos ya están dimensionados. El mínimo
+  //    sale de los hijos y del desagüe de los aparatos que vierten al tramo
+  //    (Tabla 4.1), y se lleva al primer Ø tabulado que lo alcanza.
   // ===========================================================================
   const resultadoPorId = new Map<string, ResultadoTramo>();
   let veredictoTramos: Veredicto = "neutral";
@@ -354,28 +366,36 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
     const ud = udAcum.get(id) ?? 0;
     const pendiente_pct = pendienteEfectiva(t);
 
-    // Ø mínimo impuesto por los hijos (monotonía: no decreciente aguas abajo).
-    let diametroMinPorAguasArriba_mm = 0;
+    let diametroMinPorHijos_mm = 0;
     for (const c of childrenIds.get(id) ?? []) {
       const rc = resultadoPorId.get(c);
       if (rc?.diametro_mm != null) {
-        diametroMinPorAguasArriba_mm = Math.max(diametroMinPorAguasArriba_mm, rc.diametro_mm);
+        diametroMinPorHijos_mm = Math.max(diametroMinPorHijos_mm, rc.diametro_mm);
       }
     }
+    const diametroMinPorAparatos_mm = diametroMinAparatosTramo.get(id) ?? 0;
+    const diametroMinPorAguasArriba_mm = Math.max(diametroMinPorHijos_mm, diametroMinPorAparatos_mm);
 
     const dim = dimensionarTramo(t, ud, pendiente_pct, inp.numPlantas, warnings);
 
-    // Aplicar monotonía: si la tabla devuelve un Ø menor que el de aguas arriba,
-    // se eleva al Ø de aguas arriba (no decreciente en el sentido del flujo).
+    // Si la tabla da un Ø menor que el mínimo de aguas arriba, se eleva al
+    // primer Ø tabulado que lo alcanza (Ø100 de un inodoro → Ø110).
     let diametro_mm = dim.diametro_mm;
+    let capacidad_ud = dim.capacidad_ud;
     let motivo = dim.motivo;
-    if (diametro_mm != null && diametro_mm < diametroMinPorAguasArriba_mm) {
-      diametro_mm = diametroMinPorAguasArriba_mm;
-      motivo += ` · Ø elevado a ${diametro_mm} mm por monotonía aguas abajo.`;
-    }
-    if (diametro_mm == null && diametroMinPorAguasArriba_mm > 0) {
-      // No se pudo dimensionar por capacidad, pero al menos respeta aguas arriba.
-      diametro_mm = diametroMinPorAguasArriba_mm;
+    if (diametroMinPorAguasArriba_mm > 0 && (diametro_mm == null || diametro_mm < diametroMinPorAguasArriba_mm)) {
+      const elevado = elevarADiametroTabulado(t, diametroMinPorAguasArriba_mm, pendiente_pct, inp.numPlantas);
+      if (dim.diametro_mm != null) {
+        diametro_mm = elevado.diametro_mm;
+        capacidad_ud = elevado.capacidad_ud;
+        motivo +=
+          diametroMinPorAparatos_mm >= diametroMinPorHijos_mm
+            ? ` · Ø elevado a ${diametro_mm} mm: le vierte un aparato con desagüe Ø${diametroMinPorAparatos_mm} (Tabla 4.1) y el Ø no disminuye en el sentido del flujo.`
+            : ` · Ø elevado a ${diametro_mm} mm por monotonía aguas abajo.`;
+      } else {
+        // No se pudo dimensionar por capacidad, pero al menos respeta aguas arriba.
+        diametro_mm = elevado.diametro_mm;
+      }
     }
 
     const estado = dim.estado;
@@ -390,7 +410,7 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
       pendiente_pct,
       diametro_mm,
       diametroMinPorAguasArriba_mm,
-      capacidad_ud: dim.capacidad_ud,
+      capacidad_ud,
       cumple: dim.cumple,
       estado,
       motivo,
@@ -456,6 +476,30 @@ function dimensionarTramo(
     case "colector":
       return dimensionarColector(t, ud, pendiente_pct, warnings);
   }
+}
+
+/**
+ * Primer Ø de la tabla del tramo (4.3 / 4.4 / 4.5) que alcanza `minimo_mm`, con
+ * su capacidad. Si ninguno lo alcanza se devuelve el propio mínimo sin capacidad.
+ */
+function elevarADiametroTabulado(
+  t: TramoInput,
+  minimo_mm: number,
+  pendiente_pct: number,
+  numPlantas: number,
+): { diametro_mm: number; capacidad_ud: number | null } {
+  if (t.tipo === "bajante") {
+    const tabla = BAJANTES_TABLA_4_4.datos;
+    const mas3 = numPlantas > tabla.umbralPlantas;
+    const fila = tabla.filas.find((f) => f.diametro_mm >= minimo_mm);
+    if (!fila) return { diametro_mm: minimo_mm, capacidad_ud: null };
+    return { diametro_mm: fila.diametro_mm, capacidad_ud: mas3 ? fila.bajanteMas3 : fila.bajanteHasta3 };
+  }
+  const filas =
+    t.tipo === "ramal" ? RAMALES_COLECTORES_TABLA_4_3.datos.filas : COLECTORES_TABLA_4_5.datos.filas;
+  const fila = filas.find((f) => f.diametro_mm >= minimo_mm);
+  if (!fila) return { diametro_mm: minimo_mm, capacidad_ud: null };
+  return { diametro_mm: fila.diametro_mm, capacidad_ud: capacidadAPendiente(fila, pendiente_pct) };
 }
 
 /** Ramal colector entre aparatos y bajante (Tabla 4.3). */
