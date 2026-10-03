@@ -16,7 +16,7 @@ import {
   mergeInputsHeredados,
 } from "../lib/proyecto/herencia";
 import { useProyecto } from "../lib/proyecto/ProyectoContext";
-import type { HerenciaBinding } from "../components/justificacion/ModuleShell";
+import type { HerenciaBinding } from "../components/justificacion/ModuleLayout";
 import type { JustificacionKey } from "../lib/proyecto/tipos";
 
 interface UseJustificacionStateReturn<T> {

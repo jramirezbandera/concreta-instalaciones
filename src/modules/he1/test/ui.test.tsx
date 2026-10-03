@@ -9,7 +9,8 @@ import { inicializarStorage } from "../../../lib/proyecto/storage";
 // outliner cerramiento → capas → puentes, cableado outliner ↔ estado ↔ motor
 // (editar el espesor de una capa mueve la U del cerramiento), teclado (Enter
 // añade una capa hermana en el MISMO cerramiento) y sincronía tabla → pie de
-// selección del esquema. Mismo patrón que `hs5/test/ui.test.tsx` y
+// selección (franja bajo la lista y bajo el esquema) y lista de cerramientos de
+// la izquierda. Anatomía v4: la tabla vive en Comprobaciones. Mismo patrón que `hs5/test/ui.test.tsx` y
 // `hs3/test/ui.test.tsx` (router de módulo-nivel: hash ANTES de importar App y
 // resetModules; archivo propio para respetar el límite de ~3 routers/jsdom).
 //
@@ -28,12 +29,21 @@ const VENTANA = "Ventana de salón (doble acristalamiento)";
 const CAPA_XPS = "Aislante XPS (60 mm)";
 const CAPA_CAMARA = "Cámara de aire sin ventilar (30 mm)";
 
-async function renderHe1() {
+/** Monta HE1 en Esquema (su vista inicial), sin abrir Comprobaciones. */
+async function renderHe1Esquema() {
   window.location.hash = `#/p/${DEMO_ID}/he/envolvente`;
   vi.resetModules();
   const { App } = await import("../../../App");
   const utils = render(<App />);
-  await utils.findByRole("treegrid", {}, ESPERA_CHUNK);
+  await utils.findByRole("complementary", { name: "Esquema del cerramiento" }, ESPERA_CHUNK);
+  return utils;
+}
+
+/** Monta HE1 y abre Comprobaciones, donde vive la tabla de cerramientos. */
+async function renderHe1() {
+  const utils = await renderHe1Esquema();
+  await userEvent.setup().click(utils.getByRole("tab", { name: "Comprobaciones" }));
+  await utils.findByRole("treegrid");
   return utils;
 }
 
@@ -155,24 +165,27 @@ describe("HE1 · zona de trabajo feature-8 (outliner + esquema)", () => {
     });
   });
 
-  it("seleccionar una fila muestra su resumen en el pie del esquema", async () => {
+  it("seleccionar una fila muestra su resumen en la franja y dibuja su cerramiento", async () => {
     const user = userEvent.setup();
     const utils = await renderHe1();
-    const { findByRole } = utils;
+    const { findByRole, getByRole } = utils;
 
-    // Fila de capa → nombre, espesor y R.
+    // Fila de capa → nombre, espesor y R, en la franja bajo la lista.
     await user.click(await filaPorNombre(utils, CAPA_XPS));
-    const aside = await findByRole("complementary", {
-      name: "Esquema del cerramiento",
-    });
+    const lista = await findByRole("region", { name: "Comprobaciones" });
     await waitFor(() => {
-      expect(aside).toHaveTextContent(
+      expect(lista).toHaveTextContent(
         /Seleccionado: Aislante XPS \(60 mm\) — e 0,06 m · R \d+,\d+/,
       );
     });
 
-    // Fila de cerramiento → U vs límite efectivo y veredicto en texto.
+    // Fila de cerramiento → U vs límite efectivo y veredicto en texto. La
+    // selección sobrevive al cambio de pestaña: el esquema dibuja la cubierta.
     await user.click(await filaPorNombre(utils, CUBIERTA));
+    await user.click(getByRole("tab", { name: "Esquema" }));
+    const aside = await findByRole("complementary", {
+      name: "Esquema del cerramiento",
+    });
     await waitFor(() => {
       expect(aside).toHaveTextContent(
         /Seleccionado: Cubierta plana invertida — U \d+,\d+ ≤ \d+,\d+ · (Cumple|Aviso|No cumple|Informativo)/,
@@ -182,6 +195,20 @@ describe("HE1 · zona de trabajo feature-8 (outliner + esquema)", () => {
     // …y el panel pinta SOLO ese cerramiento (`soloCerramientoId`): el <title>
     // del SVG nombra la cubierta y el muro ya no aparece en el aside.
     expect(aside).toHaveTextContent("Cerramiento Cubierta plana invertida");
+    expect(aside).not.toHaveTextContent("Muro de fachada");
+  });
+
+  it("la lista de cerramientos de la izquierda cambia el que se dibuja", async () => {
+    const user = userEvent.setup();
+    const { findByRole } = await renderHe1Esquema();
+
+    const lista = await findByRole("region", { name: "Cerramientos" });
+    await user.click(within(lista).getByRole("button", { name: new RegExp(CUBIERTA) }));
+
+    const aside = await findByRole("complementary", { name: "Esquema del cerramiento" });
+    await waitFor(() => {
+      expect(aside).toHaveTextContent("Cerramiento Cubierta plana invertida");
+    });
     expect(aside).not.toHaveTextContent("Muro de fachada");
   });
 });

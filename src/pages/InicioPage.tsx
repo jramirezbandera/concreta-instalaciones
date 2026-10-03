@@ -72,7 +72,7 @@ function descargarJson(nombreArchivo: string, contenido: string): void {
 }
 
 const BTN_FILA =
-  "text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex items-center gap-1 rounded-md px-2 py-1 text-[12px] transition-colors focus-visible:outline-2";
+  "text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex items-center gap-1 rounded px-2 py-1 text-[12px] transition-colors focus-visible:outline-2";
 
 export function InicioPage(): JSX.Element {
   // Initializer (no efecto): inicializarStorage es idempotente, así que el doble
@@ -155,7 +155,7 @@ export function InicioPage(): JSX.Element {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] transition-colors focus-visible:outline-2"
+            className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[13px] transition-colors focus-visible:outline-2"
           >
             <Upload size={14} aria-hidden="true" />
             Importar
@@ -174,7 +174,7 @@ export function InicioPage(): JSX.Element {
           />
           <Link
             to="/nuevo"
-            className="bg-btn-primary-bg hover:bg-btn-primary-bg-hover text-btn-primary-fg focus-visible:outline-accent flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="bg-btn-primary-bg hover:bg-btn-primary-bg-hover text-btn-primary-fg focus-visible:outline-accent flex items-center gap-1.5 rounded px-3 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             <Plus size={14} aria-hidden="true" />
             Nuevo proyecto
@@ -188,7 +188,7 @@ export function InicioPage(): JSX.Element {
         </h1>
 
         {proyectos.length === 0 ? (
-          <div className="border-border-sub bg-bg-surface flex flex-col items-center gap-3 rounded-md border px-6 py-12 text-center">
+          <div className="border-border-sub bg-bg-surface flex flex-col items-center gap-3 rounded border px-6 py-12 text-center">
             <FolderOpen size={28} className="text-text-disabled" aria-hidden="true" />
             <p className="text-text-secondary text-sm">
               No hay ningún proyecto todavía. Crea un expediente nuevo o importa uno exportado como
@@ -196,14 +196,14 @@ export function InicioPage(): JSX.Element {
             </p>
             <Link
               to="/nuevo"
-              className="bg-btn-primary-bg hover:bg-btn-primary-bg-hover text-btn-primary-fg focus-visible:outline-accent flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+              className="bg-btn-primary-bg hover:bg-btn-primary-bg-hover text-btn-primary-fg focus-visible:outline-accent flex items-center gap-1.5 rounded px-3 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               <Plus size={14} aria-hidden="true" />
               Nuevo proyecto
             </Link>
           </div>
         ) : (
-          <div className="border-border-sub overflow-x-auto rounded-md border">
+          <div className="border-border-sub overflow-x-auto rounded border">
             <table className="w-full min-w-[640px] border-collapse text-left text-[13px]">
               <caption className="sr-only">Lista de proyectos guardados</caption>
               <thead>
@@ -299,7 +299,7 @@ export function InicioPage(): JSX.Element {
                           <button
                             type="button"
                             onClick={() => onEliminar(p)}
-                            className="text-text-secondary hover:bg-tint-fail hover:text-state-fail focus-visible:outline-accent flex items-center gap-1 rounded-md px-2 py-1 text-[12px] transition-colors focus-visible:outline-2"
+                            className="text-text-secondary hover:bg-tint-fail hover:text-state-fail focus-visible:outline-accent flex items-center gap-1 rounded px-2 py-1 text-[12px] transition-colors focus-visible:outline-2"
                             aria-label={`Eliminar el proyecto ${p.nombre}`}
                           >
                             <Trash2 size={13} aria-hidden="true" />

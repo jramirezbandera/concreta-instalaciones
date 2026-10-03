@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, render, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DEMO_ID } from "../../../lib/proyecto/demo";
 import { inicializarStorage } from "../../../lib/proyecto/storage";
 
 // =============================================================================
-// Integración de la zona de trabajo HS5 (feature-7 §C) sobre el router real:
-// outliner (filas de tramos y aparatos), presets, teclado (Enter añade) y
-// sincronía tabla → pie de selección del esquema. Mismo patrón que
+// Integración de la zona de trabajo HS5 (feature-7 §C, anatomía v4) sobre el
+// router real: outliner en la pestaña Comprobaciones (filas de tramos y
+// aparatos), presets, teclado (Enter añade) y sincronía tabla → franja de
+// selección, que se ve bajo la lista y bajo el esquema. Mismo patrón que
 // `src/test/rutas.test.tsx` (router de módulo-nivel: hash ANTES de importar App
 // y resetModules; archivo propio para respetar el límite de ~3 routers/jsdom).
 //
@@ -24,7 +25,10 @@ async function renderHs5() {
   vi.resetModules();
   const { App } = await import("../../../App");
   const utils = render(<App />);
-  await utils.findByRole("treegrid", {}, ESPERA_CHUNK);
+  // Abre en Esquema (el dibujo manda); la tabla de tramos vive en Comprobaciones.
+  await utils.findByRole("complementary", { name: "Esquema de columna" }, ESPERA_CHUNK);
+  await userEvent.setup().click(utils.getByRole("tab", { name: "Comprobaciones" }));
+  await utils.findByRole("treegrid");
   return utils;
 }
 
@@ -46,7 +50,7 @@ describe("HS5 · zona de trabajo feature-7 (outliner + esquema)", () => {
     expect(await findByDisplayValue("ramal-bano")).toBeInTheDocument();
     expect(await findByDisplayValue("bano-completo")).toBeInTheDocument();
 
-    // La banda de veredicto del shell refleja el motor sobre el Demo.
+    // La cabecera del módulo refleja el motor sobre el Demo.
     expect(await findByText(/Red de evacuación/)).toBeInTheDocument();
   });
 
@@ -67,12 +71,10 @@ describe("HS5 · zona de trabajo feature-7 (outliner + esquema)", () => {
       );
     });
 
-    // El pie de selección del esquema apunta al ramal recién creado.
-    const aside = await findByRole("complementary", {
-      name: "Esquema de columna",
-    });
+    // La franja de selección apunta al ramal recién creado.
+    const lista = await findByRole("region", { name: "Comprobaciones" });
     await waitFor(() => {
-      expect(aside).toHaveTextContent(/Seleccionado: Ramal cocina/);
+      expect(lista).toHaveTextContent(/Seleccionado: Ramal cocina/);
     });
   });
 
@@ -95,13 +97,34 @@ describe("HS5 · zona de trabajo feature-7 (outliner + esquema)", () => {
     });
   });
 
-  it("seleccionar una fila muestra su resumen en el pie del esquema", async () => {
+  it("«Del proyecto» muestra lo heredado y abre las excepciones locales", async () => {
     const user = userEvent.setup();
-    const { findByDisplayValue, findByRole } = await renderHs5();
+    const { findByRole, getByRole } = await renderHs5();
+
+    // «Del proyecto» vive en la columna izquierda de Esquema.
+    await user.click(getByRole("tab", { name: "Esquema" }));
+    const delProyecto = await findByRole("region", { name: "Del proyecto" });
+    expect(delProyecto).toHaveTextContent(/Nº de plantas\s*4/);
+    expect(within(delProyecto).getByRole("link", { name: "Cambiar en El edificio" })).toHaveAttribute(
+      "href",
+      `#/p/${DEMO_ID}/datos`,
+    );
+
+    await user.click(within(delProyecto).getByRole("button", { name: /Nº de plantas/ }));
+    expect(
+      await findByRole("dialog", { name: "Excepciones locales del contexto heredado" }),
+    ).toBeInTheDocument();
+  });
+
+  it("seleccionar una fila muestra su resumen en la franja, también bajo el esquema", async () => {
+    const user = userEvent.setup();
+    const { findByDisplayValue, findByRole, getByRole } = await renderHs5();
 
     const inputBajante = await findByDisplayValue("bajante");
     await user.click(inputBajante.closest("tr")!);
 
+    // La selección sobrevive al cambio de pestaña: la franja del esquema la muestra.
+    await user.click(getByRole("tab", { name: "Esquema" }));
     const aside = await findByRole("complementary", {
       name: "Esquema de columna",
     });

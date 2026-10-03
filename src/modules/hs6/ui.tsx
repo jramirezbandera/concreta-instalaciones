@@ -1,8 +1,7 @@
 // DB-HS6 — Pantalla del módulo de PROTECCIÓN FRENTE AL RADÓN. Cablea el motor
 // (./calc), el render SVG (./svg) y la ficha PDF (./ficha) sobre el esqueleto
-// nuevo de feature-6: <ModuleShell> aporta Topbar + barra de contexto heredado +
-// banda de veredicto (el resumen sale de ./resumen); aquí queda la zona de
-// trabajo con el editor de LISTA DINÁMICA de soluciones (añadir/quitar con menú
+// v4 (<ModuleLayout>, REDISENO-V4 §3.3): cabecera con veredicto (el resumen
+// sale de ./resumen), a la izquierda el editor de LISTA DINÁMICA de soluciones (añadir/quitar con menú
 // de tipo e ids deterministas). El motor clasifica por zona, comprueba la
 // adecuación de la COMBINACIÓN de soluciones propuesta y el checklist
 // cualitativo/geométrico de cada medida; el elemento crítico (la medida que
@@ -11,7 +10,7 @@
 // MIGRACIÓN (T5.2, patrón de HS5/T5.1): el estado viene de useJustificacionState
 // (defaults ← guardados en el proyecto ← heredados del expediente ← URL) — los
 // campos heredados (municipio / zona) ya NO tienen campo local en el panel de
-// inputs: se ven y se excepcionan vía los chips de la BarraContexto del shell.
+// inputs: se ven y se excepcionan en «Del proyecto», arriba a la izquierda.
 // Siguen viviendo en el estado (los alimenta la herencia) y el motor los recibe
 // igual. `localHabitableEnContactoConTerreno` NO está en el mapa de herencia →
 // conserva su campo local en "Emplazamiento".
@@ -25,11 +24,13 @@
 import { useDeferredValue, useMemo, useState, type JSX, type ReactNode } from "react";
 import { Trash2, Plus, Info } from "lucide-react";
 import { useJustificacionState } from "../../hooks/useJustificacionState";
-import { useContainerWidth } from "../../hooks/useContainerWidth";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
-import { ModuleShell, type ResumenVeredicto } from "../../components/justificacion/ModuleShell";
+import { ModuleLayout, type ResumenVeredicto } from "../../components/justificacion/ModuleLayout";
+import { LienzoAjustado } from "../../components/justificacion/LienzoAjustado";
+import { ajustar } from "../../lib/ui/ajustar";
+import { FranjaDetalle } from "../../components/justificacion/FranjaDetalle";
+import { FilaResumen } from "../../components/justificacion/FilaResumen";
 import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
-import { MobileTabBar, type MobileTab } from "../../components/ui/MobileTabBar";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
 import { Field, NumberInput, SelectInput, InputLabel } from "../../components/ui/InputLabel";
 import { showToast } from "../../components/ui/Toast";
@@ -170,7 +171,6 @@ export function Hs6Module(): JSX.Element {
     hs6Defaults,
   );
   const { proyecto, derivados } = useProyecto();
-  const [tab, setTab] = useState<MobileTab>("inputs");
 
   const deferredState = useDeferredValue(state);
   const result = useMemo(() => calcHS6(deferredState), [deferredState]);
@@ -204,25 +204,27 @@ export function Hs6Module(): JSX.Element {
   // el usuario editó el expediente) formateado legible es-ES — es la fecha que
   // ya enseña el listado de InicioPage y la más veraz para el sello de la ficha
   // (no existe una "fecha de proyecto" declarativa en DatosGenerales).
+  // La misma función alimenta el botón «Ficha PDF» y la pestaña Memoria.
+  const generarFicha = () => {
+    const base = toFichaData(deferredState, result);
+    return renderFicha({
+      ...base,
+      proyecto: proyecto.nombre,
+      fechaProyecto: formatearFecha(proyecto.modificado),
+      observaciones: [
+        ...(base.observaciones ?? []),
+        ...notasExcepcionesLocales({
+          key: "hs6",
+          dg: proyecto.datosGenerales,
+          d: derivados,
+          state: deferredState,
+          overrides: herencia.campos.filter((c) => c.override).map((c) => c.campo),
+        }),
+      ],
+    });
+  };
   const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } =
-    usePdfPreview(() => {
-      const base = toFichaData(deferredState, result);
-      return renderFicha({
-        ...base,
-        proyecto: proyecto.nombre,
-        fechaProyecto: formatearFecha(proyecto.modificado),
-        observaciones: [
-          ...(base.observaciones ?? []),
-          ...notasExcepcionesLocales({
-            key: "hs6",
-            dg: proyecto.datosGenerales,
-            d: derivados,
-            state: deferredState,
-            overrides: herencia.campos.filter((c) => c.override).map((c) => c.campo),
-          }),
-        ],
-      });
-    }, valid);
+    usePdfPreview(generarFicha, valid);
 
   const handleShare = async () => {
     try {
@@ -255,14 +257,8 @@ export function Hs6Module(): JSX.Element {
     );
   };
 
-  // ── Lienzo responsive: ancho fluido + proporción del tamaño nativo del SVG ─
-  const [canvasRef, canvasWidth] = useContainerWidth();
+  // ── Lienzo: el dibujo cabe entero, con la proporción de su tamaño nativo ──
   const { nativeW, nativeH } = hs6NativeSize(result);
-  const svgW =
-    canvasWidth !== undefined && canvasWidth > 0
-      ? Math.min(640, Math.max(320, canvasWidth - 32))
-      : 480;
-  const svgH = Math.round((svgW * nativeH) / nativeW);
 
   // Resumen para la banda del shell (mismo contenido que la antigua banda
   // inline, ver ./resumen). `null` con datos inválidos → banda neutra "Datos
@@ -272,8 +268,52 @@ export function Hs6Module(): JSX.Element {
     [valid, result],
   );
 
+  const entradas = (
+    <>
+      <CollapsibleSection label="Emplazamiento" refNorma="DB-HS6 art. 1 / Apéndice B">
+        <Field
+          id="ambito"
+          label="Local en contacto"
+          help="Ámbito de aplicación (art. 1): ¿el local es HABITABLE y está en CONTACTO con el terreno (planta baja, sótano, semisótano)? Si no lo es (local no habitable o con una planta interpuesta), HS6 no exige medidas."
+          refText="DB-HS6 art. 1"
+        >
+          <SelectInput<"si" | "no">
+            id="ambito"
+            value={state.localHabitableEnContactoConTerreno ? "si" : "no"}
+            options={AMBITO_OPTIONS}
+            onChange={(v) =>
+              setField("localHabitableEnContactoConTerreno", v === "si")
+            }
+          />
+        </Field>
+      </CollapsibleSection>
+      <CollapsibleSection
+        label="Soluciones propuestas"
+        refNorma="DB-HS6 art. 3.1–3.3"
+      >
+        <div className="flex flex-col gap-3">
+          {state.soluciones.map((s) => (
+            <SolucionCard
+              key={s.id}
+              solucion={s}
+              onPatch={(patch) => patchSolucion(s.id, patch)}
+              onRemove={() => removeSolucion(s.id)}
+            />
+          ))}
+          {state.soluciones.length === 0 && (
+            <p className="text-text-disabled px-1 text-[12px] leading-snug">
+              No hay soluciones propuestas. Añada al menos una medida de protección
+              según el nivel exigido por la zona (art. 3.1).
+            </p>
+          )}
+        </div>
+        <AddSolucionMenu onAdd={addSolucion} />
+      </CollapsibleSection>
+    </>
+  );
+
   return (
-    <ModuleShell
+    <ModuleLayout
       justificacionKey="hs6"
       resultado={resumen}
       herencia={herencia}
@@ -283,105 +323,33 @@ export function Hs6Module(): JSX.Element {
         onShare: handleShare,
         onReset: reset,
       }}
+      avisos={result.warnings}
+      entradas={entradas}
+      dibujo={{
+        titulo: "Sección en contacto con el terreno",
+        lienzo: (
+          <LienzoAjustado>
+            {(caja) => {
+              const { width, height } = ajustar(nativeW, nativeH, caja, { max: 900 });
+              return <HS6SVG result={result} mode="screen" width={width} height={height} />;
+            }}
+          </LienzoAjustado>
+        ),
+        franja: (
+          <FranjaDetalle
+            etiqueta="Lo que falta"
+            seleccion={result.elementoCritico ?? null}
+            pista={
+              result.aplica
+                ? "La combinación propuesta cubre lo que exige la zona."
+                : "En este emplazamiento HS6 no exige medidas."
+            }
+          />
+        ),
+      }}
+      comprobaciones={<ResultsTable result={result} />}
+      memoria={{ generar: generarFicha, valid }}
     >
-      <MobileTabBar tab={tab} setTab={setTab} />
-
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Left: inputs */}
-        <div
-          className={[
-            "bg-bg-surface flex min-h-0 flex-col overflow-hidden",
-            "lg:border-border-main lg:w-80 lg:shrink-0 lg:border-r",
-            tab === "inputs" ? "max-lg:flex-1" : "max-lg:hidden",
-            "lg:flex",
-          ].join(" ")}
-        >
-          <div className="scroll-hide flex-1 overflow-y-auto px-4 py-3">
-            {/* Los antiguos campos "Zona de radón" y "Municipio" desaparecen del
-                panel: son heredados del expediente y se ven / excepcionan vía los
-                chips de la BarraContexto del shell. El ámbito (art. 1) NO está en
-                el mapa de herencia → conserva su campo local aquí. */}
-            <CollapsibleSection label="Emplazamiento" refNorma="DB-HS6 art. 1 / Apéndice B">
-              <Field
-                id="ambito"
-                label="Local en contacto"
-                help="Ámbito de aplicación (art. 1): ¿el local es HABITABLE y está en CONTACTO con el terreno (planta baja, sótano, semisótano)? Si no lo es (local no habitable o con una planta interpuesta), HS6 no exige medidas."
-                refText="DB-HS6 art. 1"
-              >
-                <SelectInput<"si" | "no">
-                  id="ambito"
-                  value={state.localHabitableEnContactoConTerreno ? "si" : "no"}
-                  options={AMBITO_OPTIONS}
-                  onChange={(v) =>
-                    setField("localHabitableEnContactoConTerreno", v === "si")
-                  }
-                />
-              </Field>
-            </CollapsibleSection>
-
-            <CollapsibleSection
-              label="Soluciones propuestas"
-              refNorma="DB-HS6 art. 3.1–3.3"
-            >
-              <div className="flex flex-col gap-3">
-                {state.soluciones.map((s) => (
-                  <SolucionCard
-                    key={s.id}
-                    solucion={s}
-                    onPatch={(patch) => patchSolucion(s.id, patch)}
-                    onRemove={() => removeSolucion(s.id)}
-                  />
-                ))}
-                {state.soluciones.length === 0 && (
-                  <p className="text-text-disabled px-1 text-[12px] leading-snug">
-                    No hay soluciones propuestas. Añada al menos una medida de protección
-                    según el nivel exigido por la zona (art. 3.1).
-                  </p>
-                )}
-              </div>
-              <AddSolucionMenu onAdd={addSolucion} />
-            </CollapsibleSection>
-          </div>
-        </div>
-
-        {/* Right: SVG + results. En lg se apila junto (lienzo → tablas); en
-            móvil se reparte por pestaña: "diagramas" = solo el lienzo,
-            "results" = tablas (el veredicto vive ya en la banda del shell).
-            Cada bloque se gatea por separado manteniendo intacto el orden y el
-            layout en lg (lg:flex / lg:block). */}
-        <div
-          className={[
-            "scroll-hide flex min-w-0 flex-col overflow-y-auto",
-            "lg:flex-1",
-            tab === "results" || tab === "diagramas" ? "flex-1" : "hidden",
-            "lg:flex",
-          ].join(" ")}
-        >
-          {/* Lienzo del diagrama (tab "diagramas" en móvil; siempre en lg). */}
-          <div
-            ref={canvasRef}
-            className={[
-              "border-border-main items-center justify-center border-b px-4 py-6",
-              tab === "diagramas" ? "flex" : "hidden",
-              "lg:flex",
-            ].join(" ")}
-          >
-            <HS6SVG result={result} mode="screen" width={svgW} height={svgH} />
-          </div>
-
-          {/* Tablas/resultados (tab "results" en móvil; siempre en lg). */}
-          <div
-            className={[
-              "px-6 py-4",
-              tab === "results" ? "block" : "hidden",
-              "lg:block",
-            ].join(" ")}
-          >
-            <ResultsTable result={result} />
-          </div>
-        </div>
-      </div>
-
       {/* Clon oculto del SVG para el raster del PDF (mismo id que busca renderFicha).
           Modo 'pdf' al tamaño NATIVO del viewBox (hs6NativeSize): renderFicha lo
           clona y rasteriza con scale = CW/nativeW sin deformar. */}
@@ -400,7 +368,7 @@ export function Hs6Module(): JSX.Element {
           onClose={closePdfPreview}
         />
       )}
-    </ModuleShell>
+    </ModuleLayout>
   );
 }
 
@@ -433,13 +401,13 @@ function AddSolucionMenu({ onAdd }: { onAdd: (tipo: TipoSolucionHS6) => void }) 
         type="button"
         onClick={() => setAbierto((a) => !a)}
         aria-expanded={abierto}
-        className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-[13px] transition-colors"
+        className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary flex w-full items-center justify-center gap-1.5 rounded border border-dashed py-2 text-[13px] transition-colors"
       >
         <Plus size={14} />
         Añadir solución
       </button>
       {abierto && (
-        <div className="border-border-sub bg-bg-primary mt-1.5 flex flex-col gap-1 rounded-md border p-1.5">
+        <div className="border-border-sub bg-bg-primary mt-1.5 flex flex-col gap-1 rounded border p-1.5">
           {TIPO_SOLUCION_OPTIONS.map((o) => (
             <button
               key={o.value}
@@ -476,7 +444,7 @@ function SolucionCard({
 }) {
   const nombreId = `nombre-${solucion.id}`;
   return (
-    <div className="border-border-sub bg-bg-primary rounded-md border p-2.5">
+    <div className="border-border-sub bg-bg-primary rounded border p-2.5">
       <div className="flex items-center gap-2">
         <span className="text-text-disabled flex-1 truncate text-[11px] font-semibold tracking-[0.04em] uppercase">
           {TIPO_SOLUCION_LABEL[solucion.tipo]}
@@ -860,17 +828,17 @@ function ResultsTable({ result }: { result: HS6Result }) {
         Resumen
       </div>
       <dl className="max-w-2xl text-[13px]">
-        <SummaryRow
+        <FilaResumen
           k="Zona de radón"
           v={`Zona ${result.zona}`}
           sub={result.aplica ? "indexa el nivel de protección" : "sin exigencia HS6"}
         />
-        <SummaryRow
+        <FilaResumen
           k="Nivel de referencia"
           v={`≤ ${fmt(result.nivelReferencia_Bq_m3, "Bq/m³", 0)}`}
           sub="concentración media anual (art. 2)"
         />
-        <SummaryRow
+        <FilaResumen
           k="Nivel de protección exigido"
           v={
             result.aplica
@@ -882,14 +850,14 @@ function ResultsTable({ result }: { result: HS6Result }) {
           sub={result.aplica ? "art. 3.1" : result.motivoNoAplica ?? undefined}
         />
         {result.aplica && (
-          <SummaryRow
+          <FilaResumen
             k="Combinación propuesta"
             v={`${result.nMedidasValidas} válida(s) de ${result.nMedidasMin} exigida(s)`}
             sub={result.combinacionSuficiente ? "suficiente" : "INSUFICIENTE"}
             estado={result.combinacionSuficiente ? "ok" : "fail"}
           />
         )}
-        <SummaryRow
+        <FilaResumen
           k="Veredicto global"
           v={STATUS_LABEL[result.veredictoGlobal]}
           estado={result.veredictoGlobal}
@@ -930,14 +898,6 @@ function ResultsTable({ result }: { result: HS6Result }) {
           niveles por zona art. 3.1 y zonas del Apéndice B) es de confianza alta.
         </p>
       </div>
-
-      {result.warnings.length > 0 && (
-        <ul className="text-state-warn mt-3 list-disc space-y-1 pl-5 text-[12px]">
-          {result.warnings.map((w, i) => (
-            <li key={i}>{w}</li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
@@ -972,32 +932,6 @@ function MedidaResultRow({ m, critico }: { m: ResultadoMedidaHS6; critico: boole
   );
 }
 
-function SummaryRow({
-  k,
-  v,
-  sub,
-  estado,
-}: {
-  k: string;
-  v: string;
-  sub?: string;
-  estado?: HS6Result["veredictoGlobal"];
-}) {
-  return (
-    <div className="border-border-sub flex items-baseline justify-between gap-3 border-b py-1.5">
-      <dt className="text-text-secondary">{k}</dt>
-      <dd className="flex items-baseline gap-2">
-        <span
-          className={`tabular-nums ${estado ? `font-semibold ${STATE_TEXT[estado]}` : "text-text-primary"}`}
-        >
-          {v}
-        </span>
-        {sub && <span className="text-text-disabled text-[11px]">{sub}</span>}
-      </dd>
-    </div>
-  );
-}
-
 // -----------------------------------------------------------------------------
 // Nota de alcance/limitación VISIBLE. Banner discreto pero no escondido: tinte
 // neutral + icono + texto. Accesible: `role="note"` y el icono es decorativo
@@ -1007,7 +941,7 @@ function DisclosureNote({ children }: { children: ReactNode }) {
   return (
     <div
       role="note"
-      className="bg-tint-neutral border-border-main text-text-secondary mb-3 flex items-start gap-2 rounded-md border px-3 py-2 text-[12px] leading-snug"
+      className="bg-tint-neutral border-border-main text-text-secondary mb-3 flex items-start gap-2 rounded border px-3 py-2 text-[12px] leading-snug"
     >
       <Info size={15} className="text-text-disabled mt-0.5 shrink-0" aria-hidden="true" />
       <p className="min-w-0">{children}</p>

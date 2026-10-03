@@ -3,7 +3,7 @@ import { calcHS6, hs6Defaults, type HS6Inputs } from "../calc";
 import { resumenHs6 } from "../resumen";
 
 // =============================================================================
-// HS6 — resumen para la banda de veredicto del ModuleShell (feature-6 T5.2).
+// HS6 — resumen para la cabecera del módulo (ModuleLayout) (feature-6 T5.2).
 // Transformación PURA HS6Result → ResumenVeredicto: el resumen NO recomputa el
 // veredicto ni las cifras, solo las formatea con el mismo contenido que la
 // antigua banda inline de ui.tsx. Asserts explícitos, SIN snapshots (los

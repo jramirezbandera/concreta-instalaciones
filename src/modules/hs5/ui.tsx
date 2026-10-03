@@ -1,11 +1,11 @@
 // DB-HS5 — Pantalla del módulo de saneamiento (evacuación de aguas). Cablea el
 // motor (./calc), el esquema de columna (./svg) y la ficha PDF (./ficha) sobre
-// el esqueleto de feature-6 (<ModuleShell>) con la ZONA DE TRABAJO de feature-7
-// (módulo patrón, UX-RECONCEPT §6/§7): un OUTLINER único de tramos y aparatos
-// (jerarquía por indentación — Enter añade, Tab/Shift-Tab anida/desanida, ↑↓
-// navega), presets de cuartos húmedos, y el esquema de columna compacto
-// (~380 px, plegable) sincronizado con la tabla (hover fila ↔ resalta elemento;
-// clic elemento ↔ selecciona fila). La tabla manda.
+// la anatomía v4 (<ModuleLayout>, REDISENO-V4 §3.3): el esquema de columna,
+// grande, con la franja de selección debajo; a la izquierda lo que viene del
+// proyecto y la ventilación de red; en Comprobaciones, el OUTLINER de tramos y
+// aparatos (jerarquía por indentación — Enter añade, Tab/Shift-Tab
+// anida/desanida, ↑↓ navega) con los presets de cuartos húmedos. Dibujo, tabla
+// y franja comparten la selección (hover fila ↔ resalta elemento).
 //
 // La semántica del árbol vive AQUÍ (el outliner es agnóstico): anidar = colgar
 // del hermano anterior; desanidar = subir al abuelo — por construcción no se
@@ -19,16 +19,17 @@
 // estado actual. Las mutaciones de las listas son siempre INMUTABLES.
 
 import { useDeferredValue, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useJustificacionState } from "../../hooks/useJustificacionState";
-import { useContainerWidth } from "../../hooks/useContainerWidth";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
 import {
-  ModuleShell,
+  ModuleLayout,
   type ResumenVeredicto,
-} from "../../components/justificacion/ModuleShell";
+} from "../../components/justificacion/ModuleLayout";
+import { LienzoAjustado } from "../../components/justificacion/LienzoAjustado";
+import { ajustar } from "../../lib/ui/ajustar";
+import { FranjaDetalle } from "../../components/justificacion/FranjaDetalle";
+import { FilaResumen } from "../../components/justificacion/FilaResumen";
 import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
-import { MobileTabBar } from "../../components/ui/MobileTabBar";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
 import { showToast } from "../../components/ui/Toast";
 import { Outliner } from "../../components/outliner/Outliner";
@@ -122,13 +123,6 @@ const COLUMNAS_HS5: OutlinerColumna[] = [
   { key: "estado", header: "Estado", align: "left", width: "116px" },
 ];
 
-// Pestañas móviles de feature-7 (la tabla manda; el esquema es soporte).
-type TabHs5 = "tabla" | "esquema";
-const TABS_HS5: { id: TabHs5; label: string }[] = [
-  { id: "tabla", label: "Tabla" },
-  { id: "esquema", label: "Esquema" },
-];
-
 // -----------------------------------------------------------------------------
 // Ids deterministas (contador derivado del estado actual). NO usa Math.random ni
 // Date (React-Compiler-safe; solo se invoca en handlers). Extrae el sufijo
@@ -172,10 +166,8 @@ export function Hs5Module() {
     hs5Defaults,
   );
   const { proyecto, derivados } = useProyecto();
-  const [tab, setTab] = useState<TabHs5>("tabla");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const [esquemaPlegado, setEsquemaPlegado] = useState(false);
 
   const deferredState = useDeferredValue(state);
   const result = useMemo(() => calcHS5(deferredState), [deferredState]);
@@ -199,14 +191,9 @@ export function Hs5Module() {
       ? selectedId
       : null;
 
-  // Ficha con cabecera de expediente (patrón de feature-6, sin cambios).
-  const {
-    pdfExporting,
-    pdfPreview,
-    handleExportPdf,
-    handleDownloadPdf,
-    closePdfPreview,
-  } = usePdfPreview(() => {
+  // Ficha con cabecera de expediente (patrón de feature-6). La misma función
+  // alimenta el botón «Ficha PDF» y la pestaña Memoria.
+  const generarFicha = () => {
     const base = toFichaData(deferredState, result);
     return renderFicha({
       ...base,
@@ -225,7 +212,14 @@ export function Hs5Module() {
         }),
       ],
     });
-  }, valid);
+  };
+  const {
+    pdfExporting,
+    pdfPreview,
+    handleExportPdf,
+    handleDownloadPdf,
+    closePdfPreview,
+  } = usePdfPreview(generarFicha, valid);
 
   const handleShare = async () => {
     try {
@@ -560,17 +554,9 @@ export function Hs5Module() {
     }
   }
 
-  // Tamaño del esquema: el ancho lo da el panel; el alto conserva la proporción
-  // del viewBox nativo (hs5NativeSize, misma fuente de verdad que el PDF).
-  const [canvasRef, canvasWidth] = useContainerWidth();
+  // Tamaño del esquema: cabe entero en el lienzo conservando la proporción del
+  // viewBox nativo (hs5NativeSize, misma fuente de verdad que el PDF).
   const { nativeW, nativeH } = hs5NativeSize(result);
-  const svgW =
-    canvasWidth !== undefined && canvasWidth > 0
-      ? Math.max(240, Math.min(560, canvasWidth - 24))
-      : 348;
-  const svgH = Math.round(
-    nativeW > 0 ? (svgW * nativeH) / nativeW : svgW * 1.2,
-  );
 
   const resumen: ResumenVeredicto | null = useMemo(
     () => (valid ? resumenHs5(result) : null),
@@ -579,8 +565,104 @@ export function Hs5Module() {
 
   const v = result.ventilacion;
 
+  const tablaTramos = (
+    <Outliner
+      columnas={COLUMNAS_HS5}
+      filas={filas}
+      selectedId={selVigente}
+      onSelect={setSelectedId}
+      onHover={setHoverId}
+      onAdd={handleAdd}
+      onNest={handleNest}
+      onUnnest={handleUnnest}
+      onRemove={handleRemove}
+      etiquetaAdd="+ Añadir tramo"
+      toolbar={
+        <div className="flex items-center gap-1.5">
+          {puedeGenerarVT && (
+            <button
+              type="button"
+              onClick={handleGenerarVT}
+              onBlur={() => setConfirmarGenerarVT(false)}
+              title="Reemplaza la red actual por la propuesta derivada de las viviendas tipo del proyecto"
+              className={[
+                "rounded border px-2 py-0.5 text-[11px] transition-colors",
+                confirmarGenerarVT
+                  ? "border-state-warn text-state-warn font-medium"
+                  : "border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary",
+              ].join(" ")}
+            >
+              {confirmarGenerarVT
+                ? "¿Reemplazar la red actual?"
+                : "Generar desde viviendas tipo"}
+            </button>
+          )}
+          {PRESETS_APARATOS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => aplicarPreset(p)}
+              title={`Añadir un ramal de ${p.label.toLowerCase()} con sus aparatos`}
+              className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors"
+            >
+              + {p.label}
+            </button>
+          ))}
+        </div>
+      }
+    />
+  );
+
+  const ventilacionRed = (
+    <CollapsibleSection
+      label="Ventilación de red"
+      refNorma="DB-HS5 ap. 4.3"
+    >
+      <dl className="text-[13px]">
+        <FilaResumen
+          k="Ventilación primaria"
+          v={
+            v.primaria.suficienteSola
+              ? "Suficiente sola"
+              : "Requiere secundaria"
+          }
+          sub={`≥ ${fmt(v.primaria.prolongacionMin_m, "m")} sobre cubierta`}
+        />
+        <FilaResumen
+          k="Ventilación secundaria (columna)"
+          v={
+            v.secundaria.diametroColumna_mm != null
+              ? `Ø${fmt(v.secundaria.diametroColumna_mm, "mm", 0)}`
+              : "No requerida"
+          }
+          sub={
+            v.secundaria.modo === "no_requerida"
+              ? "no requerida"
+              : v.secundaria.modo === "alternas"
+                ? "plantas alternas (4.10)"
+                : "cada planta (4.11)"
+          }
+        />
+        <FilaResumen
+          k="Ventilación terciaria (ramales)"
+          v={v.terciaria.obligatoria ? "Obligatoria" : "No requerida"}
+          sub={
+            v.terciaria.ramalesAfectados.length > 0
+              ? `ramales: ${v.terciaria.ramalesAfectados.join(", ")}`
+              : undefined
+          }
+        />
+      </dl>
+      <p className="text-text-disabled mt-2 text-[11px] leading-snug">
+        El dimensionado de la ventilación de red es un resultado
+        informativo y no entra en el veredicto global (
+        {fmt(result.udTotales, "UD")} totales).
+      </p>
+    </CollapsibleSection>
+  );
+
   return (
-    <ModuleShell
+    <ModuleLayout
       justificacionKey="hs5"
       resultado={resumen}
       herencia={herencia}
@@ -590,192 +672,46 @@ export function Hs5Module() {
         onShare: handleShare,
         onReset: reset,
       }}
-    >
-      <MobileTabBar<TabHs5> tab={tab} setTab={setTab} tabs={TABS_HS5} />
-
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Tabla (outliner) + detalle. En móvil, pestaña "tabla". */}
-        <div
-          className={[
-            "scroll-hide min-w-0 flex-col overflow-y-auto px-4 py-4 lg:px-6",
-            "lg:flex lg:flex-1",
-            tab === "tabla" ? "flex flex-1" : "hidden",
-          ].join(" ")}
-        >
-          {!result.arbolValido && (
-            <div className="text-state-fail mb-3 text-[12px] font-semibold">
-              La red de tramos no es un árbol válido (hay un ciclo, un huérfano
-              o varias raíces): revisa la jerarquía con Tab/Shift-Tab.
-            </div>
-          )}
-
-          <Outliner
-            columnas={COLUMNAS_HS5}
-            filas={filas}
-            selectedId={selVigente}
-            onSelect={setSelectedId}
-            onHover={setHoverId}
-            onAdd={handleAdd}
-            onNest={handleNest}
-            onUnnest={handleUnnest}
-            onRemove={handleRemove}
-            etiquetaAdd="+ Añadir tramo"
-            toolbar={
-              <div className="flex items-center gap-1.5">
-                {puedeGenerarVT && (
-                  <button
-                    type="button"
-                    onClick={handleGenerarVT}
-                    onBlur={() => setConfirmarGenerarVT(false)}
-                    title="Reemplaza la red actual por la propuesta derivada de las viviendas tipo del proyecto"
-                    className={[
-                      "rounded border px-2 py-0.5 text-[11px] transition-colors",
-                      confirmarGenerarVT
-                        ? "border-state-warn text-state-warn font-medium"
-                        : "border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary",
-                    ].join(" ")}
-                  >
-                    {confirmarGenerarVT
-                      ? "¿Reemplazar la red actual?"
-                      : "Generar desde viviendas tipo"}
-                  </button>
-                )}
-                {PRESETS_APARATOS.map((p) => (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => aplicarPreset(p)}
-                    title={`Añadir un ramal de ${p.label.toLowerCase()} con sus aparatos`}
-                    className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors"
-                  >
-                    + {p.label}
-                  </button>
-                ))}
-              </div>
-            }
-          />
-
-          <div className="mt-4 max-w-2xl">
-            <CollapsibleSection
-              label="Ventilación de red (informativa)"
-              refNorma="DB-HS5 ap. 4.3"
-            >
-              <dl className="text-[13px]">
-                <SummaryRow
-                  k="Ventilación primaria"
-                  v={
-                    v.primaria.suficienteSola
-                      ? "Suficiente sola"
-                      : "Requiere secundaria"
-                  }
-                  sub={`≥ ${fmt(v.primaria.prolongacionMin_m, "m")} sobre cubierta`}
-                />
-                <SummaryRow
-                  k="Ventilación secundaria (columna)"
-                  v={
-                    v.secundaria.diametroColumna_mm != null
-                      ? `Ø${fmt(v.secundaria.diametroColumna_mm, "mm", 0)}`
-                      : "No requerida"
-                  }
-                  sub={
-                    v.secundaria.modo === "no_requerida"
-                      ? "no requerida"
-                      : v.secundaria.modo === "alternas"
-                        ? "plantas alternas (4.10)"
-                        : "cada planta (4.11)"
-                  }
-                />
-                <SummaryRow
-                  k="Ventilación terciaria (ramales)"
-                  v={v.terciaria.obligatoria ? "Obligatoria" : "No requerida"}
-                  sub={
-                    v.terciaria.ramalesAfectados.length > 0
-                      ? `ramales: ${v.terciaria.ramalesAfectados.join(", ")}`
-                      : undefined
-                  }
-                />
-              </dl>
-              <p className="text-text-disabled mt-2 text-[11px] leading-snug">
-                El dimensionado de la ventilación de red es un resultado
-                informativo y no entra en el veredicto global (
-                {fmt(result.udTotales, "UD")} totales).
-              </p>
-            </CollapsibleSection>
-
-            {result.warnings.length > 0 && (
-              <ul className="text-state-warn mt-3 list-disc space-y-1 pl-5 text-[12px]">
-                {result.warnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        {/* Esquema de columna: soporte compacto, plegable en lg; pestaña en móvil. */}
-        <aside
-          aria-label="Esquema de columna"
-          className={[
-            "border-border-main bg-bg-surface min-h-0 flex-col overflow-hidden",
-            "lg:flex lg:shrink-0 lg:border-l",
-            esquemaPlegado ? "lg:w-10" : "lg:w-[380px]",
-            tab === "esquema" ? "flex flex-1" : "hidden",
-          ].join(" ")}
-        >
-          {esquemaPlegado ? (
-            <button
-              type="button"
-              onClick={() => setEsquemaPlegado(false)}
-              aria-label="Mostrar esquema de columna"
-              title="Mostrar esquema"
-              className="text-text-disabled hover:text-text-primary hidden h-full w-full items-start justify-center pt-3 transition-colors lg:flex"
-            >
-              <ChevronLeft size={15} />
-            </button>
-          ) : (
-            <>
-              <div className="border-border-sub flex items-center justify-between border-b px-3.5 py-2.5">
-                <span className="text-text-disabled text-[10px] font-semibold tracking-[0.07em] uppercase">
-                  Esquema de columna
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setEsquemaPlegado(true)}
-                  aria-label="Plegar esquema de columna"
-                  title="Plegar esquema"
-                  className="text-text-disabled hover:text-text-primary hidden transition-colors lg:block"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              <div
-                ref={canvasRef}
-                className="scroll-hide flex flex-1 items-start justify-center overflow-y-auto px-3 py-4"
-              >
+      avisos={result.warnings}
+      errores={
+        result.arbolValido
+          ? []
+          : [
+              "La red de tramos no es un árbol válido (hay un ciclo, un huérfano o varias raíces): revisa la jerarquía en Comprobaciones con Tab/Shift-Tab.",
+            ]
+      }
+      entradas={ventilacionRed}
+      dibujo={{
+        titulo: "Esquema de columna",
+        lienzo: (
+          <LienzoAjustado>
+            {(caja) => {
+              const { width, height } = ajustar(nativeW, nativeH, caja, { max: 900 });
+              return (
                 <HS5SVG
                   result={result}
                   mode="screen"
-                  width={svgW}
-                  height={svgH}
+                  width={width}
+                  height={height}
                   selectedId={selVigente}
                   hoverId={hoverId}
                   onSelect={setSelectedId}
                   etiquetas={etiquetas}
                 />
-              </div>
-              {textoSeleccion && (
-                <div className="border-border-sub bg-tint-accent flex items-center gap-2 border-t px-3.5 py-2">
-                  <span className="bg-accent h-[3px] w-3.5 shrink-0 rounded-full" />
-                  <span className="text-text-primary text-[11.5px]">
-                    Seleccionado: {textoSeleccion}
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-        </aside>
-      </div>
-
+              );
+            }}
+          </LienzoAjustado>
+        ),
+        franja: (
+          <FranjaDetalle
+            seleccion={textoSeleccion}
+            pista="Pulsa un tramo o un aparato del esquema, o una fila en Comprobaciones."
+          />
+        ),
+      }}
+      comprobaciones={tablaTramos}
+      memoria={{ generar: generarFicha, valid }}
+    >
       {/* Clon oculto del SVG para el raster del PDF (mismo id que busca renderFicha). */}
       <div className="h-0 w-0 overflow-hidden" aria-hidden="true">
         <div
@@ -795,7 +731,7 @@ export function Hs5Module() {
           onClose={closePdfPreview}
         />
       )}
-    </ModuleShell>
+    </ModuleLayout>
   );
 }
 
@@ -812,16 +748,4 @@ function formatearFecha(iso: string): string {
     month: "short",
     year: "numeric",
   }).format(d);
-}
-
-function SummaryRow({ k, v, sub }: { k: string; v: string; sub?: string }) {
-  return (
-    <div className="border-border-sub flex items-baseline justify-between gap-3 border-b py-1.5">
-      <dt className="text-text-secondary">{k}</dt>
-      <dd className="flex items-baseline gap-2">
-        <span className="text-text-primary tabular-nums">{v}</span>
-        {sub && <span className="text-text-disabled text-[11px]">{sub}</span>}
-      </dd>
-    </div>
-  );
 }

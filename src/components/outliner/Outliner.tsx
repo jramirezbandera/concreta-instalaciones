@@ -38,7 +38,7 @@ import type { OutlinerCelda, OutlinerFila, OutlinerProps } from "./tipos";
 // filas colapsadas.
 // =============================================================================
 
-/** Icono por veredicto (paridad con BandaVeredicto / STATE_TEXT). */
+/** Icono por veredicto (paridad con la cabecera de ModuleLayout / STATE_TEXT). */
 const ICONO_ESTADO: Record<
   Veredicto,
   ComponentType<{ size?: number; className?: string }>

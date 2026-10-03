@@ -28,9 +28,9 @@ export function CollapsibleSection({
         aria-expanded={open}
         aria-controls={contentId}
         onClick={() => setOpen((o) => !o)}
-        className="text-text-disabled border-border-sub mt-3 mb-2.5 flex w-full cursor-pointer items-center justify-between border-b pt-2 pb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase first:mt-0 max-md:min-h-11 max-md:py-3"
+        className="text-text-disabled border-border-sub mt-3 mb-2.5 flex w-full cursor-pointer items-baseline justify-between gap-3 border-b pt-2 text-left pb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase first:mt-0 max-md:min-h-11 max-md:py-3"
       >
-        <span className="flex items-center gap-1.5">
+        <span className="flex min-w-0 items-baseline gap-1.5">
           <svg
             width="10"
             height="10"
@@ -39,7 +39,7 @@ export function CollapsibleSection({
             stroke="currentColor"
             strokeWidth="1.5"
             strokeLinecap="round"
-            className="transition-transform duration-150"
+            className="shrink-0 transition-transform duration-150"
             style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
             aria-hidden="true"
           >
@@ -48,7 +48,13 @@ export function CollapsibleSection({
           {label}
         </span>
         {refNorma && (
-          <span className="text-text-disabled font-mono tracking-normal normal-case">{refNorma}</span>
+          // En columnas estrechas la cita se recorta; entera en el title.
+          <span
+            className="text-text-disabled max-w-[50%] shrink-0 truncate font-mono tracking-normal normal-case"
+            title={refNorma}
+          >
+            {refNorma}
+          </span>
         )}
       </button>
       {open && (

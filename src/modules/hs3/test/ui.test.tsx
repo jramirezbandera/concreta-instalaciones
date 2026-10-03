@@ -5,9 +5,10 @@ import { DEMO_ID } from "../../../lib/proyecto/demo";
 import { inicializarStorage } from "../../../lib/proyecto/storage";
 
 // =============================================================================
-// Integración de la zona de trabajo HS3 (feature-8 §A) sobre el router real:
-// outliner de estancias (filas planas con inputs y resultados), teclado (Enter
-// añade) y sincronía tabla → pie de selección del esquema. Mismo patrón que
+// Integración de la zona de trabajo HS3 (feature-8 §A, anatomía v4) sobre el
+// router real: outliner de estancias en Comprobaciones (filas planas con inputs
+// y resultados), teclado (Enter añade), lista de estancias a la izquierda y
+// sincronía tabla/lista → franja de selección del esquema. Mismo patrón que
 // `hs5/test/ui.test.tsx` (router de módulo-nivel: hash ANTES de importar App y
 // resetModules; archivo propio para respetar el límite de ~3 routers/jsdom).
 //
@@ -19,12 +20,21 @@ import { inicializarStorage } from "../../../lib/proyecto/storage";
 // que cada test espera el treegrid con timeout largo (patrón rutas-legacy).
 const ESPERA_CHUNK = { timeout: 8000 };
 
-async function renderHs3() {
+/** Monta HS3 en Esquema (su vista inicial), sin abrir Comprobaciones. */
+async function renderHs3Esquema() {
   window.location.hash = `#/p/${DEMO_ID}/hs/ventilacion`;
   vi.resetModules();
   const { App } = await import("../../../App");
   const utils = render(<App />);
-  await utils.findByRole("treegrid", {}, ESPERA_CHUNK);
+  await utils.findByRole("complementary", { name: "Esquema" }, ESPERA_CHUNK);
+  return utils;
+}
+
+/** Monta HS3 y abre Comprobaciones, donde vive la tabla de estancias. */
+async function renderHs3() {
+  const utils = await renderHs3Esquema();
+  await userEvent.setup().click(utils.getByRole("tab", { name: "Comprobaciones" }));
+  await utils.findByRole("treegrid");
   return utils;
 }
 
@@ -60,7 +70,7 @@ describe("HS3 · zona de trabajo feature-8 (outliner + esquema)", () => {
     const fila = await filaPorNombre(utils, "bano");
     expect(fila).toHaveTextContent("7 l/s");
 
-    // La banda de veredicto del shell refleja el motor sobre el Demo.
+    // La cabecera del módulo refleja el motor sobre el Demo.
     expect(await findByText(/Ventilación de la vivienda/)).toBeInTheDocument();
   });
 
@@ -101,19 +111,36 @@ describe("HS3 · zona de trabajo feature-8 (outliner + esquema)", () => {
     });
   });
 
-  it("seleccionar una fila muestra su resumen en el pie del esquema", async () => {
+  it("seleccionar una fila muestra su resumen en la franja del esquema", async () => {
     const user = userEvent.setup();
     const utils = await renderHs3();
-    const { findByRole } = utils;
+    const { findByRole, getByRole } = utils;
 
     const fila = await filaPorNombre(utils, "bano");
     await user.click(fila);
 
+    await user.click(getByRole("tab", { name: "Esquema" }));
     const aside = await findByRole("complementary", { name: "Esquema" });
     await waitFor(() => {
       expect(aside).toHaveTextContent(
         /Seleccionado: bano — 8 l\/s ≥ 7 l\/s · Cumple/,
       );
+    });
+  });
+
+  it("la lista de estancias de la izquierda selecciona y la franja la sigue", async () => {
+    const user = userEvent.setup();
+    const { findByRole } = await renderHs3Esquema();
+
+    const lista = await findByRole("region", { name: "Estancias" });
+    const bano = within(lista).getByRole("button", { name: /bano/ });
+    expect(bano).toHaveAttribute("aria-pressed", "false");
+    await user.click(bano);
+    expect(bano).toHaveAttribute("aria-pressed", "true");
+
+    const aside = await findByRole("complementary", { name: "Esquema" });
+    await waitFor(() => {
+      expect(aside).toHaveTextContent(/Seleccionado: bano — 8 l\/s/);
     });
   });
 });

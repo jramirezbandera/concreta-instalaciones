@@ -38,10 +38,12 @@ describe("rutas del expediente (F4) · inicio y dashboard", () => {
 
   it("«/p/demo» monta el dashboard del expediente dentro del provider", async () => {
     inicializarStorage("2026-08-23T00:00:00.000Z");
-    const { findByText } = await renderApp(`#/p/${DEMO_ID}`);
+    const { findByText, findAllByText } = await renderApp(`#/p/${DEMO_ID}`);
     expect(await findByText("Generar anejo CTE (PDF)")).toBeInTheDocument();
     // El Demo viene sembrado con cálculos: debe haber justificaciones en verde.
-    expect(await findByText("HS5")).toBeInTheDocument();
+    // «HS5» sale también en la barra lateral; aquí interesa la del dashboard.
+    const hs5 = await findAllByText("HS5");
+    expect(hs5.some((el) => el.closest("nav") === null)).toBe(true);
   });
 
   it("«/p/<id-inexistente>» redirige a la lista de proyectos", async () => {

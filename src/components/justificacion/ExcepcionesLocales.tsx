@@ -2,7 +2,7 @@ import { useEffect, useId, useRef } from "react";
 import type { JSX, RefObject } from "react";
 import { X } from "lucide-react";
 import { NumberInput, SelectInput } from "../ui/InputLabel";
-import type { HerenciaBinding } from "./ModuleShell";
+import type { HerenciaBinding } from "./ModuleLayout";
 
 // Popover de excepciones locales (feature-6 T3.3-bis): lista los campos del
 // contexto heredado con checkbox "Excepción local" (toggleOverride) y, con el
@@ -10,7 +10,7 @@ import type { HerenciaBinding } from "./ModuleShell";
 // text) llamando a setCampo. Sin dependencias nuevas: div absolute, cierre con
 // Escape y clic fuera. Sin sombra — eleva por superficie + borde (patrón
 // HelpTooltip). Lo posiciona bajo la barra de contexto quien lo monta
-// (BarraContexto, dentro de un contenedor `relative`).
+// (DelProyecto, dentro de un contenedor `relative`).
 
 type Campo = HerenciaBinding["campos"][number];
 
@@ -80,7 +80,7 @@ export function ExcepcionesLocales({
       role="dialog"
       aria-label="Excepciones locales del contexto heredado"
       tabIndex={-1}
-      className="border-border-main bg-bg-surface absolute top-full left-4 z-30 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-md border p-3 outline-none"
+      className="border-border-main bg-bg-surface absolute top-full left-4 z-30 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded border p-3 outline-none"
     >
       <div className="mb-1 flex items-start justify-between gap-2">
         <div className="min-w-0">

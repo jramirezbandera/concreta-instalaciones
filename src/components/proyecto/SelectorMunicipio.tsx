@@ -272,7 +272,7 @@ export function SelectorMunicipio({
           id={listboxId}
           role="listbox"
           aria-label={`Municipios de ${provincia}`}
-          className="border-border-main bg-bg-surface absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded border py-1 shadow-lg"
+          className="border-border-main bg-bg-surface absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded border py-1"
         >
           {visibles.length === 0 && (
             <li className="text-text-disabled px-2 py-1.5 text-[12px]">

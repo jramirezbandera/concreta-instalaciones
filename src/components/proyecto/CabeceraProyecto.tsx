@@ -27,7 +27,7 @@ function ChipAtributo({ children, title }: { children: ReactNode; title?: string
   return (
     <span
       title={title}
-      className="border-border-sub bg-bg-primary text-text-secondary inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] whitespace-nowrap"
+      className="border-border-sub bg-bg-primary text-text-secondary inline-flex items-center rounded border px-2 py-0.5 text-[11px] whitespace-nowrap"
     >
       {children}
     </span>
@@ -39,7 +39,7 @@ function ChipDerivado({ children, procedencia }: { children: ReactNode; proceden
   return (
     <span
       title={procedencia}
-      className="bg-tint-accent text-accent inline-flex cursor-help items-center rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
+      className="bg-tint-accent text-accent inline-flex cursor-help items-center rounded px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
     >
       {children}
     </span>
@@ -91,7 +91,7 @@ export function CabeceraProyecto(): JSX.Element {
 
       <Link
         to="datos"
-        className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] transition-colors focus-visible:outline-2"
+        className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex shrink-0 items-center gap-1.5 rounded border px-2.5 py-1.5 text-[13px] transition-colors focus-visible:outline-2"
       >
         <Pencil size={14} aria-hidden="true" />
         Editar datos

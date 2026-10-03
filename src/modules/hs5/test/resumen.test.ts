@@ -4,7 +4,7 @@ import { diametroDe, resumenHs5 } from "../resumen";
 import { fmt } from "../../../lib/units/format";
 
 // =============================================================================
-// HS5 — resumen para la banda de veredicto del ModuleShell (feature-6 T5.1).
+// HS5 — resumen para la cabecera del módulo (ModuleLayout) (feature-6 T5.1).
 // Transformación PURA HS5Result → ResumenVeredicto: el resumen NO recomputa el
 // veredicto ni las cifras, solo las formatea con el mismo contenido que la
 // antigua banda inline de ui.tsx. Asserts explícitos, SIN snapshots (los

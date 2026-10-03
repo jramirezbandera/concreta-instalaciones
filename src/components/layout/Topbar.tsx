@@ -21,7 +21,7 @@ export function Topbar({
   onMenuOpen,
 }: TopbarProps) {
   return (
-    <header className="border-border-sub bg-bg-surface flex shrink-0 items-center gap-2 border-b px-4 py-1.5">
+    <header className="border-border-main bg-bg-surface flex h-12 shrink-0 items-center gap-2 border-b px-4 lg:px-6">
       <button
         onClick={onMenuOpen}
         className="text-text-secondary hover:text-text-primary -ml-1 p-1 lg:hidden"
@@ -29,11 +29,18 @@ export function Topbar({
       >
         <Menu size={18} />
       </button>
-      <div className="min-w-0">
-        <div className="text-text-primary truncate text-[13px] leading-tight font-semibold">
-          {moduleLabel}
-        </div>
-        <div className="text-text-disabled truncate text-[11px] leading-tight">{moduleGroup}</div>
+      <div className="flex min-w-0 items-baseline gap-2">
+        {moduleGroup && (
+          <>
+            <span className="text-text-disabled truncate font-mono text-[11px] tracking-[0.06em] uppercase max-sm:hidden">
+              {moduleGroup}
+            </span>
+            <span className="text-text-disabled max-sm:hidden" aria-hidden="true">
+              /
+            </span>
+          </>
+        )}
+        <span className="text-text-primary truncate text-[13px] font-medium">{moduleLabel}</span>
       </div>
 
       <div className="flex-1" />
@@ -42,7 +49,7 @@ export function Topbar({
         {onReset && (
           <button
             onClick={onReset}
-            className="text-text-secondary hover:bg-bg-elevated hover:text-text-primary flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors"
+            className="text-text-secondary hover:bg-bg-elevated hover:text-text-primary flex h-8 items-center gap-1.5 rounded px-2.5 py-1.5 text-[13px] transition-colors"
             title="Restablecer valores"
           >
             <RotateCcw size={14} />
@@ -52,7 +59,7 @@ export function Topbar({
         {onShare && (
           <button
             onClick={onShare}
-            className="text-text-secondary hover:bg-bg-elevated hover:text-text-primary flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors"
+            className="text-text-secondary hover:bg-bg-elevated hover:text-text-primary flex h-8 items-center gap-1.5 rounded px-2.5 py-1.5 text-[13px] transition-colors"
             title="Copiar enlace con los datos"
           >
             <Share2 size={14} />
@@ -64,10 +71,11 @@ export function Topbar({
           <button
             onClick={onExportPdf}
             disabled={pdfExporting}
-            className="bg-btn-primary-bg hover:bg-btn-primary-bg-hover text-btn-primary-fg ml-1 flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors disabled:opacity-60"
+            aria-label="Ficha PDF"
+            className="bg-btn-primary-bg hover:bg-btn-primary-bg-hover text-btn-primary-fg ml-1 flex h-8 items-center gap-1.5 rounded px-3 text-[13px] font-medium whitespace-nowrap transition-colors disabled:opacity-60"
           >
             {pdfExporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
-            Ficha PDF
+            <span className="max-sm:hidden">Ficha PDF</span>
           </button>
         )}
       </div>

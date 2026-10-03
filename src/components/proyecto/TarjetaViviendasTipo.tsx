@@ -99,7 +99,7 @@ export function TarjetaViviendasTipo(): JSX.Element {
   return (
     <section
       aria-label="Viviendas tipo"
-      className="border-border-main bg-bg-surface rounded-md border p-3"
+      className="border-border-main bg-bg-surface rounded border p-3"
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-text-primary text-[13px] font-semibold">Viviendas tipo</h2>

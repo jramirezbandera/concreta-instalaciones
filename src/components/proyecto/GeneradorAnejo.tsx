@@ -300,7 +300,7 @@ export function GeneradorAnejo(): JSX.Element {
         type="button"
         onClick={() => void handleGenerar()}
         disabled={ocupado}
-        className="bg-btn-primary-bg text-btn-primary-fg hover:bg-btn-primary-hover focus-visible:outline-accent mt-3.5 flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors focus-visible:outline-2 disabled:cursor-wait disabled:opacity-70"
+        className="bg-btn-primary-bg text-btn-primary-fg hover:bg-btn-primary-hover focus-visible:outline-accent mt-3.5 flex w-full items-center justify-center gap-1.5 rounded px-3 py-2 text-[13px] font-medium transition-colors focus-visible:outline-2 disabled:cursor-wait disabled:opacity-70"
       >
         {ocupado ? (
           <Loader2 size={14} className="animate-spin" aria-hidden="true" />

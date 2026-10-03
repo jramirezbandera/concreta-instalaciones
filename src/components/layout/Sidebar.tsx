@@ -1,6 +1,6 @@
 import { useContext, type JSX } from "react";
 import { Link, NavLink } from "react-router";
-import { ArrowLeft, X } from "lucide-react";
+import { ChevronsUpDown, X } from "lucide-react";
 import { justificacionesPorGrupo, type JustificacionEntry } from "../../data/justificacionRegistry";
 import { ProyectoContext } from "../../lib/proyecto/ProyectoContext";
 import { estadoDe } from "../../lib/proyecto/progreso";
@@ -8,16 +8,16 @@ import type { EstadoJustificacion, JustificacionKey, Proyecto } from "../../lib/
 import { ENGINE_VERSION } from "../../lib/version";
 
 // =============================================================================
-// Sidebar del expediente (feature-6 T4.1). Dos modos según contexto:
+// Sidebar v4 (REDISENO-V4 §3.3). La barra lateral enseña TODO el expediente:
 //
-//   - DENTRO de un proyecto (`/p/:id`, hay ProyectoProvider): cabecera con
-//     "← Proyectos" + nombre del expediente (enlace al dashboard), y nav con
-//     las justificaciones SHIPPED no-dev agrupadas por DB, cada una con un dot
-//     compacto de estado (estadoDe). Las no-shipped NO se listan: la checklist
-//     del dashboard ya muestra el mapa de cobertura completo — la sidebar queda
-//     corta y útil.
-//   - SIN provider (`/_smoke`): cabecera genérica de la app y solo el grupo
-//     "Desarrollo" (el sandbox no pertenece a ningún expediente).
+//   - «Proyecto»: La obra (dashboard) y El edificio (datos del edificio).
+//   - Todas las justificaciones del registry agrupadas por DB, con su código y
+//     un glifo de estado a la derecha: ✓ cumple · ! por revisar · ✕ no cumple ·
+//     «pronto» si aún no existe · ↗ si se justifica fuera. Las no publicadas
+//     se listan atenuadas y sin enlace: el mapa de cobertura se ve de un vistazo.
+//
+// Sin provider (`/_smoke`) solo aparece el grupo «Desarrollo».
+// Accesibilidad: el glifo nunca va solo; lleva aria-label con el estado en texto.
 // =============================================================================
 
 interface SidebarProps {
@@ -25,80 +25,110 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-/** Dot compacto de estado — misma semántica de colores que ChipEstado, sin texto. */
-function DotEstado({ estado }: { estado: EstadoJustificacion }): JSX.Element {
-  let clase: string;
-  let texto: string;
-  if (estado.aplicabilidad === "no_aplica") {
-    clase = "bg-state-neutral";
-    texto = "No aplica";
-  } else if (estado.aplicabilidad === "externo") {
-    clase = "bg-state-neutral";
-    texto = "Externa";
-  } else {
-    switch (estado.progreso) {
-      case "no_cumple":
-        clase = "bg-state-fail";
-        texto = "No cumple";
-        break;
-      case "cumple":
-        if (estado.veredicto === "warn") {
-          clase = "bg-state-warn";
-          texto = "Cumple con avisos";
-        } else {
-          clase = "bg-state-ok";
-          texto = "Cumple";
-        }
-        break;
-      case "en_curso":
-        clase = "bg-state-warn";
-        texto = "En curso";
-        break;
-      case "sin_iniciar":
-        clase = "border-border-main border bg-transparent";
-        texto = "Sin iniciar";
-        break;
-    }
-  }
-  return (
-    <span
-      className={`h-2 w-2 shrink-0 rounded-full ${clase}`}
-      role="img"
-      aria-label={`Estado: ${texto}`}
-      title={texto}
-    />
-  );
+interface Glifo {
+  texto: string;
+  simbolo: string;
+  clase: string;
 }
 
-const LINK_BASE =
-  "flex items-center gap-2.5 rounded-md px-2.5 py-1 text-[13px] transition-colors";
+/** Glifo de estado de una justificación publicada dentro del expediente. */
+function glifoEstado(estado: EstadoJustificacion): Glifo | null {
+  if (estado.aplicabilidad === "no_aplica") {
+    return { texto: "No aplica", simbolo: "—", clase: "text-text-disabled" };
+  }
+  if (estado.aplicabilidad === "externo") {
+    return { texto: "Se justifica fuera", simbolo: "↗", clase: "text-text-disabled" };
+  }
+  switch (estado.progreso) {
+    case "no_cumple":
+      return { texto: "No cumple", simbolo: "✕", clase: "text-state-fail font-bold" };
+    case "cumple":
+      return estado.veredicto === "warn"
+        ? { texto: "Cumple, con cosas por revisar", simbolo: "!", clase: "text-state-warn font-bold" }
+        : { texto: "Cumple", simbolo: "✓", clase: "text-state-ok" };
+    case "en_curso":
+      return { texto: "En curso", simbolo: "…", clase: "text-text-disabled" };
+    case "sin_iniciar":
+      return null;
+  }
+}
 
-function linkClass({ isActive }: { isActive: boolean }): string {
-  return [
-    LINK_BASE,
-    isActive
-      ? "bg-tint-accent text-accent font-medium"
-      : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary",
-  ].join(" ");
+const ITEM =
+  "relative flex items-center gap-2 px-4 py-[5px] text-[13px] whitespace-nowrap transition-colors";
+const ITEM_ACTIVO =
+  "bg-tint-accent text-accent before:bg-accent before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-r";
+const ITEM_INACTIVO = "text-text-secondary hover:text-text-primary";
+
+function navClass({ isActive }: { isActive: boolean }): string {
+  return `${ITEM} ${isActive ? ITEM_ACTIVO : ITEM_INACTIVO}`;
+}
+
+function Codigo({ children }: { children: string }): JSX.Element {
+  return (
+    <span className="w-9 shrink-0 font-mono text-[10.5px] text-text-disabled">{children}</span>
+  );
 }
 
 function NavJustificacion(props: {
   entrada: JustificacionEntry;
-  to: string;
   proyecto: Proyecto | null;
   onClose: () => void;
 }): JSX.Element {
-  const { entrada, to, proyecto, onClose } = props;
-  const Icon = entrada.icon;
+  const { entrada, proyecto, onClose } = props;
+
+  // No publicada (o externa sin pantalla): se lista, atenuada y sin enlace.
+  if (!entrada.shipped || entrada.route === undefined) {
+    const externa = entrada.formato === "externo";
+    return (
+      <div className={`${ITEM} text-text-disabled`} title={`${entrada.codigo} — ${entrada.label}`}>
+        <Codigo>{entrada.codigo}</Codigo>
+        <span className="min-w-0 flex-1 truncate">{entrada.label}</span>
+        <span className="ml-auto font-mono text-[10px]">{externa ? "↗" : "pronto"}</span>
+      </div>
+    );
+  }
+
+  const to = proyecto !== null ? `/p/${proyecto.id}/${entrada.route}` : `/${entrada.route}`;
+  const glifo =
+    proyecto !== null && !entrada.dev
+      ? glifoEstado(estadoDe(proyecto, entrada.key as JustificacionKey))
+      : null;
+
   return (
-    <NavLink to={to} onClick={onClose} className={linkClass} title={`${entrada.codigo} — ${entrada.label}`}>
-      {Icon !== undefined && <Icon size={15} className="shrink-0" />}
-      <span className="min-w-0 flex-1 truncate">{entrada.label}</span>
-      {proyecto !== null && !entrada.dev && (
-        <DotEstado estado={estadoDe(proyecto, entrada.key as JustificacionKey)} />
+    <NavLink to={to} onClick={onClose} className={navClass} title={`${entrada.codigo} — ${entrada.label}`}>
+      {({ isActive }) => (
+        <>
+          <span className={`w-9 shrink-0 font-mono text-[10.5px] ${isActive ? "text-accent" : "text-text-disabled"}`}>
+            {entrada.codigo}
+          </span>
+          <span className="min-w-0 flex-1 truncate">{entrada.label}</span>
+          {glifo !== null && (
+            <span
+              className={`ml-auto font-mono text-[11px] ${glifo.clase}`}
+              role="img"
+              aria-label={`Estado: ${glifo.texto}`}
+              title={glifo.texto}
+            >
+              {glifo.simbolo}
+            </span>
+          )}
+        </>
       )}
     </NavLink>
   );
+}
+
+function CabeceraGrupo({ children }: { children: string }): JSX.Element {
+  return (
+    <div className="text-text-disabled truncate px-4 pt-3.5 pb-1 text-[10px] font-semibold tracking-[0.11em] uppercase">
+      {children}
+    </div>
+  );
+}
+
+/** Quita el sufijo «(DB-HS)» del nombre de grupo: en la barra basta el nombre. */
+function nombreGrupo(grupo: string): string {
+  return grupo.replace(/\s*\(.*\)\s*$/, "");
 }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
@@ -106,51 +136,27 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const ctx = useContext(ProyectoContext);
   const proyecto = ctx?.proyecto ?? null;
 
-  // En modo proyecto: solo shipped no-dev (nada de "Desarrollo" dentro del
-  // expediente). En /_smoke: solo el grupo dev, con su ruta absoluta.
-  const grupos = justificacionesPorGrupo({ soloShipped: true })
+  const grupos = justificacionesPorGrupo()
     .map((g) => ({
       grupo: g.grupo,
-      entradas: g.entradas.filter(
-        (e) => e.route !== undefined && (proyecto !== null ? !e.dev : e.dev === true),
-      ),
+      entradas: g.entradas.filter((e) => (proyecto !== null ? !e.dev : e.dev === true)),
     }))
     .filter((g) => g.entradas.length > 0);
 
   return (
     <aside
       className={[
-        "bg-bg-surface border-border-sub flex w-60 shrink-0 flex-col border-r",
+        "bg-bg-surface border-border-main flex w-64 shrink-0 flex-col border-r",
         "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:transition-transform",
         isOpen ? "max-lg:translate-x-0" : "max-lg:-translate-x-full",
       ].join(" ")}
     >
-      <div className="border-border-sub flex items-center justify-between gap-2 border-b px-4 py-2.5">
-        {proyecto !== null ? (
-          <div className="min-w-0">
-            <Link
-              to="/"
-              onClick={onClose}
-              className="text-text-secondary hover:text-text-primary flex items-center gap-1 text-[11px] leading-tight transition-colors"
-            >
-              <ArrowLeft size={12} aria-hidden="true" />
-              Proyectos
-            </Link>
-            <Link
-              to={`/p/${proyecto.id}`}
-              onClick={onClose}
-              className="text-text-primary hover:text-accent block truncate text-[13px] leading-tight font-semibold transition-colors"
-              title={proyecto.nombre}
-            >
-              {proyecto.nombre}
-            </Link>
-          </div>
-        ) : (
-          <div>
-            <div className="text-text-primary text-[13px] leading-tight font-semibold">Concreta</div>
-            <div className="text-text-disabled text-[11px] leading-tight">Instalaciones · CTE</div>
-          </div>
-        )}
+      <div className="border-border-main flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
+        <Link to="/" onClick={onClose} className="flex min-w-0 items-center gap-2">
+          <span className="bg-accent h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
+          <span className="text-text-primary truncate text-[15px] font-semibold">Concreta</span>
+          <span className="text-text-disabled truncate text-[12px]">Instalaciones</span>
+        </Link>
         <button
           onClick={onClose}
           className="text-text-secondary hover:text-text-primary shrink-0 p-1 lg:hidden"
@@ -160,26 +166,42 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </button>
       </div>
 
-      <nav className="scroll-hide flex-1 overflow-y-auto px-2.5 py-3">
+      {proyecto !== null && (
+        <Link
+          to="/"
+          onClick={onClose}
+          className="border-border-main bg-bg-primary text-text-primary hover:border-text-disabled mx-2.5 mt-2.5 mb-1 flex h-[34px] items-center gap-2 rounded border px-2.5 text-[12.5px] transition-colors"
+          title={`${proyecto.nombre} — cambiar de proyecto`}
+          aria-label={`Proyecto: ${proyecto.nombre}. Volver a la lista de proyectos`}
+        >
+          <span className="min-w-0 flex-1 truncate">{proyecto.nombre}</span>
+          <ChevronsUpDown size={13} className="text-text-disabled shrink-0" aria-hidden="true" />
+        </Link>
+      )}
+
+      <nav className="scroll-hide flex-1 overflow-y-auto pb-3" aria-label="Expediente">
+        {proyecto !== null && (
+          <div>
+            <CabeceraGrupo>Proyecto</CabeceraGrupo>
+            <NavLink to={`/p/${proyecto.id}`} end onClick={onClose} className={navClass}>
+              La obra
+            </NavLink>
+            <NavLink to={`/p/${proyecto.id}/datos`} onClick={onClose} className={navClass}>
+              El edificio
+            </NavLink>
+          </div>
+        )}
         {grupos.map((g) => (
-          <div key={g.grupo} className="mb-3">
-            <div className="text-text-disabled mb-1 truncate px-2 text-[11px] font-medium tracking-[0.07em] uppercase">
-              {g.grupo}
-            </div>
+          <div key={g.grupo}>
+            <CabeceraGrupo>{nombreGrupo(g.grupo)}</CabeceraGrupo>
             {g.entradas.map((e) => (
-              <NavJustificacion
-                key={e.key}
-                entrada={e}
-                to={proyecto !== null ? `/p/${proyecto.id}/${e.route}` : `/${e.route}`}
-                proyecto={proyecto}
-                onClose={onClose}
-              />
+              <NavJustificacion key={e.key} entrada={e} proyecto={proyecto} onClose={onClose} />
             ))}
           </div>
         ))}
       </nav>
 
-      <div className="border-border-sub text-text-disabled font-mono border-t px-4 py-2 text-[10.5px]">
+      <div className="border-border-main text-text-disabled border-t px-4 py-2 font-mono text-[10px]">
         Motor v{ENGINE_VERSION}
       </div>
     </aside>

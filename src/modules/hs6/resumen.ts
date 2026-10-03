@@ -1,16 +1,16 @@
 // =============================================================================
 // resumen — feature-6 T5.2: resumen del resultado de HS6 para la banda de
-// veredicto del ModuleShell. Extrae LITERALMENTE el contenido de la antigua
+// veredicto de la cabecera (ModuleLayout). Extrae LITERALMENTE el contenido de la antigua
 // banda inline de ui.tsx (sujeto + zona entre paréntesis + métricas de medidas
 // válidas / "sin exigencia HS6") para que la migración al shell no cambie ni
 // una letra de lo que ve el usuario.
 //
 // Lib PURA (cero React/DOM): misma entrada → mismo output. No lleva `cita`
-// porque la banda inline anterior no mostraba cita alguna — la BandaVeredicto
-// del shell cae entonces en su default (la edición del DB del registry).
+// porque la banda inline anterior no mostraba cita alguna — la cabecera de
+// ModuleLayout cae entonces en su default (la edición del DB del registry).
 // =============================================================================
 
-import type { ResumenVeredicto } from "../../components/justificacion/ModuleShell";
+import type { ResumenVeredicto } from "../../components/justificacion/ModuleLayout";
 import type { HS6Result } from "./calc";
 
 /**

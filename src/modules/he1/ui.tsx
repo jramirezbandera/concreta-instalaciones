@@ -1,7 +1,8 @@
 // DB-HE1 — Pantalla del módulo de ENVOLVENTE TÉRMICA. Cablea el motor (./calc),
 // el render SVG (./svg) y la ficha PDF (./ficha) sobre el esqueleto de feature-6
-// (<ModuleShell>) con la ZONA DE TRABAJO de feature-8 §B: réplica del módulo
-// patrón (HS5/HS4: outliner + esquema sincronizado) sobre el modelo POR-ELEMENTO
+// en la anatomía v4 (<ModuleLayout>, REDISENO-V4 §3.3): a la izquierda el
+// ambiente y la lista de cerramientos; el dibujo grande enseña UNO (el elegido o
+// el peor); en Comprobaciones, el outliner sobre el modelo POR-ELEMENTO
 // de HE1 — cerramiento (depth 0) → capas (depth 1, de INTERIOR a EXTERIOR) →
 // puentes térmicos (depth 1, kind "puente", tras las capas).
 //
@@ -37,13 +38,16 @@
 // se borre un puente anterior; suficiente para selección/borrado).
 
 import { useDeferredValue, useMemo, useState, type JSX, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { useJustificacionState } from "../../hooks/useJustificacionState";
-import { useContainerWidth } from "../../hooks/useContainerWidth";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
-import { ModuleShell, type ResumenVeredicto } from "../../components/justificacion/ModuleShell";
+import { ModuleLayout, type ResumenVeredicto } from "../../components/justificacion/ModuleLayout";
+import { LienzoAjustado } from "../../components/justificacion/LienzoAjustado";
+import { ajustar } from "../../lib/ui/ajustar";
+import { FranjaDetalle } from "../../components/justificacion/FranjaDetalle";
+import { FilaResumen } from "../../components/justificacion/FilaResumen";
+import { ListaElementos } from "../../components/justificacion/ListaElementos";
 import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
-import { MobileTabBar } from "../../components/ui/MobileTabBar";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
 import { Field, NumberInput, SelectInput } from "../../components/ui/InputLabel";
 import { showToast } from "../../components/ui/Toast";
@@ -55,7 +59,6 @@ import type {
 } from "../../components/outliner/tipos";
 import { renderFicha } from "../../lib/pdf/renderFicha";
 import { STATUS_LABEL } from "../../lib/pdf/utils";
-import { STATE_TEXT } from "../../lib/ui/veredicto";
 import { fmt } from "../../lib/units/format";
 import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
@@ -168,12 +171,6 @@ const COLUMNAS_HE1: OutlinerColumna[] = [
   { key: "estado", header: "Estado", align: "left", width: "168px" },
 ];
 
-type TabHe1 = "tabla" | "esquema";
-const TABS_HE1: { id: TabHe1; label: string }[] = [
-  { id: "tabla", label: "Tabla" },
-  { id: "esquema", label: "Esquema" },
-];
-
 // -----------------------------------------------------------------------------
 // Ids deterministas (contador derivado del estado actual; solo en handlers).
 // -----------------------------------------------------------------------------
@@ -216,10 +213,8 @@ export function He1Module(): JSX.Element {
     he1Defaults,
   );
   const { proyecto, derivados } = useProyecto();
-  const [tab, setTab] = useState<TabHe1>("tabla");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const [esquemaPlegado, setEsquemaPlegado] = useState(false);
 
   const deferredState = useDeferredValue(state);
   const result = useMemo(() => calcHE1(deferredState), [deferredState]);
@@ -264,25 +259,27 @@ export function He1Module(): JSX.Element {
 
   // Ficha con cabecera de expediente (patrón de feature-6, sin cambios): el
   // clon PDF sigue pintando TODOS los cerramientos a tamaño nativo completo.
+  // La misma función alimenta el botón «Ficha PDF» y la pestaña Memoria.
+  const generarFicha = () => {
+    const base = toFichaData(deferredState, result);
+    return renderFicha({
+      ...base,
+      proyecto: proyecto.nombre,
+      fechaProyecto: formatearFecha(proyecto.modificado),
+      observaciones: [
+        ...(base.observaciones ?? []),
+        ...notasExcepcionesLocales({
+          key: "he1",
+          dg: proyecto.datosGenerales,
+          d: derivados,
+          state: deferredState,
+          overrides: herencia.campos.filter((c) => c.override).map((c) => c.campo),
+        }),
+      ],
+    });
+  };
   const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } =
-    usePdfPreview(() => {
-      const base = toFichaData(deferredState, result);
-      return renderFicha({
-        ...base,
-        proyecto: proyecto.nombre,
-        fechaProyecto: formatearFecha(proyecto.modificado),
-        observaciones: [
-          ...(base.observaciones ?? []),
-          ...notasExcepcionesLocales({
-            key: "he1",
-            dg: proyecto.datosGenerales,
-            d: derivados,
-            state: deferredState,
-            overrides: herencia.campos.filter((c) => c.override).map((c) => c.campo),
-          }),
-        ],
-      });
-    }, valid);
+    usePdfPreview(generarFicha, valid);
 
   const handleShare = async () => {
     try {
@@ -653,20 +650,12 @@ export function He1Module(): JSX.Element {
     }
   }
 
-  // Tamaño del esquema del panel: proporción del viewBox nativo de UN
-  // cerramiento (el completo solo si no hay ninguno que mostrar).
-  const [canvasRef, canvasWidth] = useContainerWidth();
+  // Tamaño del esquema: proporción del viewBox nativo de UN cerramiento (el
+  // completo solo si no hay ninguno que mostrar), encajado en el lienzo.
   const nativoAside =
     soloCerramientoId !== null
       ? he1NativeSizeUno(result, soloCerramientoId)
       : he1NativeSize(result);
-  const svgW =
-    canvasWidth !== undefined && canvasWidth > 0
-      ? Math.max(240, Math.min(560, canvasWidth - 24))
-      : 348;
-  const svgH = Math.round(
-    nativoAside.nativeW > 0 ? (svgW * nativoAside.nativeH) / nativoAside.nativeW : svgW * 1.2,
-  );
 
   // Clon PDF: SIEMPRE todos los cerramientos a tamaño nativo completo (la ficha
   // no cambia en feature-8).
@@ -682,8 +671,158 @@ export function He1Module(): JSX.Element {
   const tempInteriorDefault = cd.tempInterior_C;
   const hrInteriorDefault = cd.hrInterior_pct[state.claseHigrometria];
 
+  // Cerramientos para la lista de la izquierda: el activo es el que se dibuja.
+  const elementosCer = result.porCerramiento.map((r) => ({
+    id: r.id,
+    nombre: r.nombre,
+    valor: `U ${fmt(r.u_W_m2K, undefined, 2)}`,
+    estado: r.estado,
+  }));
+
+  const entradas = (
+    <>
+      <CollapsibleSection
+        label="Ambiente y condiciones de cálculo"
+        refNorma="DA DB-HE/2 / DB-HE (Anejo climático)"
+      >
+        <div>
+          <Field
+            id="clase-higrometria"
+            label="Higrometría"
+            help="Clase de higrometría del espacio interior (EN ISO 13788, recogida en el DA DB-HE/2). Las viviendas y, en general, los espacios residenciales son clase ≤ 3. Fija el fRsi,min y la HR interior de cálculo (55 / 62 / 70 %)."
+            refText="DA DB-HE/2"
+          >
+            <SelectInput<ClaseHigrometria>
+              id="clase-higrometria"
+              value={state.claseHigrometria}
+              options={CLASE_HIGROMETRIA_OPTIONS}
+              onChange={(v) => setField("claseHigrometria", v)}
+            />
+          </Field>
+          <Field
+            id="temp-interior"
+            label="Temp. interior"
+            sub="θi"
+            unit="°C"
+            help={`Temperatura interior de cálculo. Si se deja vacío, se usa el default del DA DB-HE/2 (${tempInteriorDefault} °C).`}
+            refText="DA DB-HE/2 (condiciones interiores)"
+          >
+            <NumberInput
+              id="temp-interior"
+              value={state.tempInterior_C ?? Number.NaN}
+              onChange={(v) => setField("tempInterior_C", Number.isFinite(v) ? v : undefined)}
+              step={1}
+            />
+          </Field>
+          <Field
+            id="hr-interior"
+            label="HR interior"
+            sub="φi"
+            unit="%"
+            help={`Humedad relativa interior. Si se deja vacío, la del DA DB-HE/2 por clase de higrometría (ahora ${hrInteriorDefault} %).`}
+            refText="DA DB-HE/2 (condiciones interiores)"
+          >
+            <NumberInput
+              id="hr-interior"
+              value={state.hrInterior_pct ?? Number.NaN}
+              onChange={(v) => setField("hrInterior_pct", Number.isFinite(v) ? v : undefined)}
+              min={0}
+              max={100}
+              step={1}
+            />
+          </Field>
+          <Field
+            id="temp-exterior"
+            label="Temp. ext. enero"
+            sub="θe"
+            unit="°C"
+            help="DATO CLIMÁTICO: temperatura media del mes de ENERO de la localidad (Anejo climático del DB-HE), no una constante del DA. Sin este dato no hay cálculo de condensación realista; si se omite, el motor usa un valor conservador y avisa."
+            refText="DB-HE (Anejo climático) — dato de la localidad"
+          >
+            <NumberInput
+              id="temp-exterior"
+              value={state.tempExteriorEnero_C ?? Number.NaN}
+              onChange={(v) =>
+                setField("tempExteriorEnero_C", Number.isFinite(v) ? v : undefined)
+              }
+              step={1}
+            />
+          </Field>
+          <Field
+            id="hr-exterior"
+            label="HR ext. enero"
+            sub="φe"
+            unit="%"
+            help="DATO CLIMÁTICO: humedad relativa media del mes de ENERO de la localidad (Anejo climático del DB-HE). Si se omite, el motor usa el default informativo del DA DB-HE/2 (~85 %) y avisa."
+            refText="DB-HE (Anejo climático) — dato de la localidad"
+          >
+            <NumberInput
+              id="hr-exterior"
+              value={state.hrExterior_pct ?? Number.NaN}
+              onChange={(v) => setField("hrExterior_pct", Number.isFinite(v) ? v : undefined)}
+              min={0}
+              max={100}
+              step={1}
+            />
+          </Field>
+        </div>
+      </CollapsibleSection>
+      <ListaElementos
+        titulo="Cerramientos"
+        elementos={elementosCer}
+        activoId={soloCerramientoId}
+        onSelect={setSelectedId}
+      />
+      <ResumenHe1 result={result} />
+    </>
+  );
+
+  const comprobaciones = (
+    <>
+      <div className="overflow-x-auto">
+        <Outliner
+          columnas={COLUMNAS_HE1}
+          filas={filas}
+          selectedId={selVigente}
+          onSelect={setSelectedId}
+          onHover={setHoverId}
+          onAdd={handleAdd}
+          onNest={handleNest}
+          onUnnest={handleUnnest}
+          onRemove={handleRemove}
+          etiquetaAdd="+ Añadir cerramiento"
+          toolbar={
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => insertarCapa(cerObjetivo, cerObjetivo.capas.length - 1)}
+                title={`Añadir una capa al final de «${cerObjetivo.nombre}» (lado exterior)`}
+                className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors"
+              >
+                + Capa
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  insertarPuente(cerObjetivo, (cerObjetivo.puentes?.length ?? 0) - 1)
+                }
+                title={`Añadir un puente térmico a «${cerObjetivo.nombre}»`}
+                className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors"
+              >
+                + Puente térmico
+              </button>
+            </div>
+          }
+        />
+      </div>
+      <div className="mt-4 max-w-3xl">
+        <CondensacionesHe1 result={result} />
+      </div>
+    </>
+  );
+
   return (
-    <ModuleShell
+    <ModuleLayout
       justificacionKey="he1"
       resultado={resumen}
       herencia={herencia}
@@ -693,220 +832,42 @@ export function He1Module(): JSX.Element {
         onShare: handleShare,
         onReset: reset,
       }}
-    >
-      <MobileTabBar<TabHe1> tab={tab} setTab={setTab} tabs={TABS_HE1} />
-
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Tabla (outliner) + ambiente + detalle. En móvil, pestaña "tabla". */}
-        <div
-          className={[
-            "scroll-hide min-w-0 flex-col overflow-y-auto px-4 py-4 lg:px-6",
-            "lg:flex lg:flex-1",
-            tab === "tabla" ? "flex flex-1" : "hidden",
-          ].join(" ")}
-        >
-          {/* Formulario corto (no-colecciones, fuera del outliner): clase de
-              higrometría + condiciones de cálculo T/HR. La zona climática es
-              heredada (chips de la BarraContexto del shell). */}
-          <div className="max-w-2xl">
-            <CollapsibleSection
-              label="Ambiente y condiciones de cálculo"
-              refNorma="DA DB-HE/2 / DB-HE (Anejo climático)"
-            >
-              <div className="grid gap-x-6 sm:grid-cols-2">
-                <Field
-                  id="clase-higrometria"
-                  label="Higrometría"
-                  help="Clase de higrometría del espacio interior (EN ISO 13788, recogida en el DA DB-HE/2). Las viviendas y, en general, los espacios residenciales son clase ≤ 3. Fija el fRsi,min y la HR interior de cálculo (55 / 62 / 70 %)."
-                  refText="DA DB-HE/2"
-                >
-                  <SelectInput<ClaseHigrometria>
-                    id="clase-higrometria"
-                    value={state.claseHigrometria}
-                    options={CLASE_HIGROMETRIA_OPTIONS}
-                    onChange={(v) => setField("claseHigrometria", v)}
-                  />
-                </Field>
-                <Field
-                  id="temp-interior"
-                  label="Temp. interior"
-                  sub="θi"
-                  unit="°C"
-                  help={`Temperatura interior de cálculo. Si se deja vacío, se usa el default del DA DB-HE/2 (${tempInteriorDefault} °C).`}
-                  refText="DA DB-HE/2 (condiciones interiores)"
-                >
-                  <NumberInput
-                    id="temp-interior"
-                    value={state.tempInterior_C ?? Number.NaN}
-                    onChange={(v) => setField("tempInterior_C", Number.isFinite(v) ? v : undefined)}
-                    step={1}
-                  />
-                </Field>
-                <Field
-                  id="hr-interior"
-                  label="HR interior"
-                  sub="φi"
-                  unit="%"
-                  help={`Humedad relativa interior. Si se deja vacío, la del DA DB-HE/2 por clase de higrometría (ahora ${hrInteriorDefault} %).`}
-                  refText="DA DB-HE/2 (condiciones interiores)"
-                >
-                  <NumberInput
-                    id="hr-interior"
-                    value={state.hrInterior_pct ?? Number.NaN}
-                    onChange={(v) => setField("hrInterior_pct", Number.isFinite(v) ? v : undefined)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </Field>
-                <Field
-                  id="temp-exterior"
-                  label="Temp. ext. enero"
-                  sub="θe"
-                  unit="°C"
-                  help="DATO CLIMÁTICO: temperatura media del mes de ENERO de la localidad (Anejo climático del DB-HE), no una constante del DA. Sin este dato no hay cálculo de condensación realista; si se omite, el motor usa un valor conservador y avisa."
-                  refText="DB-HE (Anejo climático) — dato de la localidad"
-                >
-                  <NumberInput
-                    id="temp-exterior"
-                    value={state.tempExteriorEnero_C ?? Number.NaN}
-                    onChange={(v) =>
-                      setField("tempExteriorEnero_C", Number.isFinite(v) ? v : undefined)
-                    }
-                    step={1}
-                  />
-                </Field>
-                <Field
-                  id="hr-exterior"
-                  label="HR ext. enero"
-                  sub="φe"
-                  unit="%"
-                  help="DATO CLIMÁTICO: humedad relativa media del mes de ENERO de la localidad (Anejo climático del DB-HE). Si se omite, el motor usa el default informativo del DA DB-HE/2 (~85 %) y avisa."
-                  refText="DB-HE (Anejo climático) — dato de la localidad"
-                >
-                  <NumberInput
-                    id="hr-exterior"
-                    value={state.hrExterior_pct ?? Number.NaN}
-                    onChange={(v) => setField("hrExterior_pct", Number.isFinite(v) ? v : undefined)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </Field>
-              </div>
-            </CollapsibleSection>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Outliner
-              columnas={COLUMNAS_HE1}
-              filas={filas}
-              selectedId={selVigente}
-              onSelect={setSelectedId}
-              onHover={setHoverId}
-              onAdd={handleAdd}
-              onNest={handleNest}
-              onUnnest={handleUnnest}
-              onRemove={handleRemove}
-              etiquetaAdd="+ Añadir cerramiento"
-              toolbar={
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => insertarCapa(cerObjetivo, cerObjetivo.capas.length - 1)}
-                    title={`Añadir una capa al final de «${cerObjetivo.nombre}» (lado exterior)`}
-                    className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors"
-                  >
-                    + Capa
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      insertarPuente(cerObjetivo, (cerObjetivo.puentes?.length ?? 0) - 1)
-                    }
-                    title={`Añadir un puente térmico a «${cerObjetivo.nombre}»`}
-                    className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors"
-                  >
-                    + Puente térmico
-                  </button>
-                </div>
-              }
-            />
-          </div>
-
-          {/* Detalle bajo la tabla: lo que no cabe en las filas (fRsi, Glaser,
-              H_PT y notas por cerramiento) + resumen + alcance + avisos. */}
-          <div className="mt-4 max-w-2xl">
-            <DetalleHe1 result={result} />
-          </div>
-        </div>
-
-        {/* Esquema del cerramiento: panel compacto, plegable en lg; pestaña en
-            móvil. Muestra SOLO el cerramiento seleccionado (o el peor). */}
-        <aside
-          aria-label="Esquema del cerramiento"
-          className={[
-            "border-border-main bg-bg-surface min-h-0 flex-col overflow-hidden",
-            "lg:flex lg:shrink-0 lg:border-l",
-            esquemaPlegado ? "lg:w-10" : "lg:w-[380px]",
-            tab === "esquema" ? "flex flex-1" : "hidden",
-          ].join(" ")}
-        >
-          {esquemaPlegado ? (
-            <button
-              type="button"
-              onClick={() => setEsquemaPlegado(false)}
-              aria-label="Mostrar esquema del cerramiento"
-              title="Mostrar esquema"
-              className="text-text-disabled hover:text-text-primary hidden h-full w-full items-start justify-center pt-3 transition-colors lg:flex"
-            >
-              <ChevronLeft size={15} />
-            </button>
-          ) : (
-            <>
-              <div className="border-border-sub flex items-center justify-between border-b px-3.5 py-2.5">
-                <span className="text-text-disabled text-[10px] font-semibold tracking-[0.07em] uppercase">
-                  Esquema del cerramiento
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setEsquemaPlegado(true)}
-                  aria-label="Plegar esquema del cerramiento"
-                  title="Plegar esquema"
-                  className="text-text-disabled hover:text-text-primary hidden transition-colors lg:block"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              <div
-                ref={canvasRef}
-                className="scroll-hide flex flex-1 items-start justify-center overflow-y-auto px-3 py-4"
-              >
+      avisos={result.warnings}
+      entradas={entradas}
+      dibujo={{
+        titulo: "Esquema del cerramiento",
+        lienzo: (
+          <LienzoAjustado>
+            {(caja) => {
+              const { width, height } = ajustar(nativoAside.nativeW, nativoAside.nativeH, caja, {
+                max: 900,
+              });
+              return (
                 <He1SVG
                   result={result}
                   mode="screen"
-                  width={svgW}
-                  height={svgH}
+                  width={width}
+                  height={height}
                   selectedId={selVigente}
                   hoverId={hoverId}
                   onSelect={setSelectedId}
                   etiquetas={etiquetas}
                   soloCerramientoId={soloCerramientoId}
                 />
-              </div>
-              {textoSeleccion && (
-                <div className="border-border-sub bg-tint-accent flex items-center gap-2 border-t px-3.5 py-2">
-                  <span className="bg-accent h-[3px] w-3.5 shrink-0 rounded-full" />
-                  <span className="text-text-primary text-[11.5px]">
-                    Seleccionado: {textoSeleccion}
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-        </aside>
-      </div>
-
+              );
+            }}
+          </LienzoAjustado>
+        ),
+        franja: (
+          <FranjaDetalle
+            seleccion={textoSeleccion}
+            pista="Se dibuja el cerramiento más desfavorable. Elige otro en la lista de cerramientos o pulsa una capa del dibujo."
+          />
+        ),
+      }}
+      comprobaciones={comprobaciones}
+      memoria={{ generar: generarFicha, valid }}
+    >
       {/* Clon oculto del SVG para el raster del PDF (mismo id que busca
           renderFicha). Modo 'pdf' al tamaño NATIVO completo (he1NativeSize):
           TODOS los cerramientos, como en la ficha de siempre. */}
@@ -925,7 +886,7 @@ export function He1Module(): JSX.Element {
           onClose={closePdfPreview}
         />
       )}
-    </ModuleShell>
+    </ModuleLayout>
   );
 }
 
@@ -954,74 +915,81 @@ function formatearFecha(iso: string): string {
 }
 
 // -----------------------------------------------------------------------------
-// Detalle bajo la tabla (WCAG: el dato numérico SIEMPRE en texto, no solo en el
-// SVG). Lo que NO cabe en las filas del outliner: condensación superficial
-// (fRsi vs fRsi,min) e intersticial (Glaser) por cerramiento, H_PT y notas del
-// motor; más el resumen global, la zona de alcance/supuestos y los avisos.
+// Detalle en texto (WCAG: el dato numérico SIEMPRE en texto, no solo en el SVG).
+// CondensacionesHe1 va bajo la tabla en Comprobaciones: lo que NO cabe en las
+// filas del outliner — condensación superficial (fRsi vs fRsi,min) e
+// intersticial (Glaser) por cerramiento, H_PT y notas del motor. ResumenHe1 va
+// en la columna izquierda: resumen global y alcance/supuestos. Los avisos los
+// pinta la cabecera, a lo ancho.
 // -----------------------------------------------------------------------------
-function DetalleHe1({ result }: { result: HE1Result }) {
+function CondensacionesHe1({ result }: { result: HE1Result }) {
   const notas = result.porCerramiento.flatMap((c) =>
     c.notas.map((n) => `${c.nombre}: ${n}`),
   );
   return (
-    <>
-      <CollapsibleSection label="Condensaciones y detalle" refNorma="DA DB-HE/2">
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="text-text-disabled border-border-sub border-b text-left text-[11px] uppercase">
-                <th scope="col" className="py-1.5 font-medium">Cerramiento</th>
-                <th scope="col" className="py-1.5 text-right font-medium">fRsi</th>
-                <th scope="col" className="py-1.5 text-right font-medium">Glaser (enero)</th>
-                <th scope="col" className="py-1.5 text-right font-medium">H_PT</th>
+    <CollapsibleSection label="Condensaciones y detalle" refNorma="DA DB-HE/2">
+      <div className="overflow-x-auto">
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="text-text-disabled border-border-sub border-b text-left text-[11px] uppercase">
+              <th scope="col" className="py-1.5 font-medium">Cerramiento</th>
+              <th scope="col" className="py-1.5 text-right font-medium">fRsi</th>
+              <th scope="col" className="py-1.5 text-right font-medium">Glaser (enero)</th>
+              <th scope="col" className="py-1.5 text-right font-medium">H_PT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.porCerramiento.map((c) => (
+              <tr key={c.id} className="border-border-sub border-b">
+                <td className="text-text-secondary py-1.5">{c.nombre}</td>
+                <td
+                  className={`py-1.5 text-right tabular-nums ${
+                    c.cumpleFRsi ? "text-text-secondary" : "text-state-fail font-semibold"
+                  }`}
+                >
+                  {fmt(c.fRsi, "", 2)}
+                  <span className="text-text-disabled ml-1 text-[10px]">
+                    ≥ {fmt(c.fRsiMin, "", 2)}
+                  </span>
+                </td>
+                <td className="py-1.5 text-right text-[12px]">
+                  {c.glaser.condensaIntersticial ? (
+                    <span className="text-state-warn font-semibold">condensa (revisar)</span>
+                  ) : (
+                    <span className="text-text-secondary">sin condensación</span>
+                  )}
+                </td>
+                <td className="text-text-disabled py-1.5 text-right tabular-nums">
+                  {c.hPuentes_W_K != null ? fmt(c.hPuentes_W_K, "W/K", 2) : "—"}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {result.porCerramiento.map((c) => (
-                <tr key={c.id} className="border-border-sub border-b">
-                  <td className="text-text-secondary py-1.5">{c.nombre}</td>
-                  <td
-                    className={`py-1.5 text-right tabular-nums ${
-                      c.cumpleFRsi ? "text-text-secondary" : "text-state-fail font-semibold"
-                    }`}
-                  >
-                    {fmt(c.fRsi, "", 2)}
-                    <span className="text-text-disabled ml-1 text-[10px]">
-                      ≥ {fmt(c.fRsiMin, "", 2)}
-                    </span>
-                  </td>
-                  <td className="py-1.5 text-right text-[12px]">
-                    {c.glaser.condensaIntersticial ? (
-                      <span className="text-state-warn font-semibold">condensa (revisar)</span>
-                    ) : (
-                      <span className="text-text-secondary">sin condensación</span>
-                    )}
-                  </td>
-                  <td className="text-text-disabled py-1.5 text-right tabular-nums">
-                    {c.hPuentes_W_K != null ? fmt(c.hPuentes_W_K, "W/K", 2) : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {notas.length > 0 && (
-          <ul className="text-text-disabled mt-2 list-disc space-y-0.5 pl-5 text-[11px]">
-            {notas.map((n, i) => (
-              <li key={i}>{n}</li>
             ))}
-          </ul>
-        )}
-      </CollapsibleSection>
+          </tbody>
+        </table>
+      </div>
+      {notas.length > 0 && (
+        <ul className="text-text-disabled mt-2 list-disc space-y-0.5 pl-5 text-[11px]">
+          {notas.map((n, i) => (
+            <li key={i}>{n}</li>
+          ))}
+        </ul>
+      )}
+    </CollapsibleSection>
+  );
+}
 
+/** Resumen global + alcance y supuestos (columna izquierda). */
+function ResumenHe1({ result }: { result: HE1Result }) {
+  return (
+    <>
       <CollapsibleSection label="Resumen" refNorma="DB-HE1 Tabla 3.1.1.a">
         <dl className="text-[13px]">
-          <SummaryRow
+          <FilaResumen
             k="Zona climática de invierno"
             v={result.zonaClimatica}
             sub="indexa Ulim y fRsi,min"
           />
-          <SummaryRow
+          <FilaResumen
             k="Condiciones de cálculo"
             v={`${fmt(result.tempInterior_C, "°C", 0)} / ${fmt(result.hrInterior_pct, "%", 0)} int.`}
             sub={`${fmt(result.tempExteriorEnero_C, "°C", 0)} / ${fmt(
@@ -1030,7 +998,7 @@ function DetalleHe1({ result }: { result: HE1Result }) {
               0,
             )} ext. (enero)`}
           />
-          <SummaryRow
+          <FilaResumen
             k="Veredicto global"
             v={STATUS_LABEL[result.veredictoGlobal]}
             estado={result.veredictoGlobal}
@@ -1060,41 +1028,7 @@ function DetalleHe1({ result }: { result: HE1Result }) {
           térmicos (H_PT) son informativos: sus ψ están pendientes de verificación literal.
         </p>
       </div>
-
-      {result.warnings.length > 0 && (
-        <ul className="text-state-warn mt-3 list-disc space-y-1 pl-5 text-[12px]">
-          {result.warnings.map((w, i) => (
-            <li key={i}>{w}</li>
-          ))}
-        </ul>
-      )}
     </>
-  );
-}
-
-function SummaryRow({
-  k,
-  v,
-  sub,
-  estado,
-}: {
-  k: string;
-  v: string;
-  sub?: string;
-  estado?: HE1Result["veredictoGlobal"];
-}) {
-  return (
-    <div className="border-border-sub flex items-baseline justify-between gap-3 border-b py-1.5">
-      <dt className="text-text-secondary">{k}</dt>
-      <dd className="flex items-baseline gap-2">
-        <span
-          className={`tabular-nums ${estado ? `font-semibold ${STATE_TEXT[estado]}` : "text-text-primary"}`}
-        >
-          {v}
-        </span>
-        {sub && <span className="text-text-disabled text-[11px]">{sub}</span>}
-      </dd>
-    </div>
   );
 }
 
@@ -1107,7 +1041,7 @@ function DisclosureNote({ children }: { children: ReactNode }) {
   return (
     <div
       role="note"
-      className="bg-tint-neutral border-border-main text-text-secondary mb-3 flex items-start gap-2 rounded-md border px-3 py-2 text-[12px] leading-snug"
+      className="bg-tint-neutral border-border-main text-text-secondary mb-3 flex items-start gap-2 rounded border px-3 py-2 text-[12px] leading-snug"
     >
       <Info size={15} className="text-text-disabled mt-0.5 shrink-0" aria-hidden="true" />
       <p className="min-w-0">{children}</p>

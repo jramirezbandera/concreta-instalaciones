@@ -1,14 +1,14 @@
 // DB-HS4 — Pantalla del módulo de suministro de agua (fontanería). Cablea el
 // motor (./calc), el esquema de columna (./svg) y la ficha PDF (./ficha) sobre
-// el esqueleto de feature-6 (<ModuleShell>) con la ZONA DE TRABAJO de feature-7:
-// réplica del módulo patrón HS5 (outliner + esquema + presets) sobre el modelo
+// la anatomía v4 (<ModuleLayout>, REDISENO-V4 §3.3), como el módulo patrón HS5
+// (esquema grande + outliner en Comprobaciones + presets), sobre el modelo
 // HIDRÁULICO de HS4 — caudal de cálculo (×K), Ø comercial, velocidad en rango,
 // pérdida de carga y presión residual, con el RECORRIDO CRÍTICO marcado en la
 // tabla (texto "◆ crítico" junto al estado) y en rojo en el esquema.
 //
 // El formulario corto de "Suministro" (presión de acometida — herencia
-// CONDICIONAL —, criterio K y pérdidas localizadas) se mantiene SOBRE la tabla:
-// no son colección, no van al outliner. La semántica del árbol es la de HS5
+// CONDICIONAL —, criterio K y pérdidas localizadas) va en la columna izquierda
+// con el resumen: no son colección, no van al outliner. La semántica del árbol es la de HS5
 // (anidar = colgar del hermano anterior; desanidar = subir al abuelo; sin
 // ciclos por construcción). Columna "Mat. / P mín": en tramos el material de la
 // tubería; en aparatos el modo de presión mínima (auto / grifo / fluxor).
@@ -18,16 +18,18 @@
 // mutaciones inmutables.
 
 import { useDeferredValue, useMemo, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { useJustificacionState } from "../../hooks/useJustificacionState";
-import { useContainerWidth } from "../../hooks/useContainerWidth";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
 import {
-  ModuleShell,
+  ModuleLayout,
   type ResumenVeredicto,
-} from "../../components/justificacion/ModuleShell";
+} from "../../components/justificacion/ModuleLayout";
+import { LienzoAjustado } from "../../components/justificacion/LienzoAjustado";
+import { ajustar } from "../../lib/ui/ajustar";
+import { FranjaDetalle } from "../../components/justificacion/FranjaDetalle";
+import { FilaResumen } from "../../components/justificacion/FilaResumen";
 import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
-import { MobileTabBar } from "../../components/ui/MobileTabBar";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
 import {
   Field,
@@ -144,12 +146,6 @@ const COLUMNAS_HS4: OutlinerColumna[] = [
   { key: "estado", header: "Estado", align: "left", width: "150px" },
 ];
 
-type TabHs4 = "tabla" | "esquema";
-const TABS_HS4: { id: TabHs4; label: string }[] = [
-  { id: "tabla", label: "Tabla" },
-  { id: "esquema", label: "Esquema" },
-];
-
 // -----------------------------------------------------------------------------
 // Ids deterministas (contador derivado del estado actual; solo en handlers).
 // -----------------------------------------------------------------------------
@@ -175,10 +171,8 @@ export function Hs4Module() {
     hs4Defaults,
   );
   const { proyecto, derivados } = useProyecto();
-  const [tab, setTab] = useState<TabHs4>("tabla");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const [esquemaPlegado, setEsquemaPlegado] = useState(false);
 
   const deferredState = useDeferredValue(state);
   const result = useMemo(() => calcHS4(deferredState), [deferredState]);
@@ -200,14 +194,9 @@ export function Hs4Module() {
       ? selectedId
       : null;
 
-  // Ficha con cabecera de expediente (patrón de feature-6, sin cambios).
-  const {
-    pdfExporting,
-    pdfPreview,
-    handleExportPdf,
-    handleDownloadPdf,
-    closePdfPreview,
-  } = usePdfPreview(() => {
+  // Ficha con cabecera de expediente (patrón de feature-6). La misma función
+  // alimenta el botón «Ficha PDF» y la pestaña Memoria.
+  const generarFicha = () => {
     const base = toFichaData(deferredState, result);
     return renderFicha({
       ...base,
@@ -226,7 +215,14 @@ export function Hs4Module() {
         }),
       ],
     });
-  }, valid);
+  };
+  const {
+    pdfExporting,
+    pdfPreview,
+    handleExportPdf,
+    handleDownloadPdf,
+    closePdfPreview,
+  } = usePdfPreview(generarFicha, valid);
 
   const handleShare = async () => {
     try {
@@ -614,16 +610,8 @@ export function Hs4Module() {
     }
   }
 
-  // Tamaño del esquema (proporción del viewBox nativo, como HS5).
-  const [canvasRef, canvasWidth] = useContainerWidth();
+  // Tamaño del esquema: cabe entero en el lienzo (proporción del viewBox nativo).
   const { nativeW, nativeH } = hs4NativeSize(result);
-  const svgW =
-    canvasWidth !== undefined && canvasWidth > 0
-      ? Math.max(240, Math.min(560, canvasWidth - 24))
-      : 348;
-  const svgH = Math.round(
-    nativeW > 0 ? (svgW * nativeH) / nativeW : svgW * 1.2,
-  );
 
   const resumen: ResumenVeredicto | null = useMemo(
     () => (valid ? resumenHs4(result) : null),
@@ -631,7 +619,7 @@ export function Hs4Module() {
   );
 
   // Herencia CONDICIONAL de la presión de acometida (ver comentario de cabecera):
-  // con el dato informado en el expediente, manda el chip de la BarraContexto y
+  // con el dato informado en el expediente, manda «Del proyecto» (columna izquierda) y
   // el Field local se oculta.
   const presionHeredada = herencia.campos.some(
     (c) => c.campo === "presionAcometida_kPa",
@@ -643,8 +631,193 @@ export function Hs4Module() {
       : undefined;
   const presionMinCritico_kPa = apCritico?.presionMinExigida_kPa ?? null;
 
+  const entradas = (
+    <>
+      <CollapsibleSection
+        label="Suministro"
+        refNorma="DB-HS4 ap. 2.1.3 / 4.2"
+      >
+        <div>
+          {!presionHeredada && (
+            <Field
+              id="presion-acometida"
+              label="Presión acometida"
+              sub="P"
+              unit="kPa"
+              help="Presión disponible en la acometida (entrada de la red). Es el punto de partida de la presión residual: a lo largo del recorrido se le restan las pérdidas de carga y la cota. Si en el punto más desfavorable cae por debajo de la mínima exigida, hace falta grupo de presión (ap. 4.5)."
+              refText="DB-HS4 ap. 2.1.3"
+            >
+              <NumberInput
+                id="presion-acometida"
+                value={state.presionAcometida_kPa}
+                onChange={(v) => setField("presionAcometida_kPa", v)}
+                min={0}
+                step={10}
+              />
+            </Field>
+          )}
+          <Field
+            id="criterio-k"
+            label="Simultaneidad"
+            sub="K"
+            help="Coeficiente de simultaneidad K aplicado al caudal acumulado de cada tramo. UNE 149201 (K = 1/√(n−1)) es un CRITERIO EXTERNO, no exigencia del DB-HS4 (el DB sólo remite a «un criterio adecuado»). «Sin simultaneidad» suma directa de caudales (K = 1)."
+            refText="UNE 149201 (criterio externo)"
+          >
+            <SelectInput<CriterioK>
+              id="criterio-k"
+              value={state.criterioK}
+              options={CRITERIO_K_OPTIONS}
+              onChange={(v) => setField("criterioK", v)}
+            />
+          </Field>
+          <Field
+            id="perdidas-localizadas"
+            label="Pérdidas local."
+            sub="%"
+            unit="%"
+            help="Fracción de pérdidas localizadas (codos, tes, válvulas…) estimada sobre las longitudinales. Es buena práctica de cálculo (20–30 %), NO cifra del DB-HS4. Por defecto 25 %."
+            refText="Buena práctica (no DB)"
+          >
+            <NumberInput
+              id="perdidas-localizadas"
+              value={fraccionPct}
+              onChange={(v) =>
+                setField("fraccionPerdidasLocalizadas", v / 100)
+              }
+              min={20}
+              max={30}
+              step={1}
+            />
+          </Field>
+        </div>
+      </CollapsibleSection>
+      <CollapsibleSection
+        label="Resumen"
+        refNorma="DB-HS4 ap. 2.1.3 / 4.5"
+      >
+        <dl className="text-[13px]">
+          <FilaResumen
+            k="Caudal de cálculo total"
+            v={fmt(result.caudalTotal_dm3_s, "dm³/s", 2)}
+            sub="que llega a la acometida"
+          />
+          <FilaResumen
+            k="Presión en el punto crítico"
+            v={fmt(result.presionCritica_kPa, "kPa", 0)}
+            sub={
+              presionMinCritico_kPa != null
+                ? `mínima exigida ${fmt(presionMinCritico_kPa, "kPa", 0)}${
+                    apCritico ? ` · ${apCritico.id}` : ""
+                  }`
+                : "sin punto de consumo crítico"
+            }
+          />
+          <FilaResumen
+            k="Grupo de presión (ap. 4.5)"
+            v={
+              result.grupoPresionNecesario ? "Necesario" : "No necesario"
+            }
+            sub={
+              result.grupoPresionNecesario
+                ? "la presión cae por debajo de la mínima en el punto más desfavorable"
+                : "la presión de acometida es suficiente"
+            }
+          />
+          <FilaResumen
+            k="Criterio de simultaneidad"
+            v={
+              result.criterioK === "une149201"
+                ? "K = 1/√(n−1)"
+                : "K = 1 (sin simultaneidad)"
+            }
+            sub={
+              result.kEsCriterioExterno
+                ? `${result.normaCriterioK ?? "UNE 149201"} — criterio externo (no exigencia CTE)`
+                : "suma directa de caudales"
+            }
+          />
+        </dl>
+      </CollapsibleSection>
+      {/* Zona única de ALCANCE Y SUPUESTOS (ARCH-1 / ARCH-2): las
+          limitaciones agrupadas, visibles y no solo color. */}
+      <div className="mt-4">
+        <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
+          Alcance y supuestos
+        </div>
+        <DisclosureNote>
+          <span className="font-semibold">Alcance:</span> esta versión
+          dimensiona solo la red de agua fría (AF). La red de ACS (agua
+          caliente sanitaria) no se dimensiona en esta versión.
+        </DisclosureNote>
+        <DisclosureNote>
+          <span className="font-semibold">Presión estimada:</span> los
+          valores de presión (residual, en el punto crítico y la necesidad
+          de grupo de presión) provienen de un modelo de predimensionado y
+          son orientativos; no sustituyen un cálculo hidráulico de
+          detalle.
+        </DisclosureNote>
+        <p className="text-text-disabled text-[11px] leading-snug">
+          El coeficiente de simultaneidad K (UNE 149201) y la estimación
+          de pérdidas localizadas (20–30 %) son criterios externos al
+          DB-HS4, no exigencias del CTE. El modelo de pérdida de carga es
+          de predimensionado.
+        </p>
+      </div>
+    </>
+  );
+
+  const tablaTramos = (
+    <div className="overflow-x-auto">
+      <Outliner
+        columnas={COLUMNAS_HS4}
+        filas={filas}
+        selectedId={selVigente}
+        onSelect={setSelectedId}
+        onHover={setHoverId}
+        onAdd={handleAdd}
+        onNest={handleNest}
+        onUnnest={handleUnnest}
+        onRemove={handleRemove}
+        etiquetaAdd="+ Añadir tramo"
+        toolbar={
+          <div className="flex items-center gap-1.5">
+            {puedeGenerarVT && (
+              <button
+                type="button"
+                onClick={handleGenerarVT}
+                onBlur={() => setConfirmarGenerarVT(false)}
+                title="Reemplaza la red actual por la propuesta derivada de las viviendas tipo del proyecto"
+                className={[
+                  "rounded border px-2 py-0.5 text-[11px] transition-colors",
+                  confirmarGenerarVT
+                    ? "border-state-warn text-state-warn font-medium"
+                    : "border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary",
+                ].join(" ")}
+              >
+                {confirmarGenerarVT
+                  ? "¿Reemplazar la red actual?"
+                  : "Generar desde viviendas tipo"}
+              </button>
+            )}
+            {PRESETS_APARATOS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => aplicarPreset(p)}
+                title={`Añadir una derivación de ${p.label.toLowerCase()} con sus aparatos`}
+                className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors"
+              >
+                + {p.label}
+              </button>
+            ))}
+          </div>
+        }
+      />
+    </div>
+  );
+
   return (
-    <ModuleShell
+    <ModuleLayout
       justificacionKey="hs4"
       resultado={resumen}
       herencia={herencia}
@@ -654,284 +827,46 @@ export function Hs4Module() {
         onShare: handleShare,
         onReset: reset,
       }}
-    >
-      <MobileTabBar<TabHs4> tab={tab} setTab={setTab} tabs={TABS_HS4} />
-
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Tabla (outliner) + suministro + detalle. En móvil, pestaña "tabla". */}
-        <div
-          className={[
-            "scroll-hide min-w-0 flex-col overflow-y-auto px-4 py-4 lg:px-6",
-            "lg:flex lg:flex-1",
-            tab === "tabla" ? "flex flex-1" : "hidden",
-          ].join(" ")}
-        >
-          {/* Formulario corto de suministro (no es colección: fuera del outliner). */}
-          <div className="max-w-2xl">
-            <CollapsibleSection
-              label="Suministro"
-              refNorma="DB-HS4 ap. 2.1.3 / 4.2"
-            >
-              <div className="grid gap-x-6 sm:grid-cols-2">
-                {!presionHeredada && (
-                  <Field
-                    id="presion-acometida"
-                    label="Presión acometida"
-                    sub="P"
-                    unit="kPa"
-                    help="Presión disponible en la acometida (entrada de la red). Es el punto de partida de la presión residual: a lo largo del recorrido se le restan las pérdidas de carga y la cota. Si en el punto más desfavorable cae por debajo de la mínima exigida, hace falta grupo de presión (ap. 4.5)."
-                    refText="DB-HS4 ap. 2.1.3"
-                  >
-                    <NumberInput
-                      id="presion-acometida"
-                      value={state.presionAcometida_kPa}
-                      onChange={(v) => setField("presionAcometida_kPa", v)}
-                      min={0}
-                      step={10}
-                    />
-                  </Field>
-                )}
-                <Field
-                  id="criterio-k"
-                  label="Simultaneidad"
-                  sub="K"
-                  help="Coeficiente de simultaneidad K aplicado al caudal acumulado de cada tramo. UNE 149201 (K = 1/√(n−1)) es un CRITERIO EXTERNO, no exigencia del DB-HS4 (el DB sólo remite a «un criterio adecuado»). «Sin simultaneidad» suma directa de caudales (K = 1)."
-                  refText="UNE 149201 (criterio externo)"
-                >
-                  <SelectInput<CriterioK>
-                    id="criterio-k"
-                    value={state.criterioK}
-                    options={CRITERIO_K_OPTIONS}
-                    onChange={(v) => setField("criterioK", v)}
-                  />
-                </Field>
-                <Field
-                  id="perdidas-localizadas"
-                  label="Pérdidas local."
-                  sub="%"
-                  unit="%"
-                  help="Fracción de pérdidas localizadas (codos, tes, válvulas…) estimada sobre las longitudinales. Es buena práctica de cálculo (20–30 %), NO cifra del DB-HS4. Por defecto 25 %."
-                  refText="Buena práctica (no DB)"
-                >
-                  <NumberInput
-                    id="perdidas-localizadas"
-                    value={fraccionPct}
-                    onChange={(v) =>
-                      setField("fraccionPerdidasLocalizadas", v / 100)
-                    }
-                    min={20}
-                    max={30}
-                    step={1}
-                  />
-                </Field>
-              </div>
-            </CollapsibleSection>
-          </div>
-
-          {!result.arbolValido && (
-            <div className="text-state-fail mb-3 text-[12px] font-semibold">
-              La red de tramos no es un árbol válido (hay un ciclo, un huérfano
-              o varias raíces): revisa la jerarquía con Tab/Shift-Tab.
-            </div>
-          )}
-
-          <div className="overflow-x-auto">
-            <Outliner
-              columnas={COLUMNAS_HS4}
-              filas={filas}
-              selectedId={selVigente}
-              onSelect={setSelectedId}
-              onHover={setHoverId}
-              onAdd={handleAdd}
-              onNest={handleNest}
-              onUnnest={handleUnnest}
-              onRemove={handleRemove}
-              etiquetaAdd="+ Añadir tramo"
-              toolbar={
-                <div className="flex items-center gap-1.5">
-                  {puedeGenerarVT && (
-                    <button
-                      type="button"
-                      onClick={handleGenerarVT}
-                      onBlur={() => setConfirmarGenerarVT(false)}
-                      title="Reemplaza la red actual por la propuesta derivada de las viviendas tipo del proyecto"
-                      className={[
-                        "rounded border px-2 py-0.5 text-[11px] transition-colors",
-                        confirmarGenerarVT
-                          ? "border-state-warn text-state-warn font-medium"
-                          : "border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary",
-                      ].join(" ")}
-                    >
-                      {confirmarGenerarVT
-                        ? "¿Reemplazar la red actual?"
-                        : "Generar desde viviendas tipo"}
-                    </button>
-                  )}
-                  {PRESETS_APARATOS.map((p) => (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={() => aplicarPreset(p)}
-                      title={`Añadir una derivación de ${p.label.toLowerCase()} con sus aparatos`}
-                      className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors"
-                    >
-                      + {p.label}
-                    </button>
-                  ))}
-                </div>
-              }
-            />
-          </div>
-
-          <div className="mt-4 max-w-2xl">
-            <CollapsibleSection
-              label="Resumen"
-              refNorma="DB-HS4 ap. 2.1.3 / 4.5"
-            >
-              <dl className="text-[13px]">
-                <SummaryRow
-                  k="Caudal de cálculo total"
-                  v={fmt(result.caudalTotal_dm3_s, "dm³/s", 2)}
-                  sub="que llega a la acometida"
-                />
-                <SummaryRow
-                  k="Presión en el punto crítico"
-                  v={fmt(result.presionCritica_kPa, "kPa", 0)}
-                  sub={
-                    presionMinCritico_kPa != null
-                      ? `mínima exigida ${fmt(presionMinCritico_kPa, "kPa", 0)}${
-                          apCritico ? ` · ${apCritico.id}` : ""
-                        }`
-                      : "sin punto de consumo crítico"
-                  }
-                />
-                <SummaryRow
-                  k="Grupo de presión (ap. 4.5)"
-                  v={
-                    result.grupoPresionNecesario ? "Necesario" : "No necesario"
-                  }
-                  sub={
-                    result.grupoPresionNecesario
-                      ? "la presión cae por debajo de la mínima en el punto más desfavorable"
-                      : "la presión de acometida es suficiente"
-                  }
-                />
-                <SummaryRow
-                  k="Criterio de simultaneidad"
-                  v={
-                    result.criterioK === "une149201"
-                      ? "K = 1/√(n−1)"
-                      : "K = 1 (sin simultaneidad)"
-                  }
-                  sub={
-                    result.kEsCriterioExterno
-                      ? `${result.normaCriterioK ?? "UNE 149201"} — criterio externo (no exigencia CTE)`
-                      : "suma directa de caudales"
-                  }
-                />
-              </dl>
-            </CollapsibleSection>
-
-            {/* Zona única de ALCANCE Y SUPUESTOS (ARCH-1 / ARCH-2): las
-                limitaciones agrupadas, visibles y no solo color. */}
-            <div className="mt-4">
-              <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-                Alcance y supuestos
-              </div>
-              <DisclosureNote>
-                <span className="font-semibold">Alcance:</span> esta versión
-                dimensiona solo la red de agua fría (AF). La red de ACS (agua
-                caliente sanitaria) no se dimensiona en esta versión.
-              </DisclosureNote>
-              <DisclosureNote>
-                <span className="font-semibold">Presión estimada:</span> los
-                valores de presión (residual, en el punto crítico y la necesidad
-                de grupo de presión) provienen de un modelo de predimensionado y
-                son orientativos; no sustituyen un cálculo hidráulico de
-                detalle.
-              </DisclosureNote>
-              <p className="text-text-disabled text-[11px] leading-snug">
-                El coeficiente de simultaneidad K (UNE 149201) y la estimación
-                de pérdidas localizadas (20–30 %) son criterios externos al
-                DB-HS4, no exigencias del CTE. El modelo de pérdida de carga es
-                de predimensionado.
-              </p>
-            </div>
-
-            {result.warnings.length > 0 && (
-              <ul className="text-state-warn mt-3 list-disc space-y-1 pl-5 text-[12px]">
-                {result.warnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        {/* Esquema de columna: soporte compacto, plegable en lg; pestaña en móvil. */}
-        <aside
-          aria-label="Esquema de columna"
-          className={[
-            "border-border-main bg-bg-surface min-h-0 flex-col overflow-hidden",
-            "lg:flex lg:shrink-0 lg:border-l",
-            esquemaPlegado ? "lg:w-10" : "lg:w-[380px]",
-            tab === "esquema" ? "flex flex-1" : "hidden",
-          ].join(" ")}
-        >
-          {esquemaPlegado ? (
-            <button
-              type="button"
-              onClick={() => setEsquemaPlegado(false)}
-              aria-label="Mostrar esquema de columna"
-              title="Mostrar esquema"
-              className="text-text-disabled hover:text-text-primary hidden h-full w-full items-start justify-center pt-3 transition-colors lg:flex"
-            >
-              <ChevronLeft size={15} />
-            </button>
-          ) : (
-            <>
-              <div className="border-border-sub flex items-center justify-between border-b px-3.5 py-2.5">
-                <span className="text-text-disabled text-[10px] font-semibold tracking-[0.07em] uppercase">
-                  Esquema de columna
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setEsquemaPlegado(true)}
-                  aria-label="Plegar esquema de columna"
-                  title="Plegar esquema"
-                  className="text-text-disabled hover:text-text-primary hidden transition-colors lg:block"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              <div
-                ref={canvasRef}
-                className="scroll-hide flex flex-1 items-start justify-center overflow-y-auto px-3 py-4"
-              >
+      avisos={result.warnings}
+      errores={
+        result.arbolValido
+          ? []
+          : [
+              "La red de tramos no es un árbol válido (hay un ciclo, un huérfano o varias raíces): revisa la jerarquía en Comprobaciones con Tab/Shift-Tab.",
+            ]
+      }
+      entradas={entradas}
+      dibujo={{
+        titulo: "Esquema de columna",
+        lienzo: (
+          <LienzoAjustado>
+            {(caja) => {
+              const { width, height } = ajustar(nativeW, nativeH, caja, { max: 900 });
+              return (
                 <HS4SVG
                   result={result}
                   mode="screen"
-                  width={svgW}
-                  height={svgH}
+                  width={width}
+                  height={height}
                   selectedId={selVigente}
                   hoverId={hoverId}
                   onSelect={setSelectedId}
                   etiquetas={etiquetas}
                 />
-              </div>
-              {textoSeleccion && (
-                <div className="border-border-sub bg-tint-accent flex items-center gap-2 border-t px-3.5 py-2">
-                  <span className="bg-accent h-[3px] w-3.5 shrink-0 rounded-full" />
-                  <span className="text-text-primary text-[11.5px]">
-                    Seleccionado: {textoSeleccion}
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-        </aside>
-      </div>
-
+              );
+            }}
+          </LienzoAjustado>
+        ),
+        franja: (
+          <FranjaDetalle
+            seleccion={textoSeleccion}
+            pista="Pulsa un tramo o un punto de consumo del esquema, o una fila en Comprobaciones."
+          />
+        ),
+      }}
+      comprobaciones={tablaTramos}
+      memoria={{ generar: generarFicha, valid }}
+    >
       {/* Clon oculto del SVG para el raster del PDF (mismo id que busca renderFicha). */}
       <div className="h-0 w-0 overflow-hidden" aria-hidden="true">
         <div
@@ -951,7 +886,7 @@ export function Hs4Module() {
           onClose={closePdfPreview}
         />
       )}
-    </ModuleShell>
+    </ModuleLayout>
   );
 }
 
@@ -970,18 +905,6 @@ function formatearFecha(iso: string): string {
   }).format(d);
 }
 
-function SummaryRow({ k, v, sub }: { k: string; v: string; sub?: string }) {
-  return (
-    <div className="border-border-sub flex items-baseline justify-between gap-3 border-b py-1.5">
-      <dt className="text-text-secondary">{k}</dt>
-      <dd className="flex items-baseline gap-2">
-        <span className="text-text-primary tabular-nums">{v}</span>
-        {sub && <span className="text-text-disabled text-[11px]">{sub}</span>}
-      </dd>
-    </div>
-  );
-}
-
 // -----------------------------------------------------------------------------
 // Nota de alcance/limitación VISIBLE (ARCH-1 / ARCH-2). Banner discreto pero no
 // escondido: tinte neutral + icono + texto. Accesible: `role="note"` y el icono
@@ -991,7 +914,7 @@ function DisclosureNote({ children }: { children: ReactNode }) {
   return (
     <div
       role="note"
-      className="bg-tint-neutral border-border-main text-text-secondary mb-3 flex items-start gap-2 rounded-md border px-3 py-2 text-[12px] leading-snug"
+      className="bg-tint-neutral border-border-main text-text-secondary mb-3 flex items-start gap-2 rounded border px-3 py-2 text-[12px] leading-snug"
     >
       <Info
         size={15}

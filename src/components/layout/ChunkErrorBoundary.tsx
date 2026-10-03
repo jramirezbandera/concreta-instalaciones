@@ -28,7 +28,7 @@ export class ChunkErrorBoundary extends Component<Props, State> {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="bg-btn-primary-bg hover:bg-btn-primary-bg-hover text-btn-primary-fg rounded-md px-4 py-1.5 text-sm font-medium"
+            className="bg-btn-primary-bg hover:bg-btn-primary-bg-hover text-btn-primary-fg rounded px-4 py-1.5 text-sm font-medium"
           >
             Recargar
           </button>

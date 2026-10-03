@@ -4,7 +4,7 @@ import { presionMinCritico, resumenHs4 } from "../resumen";
 import { fmt } from "../../../lib/units/format";
 
 // =============================================================================
-// HS4 — resumen para la banda de veredicto del ModuleShell (feature-6 T5.4).
+// HS4 — resumen para la cabecera del módulo (ModuleLayout) (feature-6 T5.4).
 // Transformación PURA HS4Result → ResumenVeredicto: el resumen NO recomputa el
 // veredicto ni las cifras, solo las formatea con el mismo contenido que la
 // antigua banda inline de ui.tsx. Asserts explícitos, SIN snapshots (los

@@ -61,7 +61,7 @@ function BadgeForzado({ nota }: { nota?: string }): JSX.Element {
   return (
     <span
       title={nota}
-      className="bg-tint-warn text-state-warn shrink-0 rounded-full px-1.5 py-0.5 text-[10px] whitespace-nowrap"
+      className="bg-tint-warn text-state-warn shrink-0 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap"
     >
       forzado por el proyectista
     </span>
@@ -109,7 +109,7 @@ function MenuFila(props: {
         <div
           role="menu"
           aria-label={`Aplicabilidad de ${fila.entry.codigo}`}
-          className="border-border-main bg-bg-primary absolute top-full right-0 z-20 mt-1 w-48 rounded-md border py-1 shadow-lg"
+          className="border-border-main bg-bg-primary absolute top-full right-0 z-20 mt-1 w-48 rounded border py-1"
         >
           <button
             type="button"
@@ -219,7 +219,7 @@ function FilaExterna(props: {
         <button
           type="button"
           onClick={() => onAdjuntarRef(fila.key)}
-          className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] transition-colors focus-visible:outline-2"
+          className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] transition-colors focus-visible:outline-2"
         >
           <Paperclip size={11} aria-hidden="true" />
           Adjuntar ref.
@@ -349,7 +349,7 @@ export function ChecklistJustificaciones(): JSX.Element {
   return (
     <section
       aria-label="Checklist de justificaciones"
-      className="border-border-main bg-bg-surface rounded-md border"
+      className="border-border-main bg-bg-surface rounded border"
     >
       <div className="border-border-main flex items-baseline justify-between gap-2 border-b px-3 py-2.5">
         <h2 className="text-text-primary text-[13px] font-semibold">Justificaciones</h2>

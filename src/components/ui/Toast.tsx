@@ -32,7 +32,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
     <div
       className={[
         "flex items-center justify-between gap-3 px-4 py-3",
-        "bg-bg-surface border-border-main rounded-md border shadow-lg",
+        "bg-bg-surface border-border-main rounded border",
         "text-text-primary w-80 text-sm",
         "transition-all duration-200",
         visible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",

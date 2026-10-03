@@ -1,11 +1,11 @@
 // DB-HS3 — Pantalla del módulo de ventilación. Cablea el motor (./calc), el
 // esquema (./svg) y la ficha PDF (./ficha) sobre el esqueleto de feature-6
-// (<ModuleShell>) con la ZONA DE TRABAJO de feature-7/feature-8 (§A): el
-// formulario corto (dormitorios + modo de conducto) SOBRE la tabla, un OUTLINER
-// principal de estancias (colección plana: inputs y resultados en la misma
-// fila), en modo avanzado un SEGUNDO outliner jerárquico con la red de
-// colectivos (colectivo → planta → estancia húmeda que vierte), y el esquema
-// compacto (~380 px, plegable) sincronizado con la tabla. La tabla manda.
+// en la anatomía v4 (<ModuleLayout>, REDISENO-V4 §3.3): a la izquierda el
+// formulario corto (dormitorios + modo de conducto), la lista de estancias y el
+// balance; el esquema grande con su franja; en Comprobaciones el OUTLINER de
+// estancias (inputs y resultados en la misma fila) y, en modo avanzado, el
+// SEGUNDO outliner jerárquico de la red de colectivos (colectivo → planta →
+// estancia húmeda que vierte). Todo comparte la misma selección.
 //
 // La jerarquía del outliner de red es FIJA por construcción (colectivo →
 // planta → referencia): no hay Tab/Shift-Tab (filas `anidable:false`); Enter
@@ -20,16 +20,18 @@
 // del estado actual. Las mutaciones de las listas son siempre INMUTABLES.
 
 import { useDeferredValue, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useJustificacionState } from "../../hooks/useJustificacionState";
-import { useContainerWidth } from "../../hooks/useContainerWidth";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
 import {
-  ModuleShell,
+  ModuleLayout,
   type ResumenVeredicto,
-} from "../../components/justificacion/ModuleShell";
+} from "../../components/justificacion/ModuleLayout";
+import { LienzoAjustado } from "../../components/justificacion/LienzoAjustado";
+import { ajustar } from "../../lib/ui/ajustar";
+import { FranjaDetalle } from "../../components/justificacion/FranjaDetalle";
+import { FilaResumen } from "../../components/justificacion/FilaResumen";
+import { ListaElementos } from "../../components/justificacion/ListaElementos";
 import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
-import { MobileTabBar } from "../../components/ui/MobileTabBar";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
 import { Field, InputLabel, NumberInput } from "../../components/ui/InputLabel";
 import { showToast } from "../../components/ui/Toast";
@@ -39,7 +41,7 @@ import type {
   OutlinerColumna,
   OutlinerFila,
 } from "../../components/outliner/tipos";
-import { renderFicha, type Veredicto } from "../../lib/pdf/renderFicha";
+import { renderFicha } from "../../lib/pdf/renderFicha";
 import { STATE_TEXT, STATE_TINT } from "../../lib/ui/veredicto";
 import { fmt } from "../../lib/units/format";
 import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
@@ -104,13 +106,6 @@ const COLUMNAS_RED: OutlinerColumna[] = [
   { key: "qvt", header: "qvt", align: "right", width: "90px" },
   { key: "seccion", header: "Sección", align: "right", width: "96px" },
   { key: "tiro", header: "Tiro", align: "left", width: "130px" },
-];
-
-// Pestañas móviles de feature-7 (la tabla manda; el esquema es soporte).
-type TabHs3 = "tabla" | "esquema";
-const TABS_HS3: { id: TabHs3; label: string }[] = [
-  { id: "tabla", label: "Tabla" },
-  { id: "esquema", label: "Esquema" },
 ];
 
 // -----------------------------------------------------------------------------
@@ -184,10 +179,8 @@ export function Hs3Module() {
     hs3Defaults,
   );
   const { proyecto, derivados } = useProyecto();
-  const [tab, setTab] = useState<TabHs3>("tabla");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const [esquemaPlegado, setEsquemaPlegado] = useState(false);
 
   const deferredState = useDeferredValue(state);
   const result = useMemo(() => calcHS3(deferredState), [deferredState]);
@@ -231,14 +224,9 @@ export function Hs3Module() {
       ? selectedId
       : null;
 
-  // Ficha con cabecera de expediente (patrón de feature-6, sin cambios).
-  const {
-    pdfExporting,
-    pdfPreview,
-    handleExportPdf,
-    handleDownloadPdf,
-    closePdfPreview,
-  } = usePdfPreview(() => {
+  // Ficha con cabecera de expediente (patrón de feature-6). La misma función
+  // alimenta el botón «Ficha PDF» y la pestaña Memoria.
+  const generarFicha = () => {
     const base = toFichaData(deferredState, result);
     return renderFicha({
       ...base,
@@ -257,7 +245,14 @@ export function Hs3Module() {
         }),
       ],
     });
-  }, valid);
+  };
+  const {
+    pdfExporting,
+    pdfPreview,
+    handleExportPdf,
+    handleDownloadPdf,
+    closePdfPreview,
+  } = usePdfPreview(generarFicha, valid);
 
   const handleShare = async () => {
     try {
@@ -699,18 +694,10 @@ export function Hs3Module() {
     }
   }
 
-  // Tamaño del esquema: el ancho lo da el panel; el alto conserva la proporción
-  // del viewBox nativo. `hs3NativeSize` ya elige por sí misma la geometría de la
-  // RED cuando hay `result.red` (misma elección que hace HS3SVG al pintar).
-  const [canvasRef, canvasWidth] = useContainerWidth();
+  // Tamaño del esquema: cabe entero en el lienzo conservando la proporción del
+  // viewBox nativo. `hs3NativeSize` ya elige por sí misma la geometría de la RED
+  // cuando hay `result.red` (misma elección que hace HS3SVG al pintar).
   const { nativeW, nativeH } = hs3NativeSize(result);
-  const svgW =
-    canvasWidth !== undefined && canvasWidth > 0
-      ? Math.max(240, Math.min(560, canvasWidth - 24))
-      : 348;
-  const svgH = Math.round(
-    nativeW > 0 ? (svgW * nativeH) / nativeW : svgW * 0.6,
-  );
 
   // Resumen para la banda del shell (mismo contenido que la antigua banda
   // inline, ver ./resumen). `null` con datos inválidos → banda neutra "Datos
@@ -720,8 +707,227 @@ export function Hs3Module() {
     [valid, result],
   );
 
+  // Estancias para la lista de la izquierda (mismo id que la fila y el dibujo).
+  const elementosEstancias = result.porEstancia.map((r) => ({
+    id: r.id,
+    nombre: etiquetas[r.id] ?? r.id,
+    valor: fmt(r.caudalPropuesto_l_s, "l/s"),
+    estado: r.estado,
+  }));
+
+  const entradas = (
+    <>
+      <CollapsibleSection
+        label="Vivienda y conducto"
+        refNorma="DB-HS3 Tabla 2.1 / 4.3"
+      >
+        <div className="flex flex-col gap-1">
+          <div>
+            <Field
+              id="num-dormitorios"
+              label="Dormitorios"
+              sub="nº"
+              help="Número de dormitorios de la vivienda. Deriva la categoría de la Tabla 2.1 (0-1 · 2 · 3+) que fija los caudales mínimos."
+              refText="DB-HS3 Tabla 2.1"
+            >
+              <NumberInput
+                id="num-dormitorios"
+                value={state.numDormitorios}
+                onChange={(v) => setField("numDormitorios", v)}
+                min={0}
+                step={1}
+              />
+            </Field>
+            {modo === "rapido" && (
+              // numPlantasConducto NO se hereda: son las plantas que
+              // vierten AL CONDUCTO (saturado en 8), no las plantas del
+              // edificio. La ayuda recuerda el dato del expediente a
+              // título orientativo — el proyecto propone, el proyectista
+              // decide.
+              <Field
+                id="num-plantas-conducto"
+                label="Plantas (conducto)"
+                sub="nº"
+                help={
+                  "Nº de plantas entre la más baja que vierte al conducto y la última (ambas incluidas). Con la zona térmica fija la clase de tiro (Tabla 4.3). Se satura en 8 (8 o más). " +
+                  `El proyecto declara ${proyecto.datosGenerales.plantasSobreRasante} plantas sobre rasante, pero este dato es propio del conducto: el proyecto propone, el proyectista decide.`
+                }
+                refText="DB-HS3 Tabla 4.3"
+              >
+                <NumberInput
+                  id="num-plantas-conducto"
+                  value={state.numPlantasConducto}
+                  onChange={(v) => setField("numPlantasConducto", v)}
+                  min={1}
+                  step={1}
+                />
+              </Field>
+            )}
+          </div>
+          <div className="py-1">
+            <InputLabel
+              label="Conducto de extracción"
+              help="Rápido: un único conducto agregado (nº de plantas + zona térmica → clase de tiro). Avanzado: red de conductos colectivos multiplanta, editada abajo. Los datos de cada modo persisten; solo el activo calcula/exporta."
+              refText="DB-HS3 Tabla 4.2 / 4.3"
+            />
+            <ModoToggle
+              modo={modo}
+              onChange={(m) => setField("modoConducto", m)}
+            />
+          </div>
+        </div>
+      </CollapsibleSection>
+      <ListaElementos
+        titulo="Estancias"
+        elementos={elementosEstancias}
+        activoId={selVigente}
+        onSelect={setSelectedId}
+      />
+      <CollapsibleSection
+        label="Balance de vivienda"
+        refNorma="DB-HS3 Tabla 2.1 / 4.1"
+      >
+        <dl className="text-[13px]">
+          <FilaResumen
+            k="Extracción de húmedos (total)"
+            v={`${fmt(result.humedosTotalPropuesto_l_s, "l/s")} (mín. ${fmt(result.humedosTotalRequerido_l_s, "l/s")})`}
+            estado={result.estadoHumedosTotal}
+            sub={ESTADO_LABEL[result.estadoHumedosTotal]}
+          />
+          <FilaResumen
+            k="Equilibrio admisión / extracción"
+            v={`${fmt(result.totalAdmision_l_s, "l/s")} ↔ ${fmt(result.totalExtraccion_l_s, "l/s")}`}
+            estado={result.estadoBalance}
+            sub={ESTADO_LABEL[result.estadoBalance]}
+          />
+          <FilaResumen
+            k="Área de abertura de paso"
+            v={fmt(result.areaPaso_cm2, "cm²", 0)}
+          />
+        </dl>
+      </CollapsibleSection>
+      {!result.red && (
+        <CollapsibleSection
+          label="Conducto de extracción"
+          refNorma="DB-HS3 Tabla 4.2 / 4.3"
+        >
+          <dl className="text-[13px]">
+            <FilaResumen
+              k={`Sección requerida (clase ${result.conducto.claseTiro})`}
+              v={`${fmt(result.conducto.seccionRequerida_cm2, "cm²", 0)} · qvt ${fmt(result.conducto.qvt_l_s, "l/s")}`}
+              estado="neutral"
+              sub={ESTADO_LABEL.neutral}
+            />
+            <FilaResumen
+              k="Desglose de conductos"
+              v={result.conducto.conductos
+                .map((cc) => `${cc.n} × ${fmt(cc.seccion_cm2, "cm²", 0)}`)
+                .join(" · ")}
+            />
+          </dl>
+          <p className="text-text-disabled mt-2 text-[11px] leading-snug">
+            {result.conducto.aviso}. La sección del conducto se reporta a
+            título informativo y no entra en el veredicto global.
+          </p>
+        </CollapsibleSection>
+      )}
+    </>
+  );
+
+  const comprobaciones = (
+    <>
+      <Outliner
+        columnas={COLUMNAS_ESTANCIAS}
+        filas={filasEstancias}
+        selectedId={selVigente}
+        onSelect={setSelectedId}
+        onHover={setHoverId}
+        onAdd={handleAddEstancia}
+        onNest={sinAnidar}
+        onUnnest={sinAnidar}
+        onRemove={handleRemoveEstancia}
+        etiquetaAdd="+ Añadir estancia"
+        toolbar={
+          puedeGenerarVT ? (
+            <button
+              type="button"
+              onClick={handleGenerarVT}
+              onBlur={() => setConfirmarGenerarVT(false)}
+              title="Reemplaza las estancias (y la red colectiva) por la propuesta derivada de las viviendas tipo del proyecto"
+              className={[
+                "rounded border px-2 py-0.5 text-[11px] transition-colors",
+                confirmarGenerarVT
+                  ? "border-state-warn text-state-warn font-medium"
+                  : "border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary",
+              ].join(" ")}
+            >
+              {confirmarGenerarVT
+                ? "¿Reemplazar las estancias?"
+                : "Generar desde viviendas tipo"}
+            </button>
+          ) : undefined
+        }
+      />
+      {modo === "avanzado" && (
+        <div className="mt-6">
+          <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
+            Red de conductos colectiva
+          </div>
+          {redColectivos.length === 0 && (
+            <p
+              role="note"
+              className="text-text-secondary border-border-sub mb-2 rounded border border-dashed px-3 py-2 text-[12px] leading-snug"
+            >
+              Define las columnas colectivas: cada colectivo agrupa las
+              plantas que vierten a una misma boca de cubierta. Usa «+
+              Añadir colectivo» o «Generar desde estancias» para sembrar la
+              red con tus húmedas actuales.
+            </p>
+          )}
+          <Outliner
+            columnas={COLUMNAS_RED}
+            filas={filasRed}
+            selectedId={selVigente}
+            onSelect={setSelectedId}
+            onHover={setHoverId}
+            onAdd={handleAddRed}
+            onNest={sinAnidar}
+            onUnnest={sinAnidar}
+            onRemove={handleRemoveRed}
+            etiquetaAdd="+ Añadir colectivo"
+            toolbar={
+              <button
+                type="button"
+                onClick={seedFromEstancias}
+                disabled={humedos.length === 0}
+                title={
+                  humedos.length > 0
+                    ? "Sembrar un colectivo con todas las estancias húmedas en la planta baja"
+                    : "No hay estancias húmedas que asignar"
+                }
+                className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Generar desde estancias
+              </button>
+            }
+          />
+        </div>
+      )}
+      <div className="mt-4 max-w-3xl">
+        {result.red && (
+          <CollapsibleSection
+            label="Red colectiva de extracción"
+            refNorma="DB-HS3 Tabla 4.2 / 4.3"
+          >
+            <RedResults red={result.red} />
+          </CollapsibleSection>
+        )}
+      </div>
+    </>
+  );
+
   return (
-    <ModuleShell
+    <ModuleLayout
       justificacionKey="hs3"
       resultado={resumen}
       herencia={herencia}
@@ -731,296 +937,39 @@ export function Hs3Module() {
         onShare: handleShare,
         onReset: reset,
       }}
-    >
-      <MobileTabBar<TabHs3> tab={tab} setTab={setTab} tabs={TABS_HS3} />
-
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Tabla (outliners) + formulario corto + detalle. En móvil, pestaña "tabla". */}
-        <div
-          className={[
-            "scroll-hide min-w-0 flex-col overflow-y-auto px-4 py-4 lg:px-6",
-            "lg:flex lg:flex-1",
-            tab === "tabla" ? "flex flex-1" : "hidden",
-          ].join(" ")}
-        >
-          {/* Formulario corto (no-colecciones: fuera del outliner). La zona
-              térmica sigue heredada vía los chips de la BarraContexto. */}
-          <div className="max-w-2xl">
-            <CollapsibleSection
-              label="Vivienda y conducto"
-              refNorma="DB-HS3 Tabla 2.1 / 4.3"
-            >
-              <div className="grid gap-x-6 sm:grid-cols-2">
-                <div>
-                  <Field
-                    id="num-dormitorios"
-                    label="Dormitorios"
-                    sub="nº"
-                    help="Número de dormitorios de la vivienda. Deriva la categoría de la Tabla 2.1 (0-1 · 2 · 3+) que fija los caudales mínimos."
-                    refText="DB-HS3 Tabla 2.1"
-                  >
-                    <NumberInput
-                      id="num-dormitorios"
-                      value={state.numDormitorios}
-                      onChange={(v) => setField("numDormitorios", v)}
-                      min={0}
-                      step={1}
-                    />
-                  </Field>
-                  {modo === "rapido" && (
-                    // numPlantasConducto NO se hereda: son las plantas que
-                    // vierten AL CONDUCTO (saturado en 8), no las plantas del
-                    // edificio. La ayuda recuerda el dato del expediente a
-                    // título orientativo — el proyecto propone, el proyectista
-                    // decide.
-                    <Field
-                      id="num-plantas-conducto"
-                      label="Plantas (conducto)"
-                      sub="nº"
-                      help={
-                        "Nº de plantas entre la más baja que vierte al conducto y la última (ambas incluidas). Con la zona térmica fija la clase de tiro (Tabla 4.3). Se satura en 8 (8 o más). " +
-                        `El proyecto declara ${proyecto.datosGenerales.plantasSobreRasante} plantas sobre rasante, pero este dato es propio del conducto: el proyecto propone, el proyectista decide.`
-                      }
-                      refText="DB-HS3 Tabla 4.3"
-                    >
-                      <NumberInput
-                        id="num-plantas-conducto"
-                        value={state.numPlantasConducto}
-                        onChange={(v) => setField("numPlantasConducto", v)}
-                        min={1}
-                        step={1}
-                      />
-                    </Field>
-                  )}
-                </div>
-                <div className="py-1">
-                  <InputLabel
-                    label="Conducto de extracción"
-                    help="Rápido: un único conducto agregado (nº de plantas + zona térmica → clase de tiro). Avanzado: red de conductos colectivos multiplanta, editada abajo. Los datos de cada modo persisten; solo el activo calcula/exporta."
-                    refText="DB-HS3 Tabla 4.2 / 4.3"
-                  />
-                  <ModoToggle
-                    modo={modo}
-                    onChange={(m) => setField("modoConducto", m)}
-                  />
-                </div>
-              </div>
-            </CollapsibleSection>
-          </div>
-
-          {/* Outliner PRINCIPAL de estancias (colección plana, filas no anidables). */}
-          <Outliner
-            columnas={COLUMNAS_ESTANCIAS}
-            filas={filasEstancias}
-            selectedId={selVigente}
-            onSelect={setSelectedId}
-            onHover={setHoverId}
-            onAdd={handleAddEstancia}
-            onNest={sinAnidar}
-            onUnnest={sinAnidar}
-            onRemove={handleRemoveEstancia}
-            etiquetaAdd="+ Añadir estancia"
-            toolbar={
-              puedeGenerarVT ? (
-                <button
-                  type="button"
-                  onClick={handleGenerarVT}
-                  onBlur={() => setConfirmarGenerarVT(false)}
-                  title="Reemplaza las estancias (y la red colectiva) por la propuesta derivada de las viviendas tipo del proyecto"
-                  className={[
-                    "rounded border px-2 py-0.5 text-[11px] transition-colors",
-                    confirmarGenerarVT
-                      ? "border-state-warn text-state-warn font-medium"
-                      : "border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary",
-                  ].join(" ")}
-                >
-                  {confirmarGenerarVT
-                    ? "¿Reemplazar las estancias?"
-                    : "Generar desde viviendas tipo"}
-                </button>
-              ) : undefined
-            }
-          />
-
-          {/* Segundo outliner: red de conductos colectiva (solo modo avanzado). */}
-          {modo === "avanzado" && (
-            <div className="mt-6">
-              <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-                Red de conductos colectiva
-              </div>
-              {redColectivos.length === 0 && (
-                <p
-                  role="note"
-                  className="text-text-secondary border-border-sub mb-2 rounded-md border border-dashed px-3 py-2 text-[12px] leading-snug"
-                >
-                  Define las columnas colectivas: cada colectivo agrupa las
-                  plantas que vierten a una misma boca de cubierta. Usa «+
-                  Añadir colectivo» o «Generar desde estancias» para sembrar la
-                  red con tus húmedas actuales.
-                </p>
-              )}
-              <Outliner
-                columnas={COLUMNAS_RED}
-                filas={filasRed}
-                selectedId={selVigente}
-                onSelect={setSelectedId}
-                onHover={setHoverId}
-                onAdd={handleAddRed}
-                onNest={sinAnidar}
-                onUnnest={sinAnidar}
-                onRemove={handleRemoveRed}
-                etiquetaAdd="+ Añadir colectivo"
-                toolbar={
-                  <button
-                    type="button"
-                    onClick={seedFromEstancias}
-                    disabled={humedos.length === 0}
-                    title={
-                      humedos.length > 0
-                        ? "Sembrar un colectivo con todas las estancias húmedas en la planta baja"
-                        : "No hay estancias húmedas que asignar"
-                    }
-                    className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Generar desde estancias
-                  </button>
-                }
-              />
-            </div>
-          )}
-
-          {/* Detalle bajo la tabla: lo que NO está ya en las filas. */}
-          <div className="mt-4 max-w-2xl">
-            <CollapsibleSection
-              label="Balance de vivienda"
-              refNorma="DB-HS3 Tabla 2.1 / 4.1"
-            >
-              <dl className="text-[13px]">
-                <SummaryRow
-                  k="Extracción de húmedos (total)"
-                  v={`${fmt(result.humedosTotalPropuesto_l_s, "l/s")} (mín. ${fmt(result.humedosTotalRequerido_l_s, "l/s")})`}
-                  estado={result.estadoHumedosTotal}
-                />
-                <SummaryRow
-                  k="Equilibrio admisión / extracción"
-                  v={`${fmt(result.totalAdmision_l_s, "l/s")} ↔ ${fmt(result.totalExtraccion_l_s, "l/s")}`}
-                  estado={result.estadoBalance}
-                />
-                <SummaryRow
-                  k="Área de abertura de paso"
-                  v={fmt(result.areaPaso_cm2, "cm²", 0)}
-                />
-              </dl>
-            </CollapsibleSection>
-
-            {!result.red && (
-              <CollapsibleSection
-                label="Conducto de extracción"
-                refNorma="DB-HS3 Tabla 4.2 / 4.3"
-              >
-                <dl className="text-[13px]">
-                  <SummaryRow
-                    k={`Sección requerida (clase ${result.conducto.claseTiro})`}
-                    v={`${fmt(result.conducto.seccionRequerida_cm2, "cm²", 0)} · qvt ${fmt(result.conducto.qvt_l_s, "l/s")}`}
-                    estado="neutral"
-                  />
-                  <SummaryRow
-                    k="Desglose de conductos"
-                    v={result.conducto.conductos
-                      .map((cc) => `${cc.n} × ${fmt(cc.seccion_cm2, "cm²", 0)}`)
-                      .join(" · ")}
-                  />
-                </dl>
-                <p className="text-text-disabled mt-2 text-[11px] leading-snug">
-                  {result.conducto.aviso}. La sección del conducto se reporta a
-                  título informativo y no entra en el veredicto global.
-                </p>
-              </CollapsibleSection>
-            )}
-
-            {result.red && (
-              <CollapsibleSection
-                label="Red colectiva de extracción"
-                refNorma="DB-HS3 Tabla 4.2 / 4.3"
-              >
-                <RedResults red={result.red} />
-              </CollapsibleSection>
-            )}
-
-            {result.warnings.length > 0 && (
-              <ul className="text-state-warn mt-3 list-disc space-y-1 pl-5 text-[12px]">
-                {result.warnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        {/* Esquema: soporte compacto, plegable en lg; pestaña en móvil. */}
-        <aside
-          aria-label="Esquema"
-          className={[
-            "border-border-main bg-bg-surface min-h-0 flex-col overflow-hidden",
-            "lg:flex lg:shrink-0 lg:border-l",
-            esquemaPlegado ? "lg:w-10" : "lg:w-[380px]",
-            tab === "esquema" ? "flex flex-1" : "hidden",
-          ].join(" ")}
-        >
-          {esquemaPlegado ? (
-            <button
-              type="button"
-              onClick={() => setEsquemaPlegado(false)}
-              aria-label="Mostrar esquema"
-              title="Mostrar esquema"
-              className="text-text-disabled hover:text-text-primary hidden h-full w-full items-start justify-center pt-3 transition-colors lg:flex"
-            >
-              <ChevronLeft size={15} />
-            </button>
-          ) : (
-            <>
-              <div className="border-border-sub flex items-center justify-between border-b px-3.5 py-2.5">
-                <span className="text-text-disabled text-[10px] font-semibold tracking-[0.07em] uppercase">
-                  Esquema
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setEsquemaPlegado(true)}
-                  aria-label="Plegar esquema"
-                  title="Plegar esquema"
-                  className="text-text-disabled hover:text-text-primary hidden transition-colors lg:block"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              <div
-                ref={canvasRef}
-                className="scroll-hide flex flex-1 items-start justify-center overflow-y-auto px-3 py-4"
-              >
+      avisos={result.warnings}
+      entradas={entradas}
+      dibujo={{
+        titulo: "Esquema",
+        lienzo: (
+          <LienzoAjustado>
+            {(caja) => {
+              const { width, height } = ajustar(nativeW, nativeH, caja, { max: 960 });
+              return (
                 <HS3SVG
                   result={result}
                   mode="screen"
-                  width={svgW}
-                  height={svgH}
+                  width={width}
+                  height={height}
                   selectedId={selVigente}
                   hoverId={hoverId}
                   onSelect={setSelectedId}
                   etiquetas={etiquetas}
                 />
-              </div>
-              {textoSeleccion && (
-                <div className="border-border-sub bg-tint-accent flex items-center gap-2 border-t px-3.5 py-2">
-                  <span className="bg-accent h-[3px] w-3.5 shrink-0 rounded-full" />
-                  <span className="text-text-primary text-[11.5px]">
-                    Seleccionado: {textoSeleccion}
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-        </aside>
-      </div>
-
+              );
+            }}
+          </LienzoAjustado>
+        ),
+        franja: (
+          <FranjaDetalle
+            seleccion={textoSeleccion}
+            pista="Pulsa una estancia del dibujo o de la lista para ver su caudal."
+          />
+        ),
+      }}
+      comprobaciones={comprobaciones}
+      memoria={{ generar: generarFicha, valid }}
+    >
       {/* Clon oculto del SVG para el raster del PDF (mismo id que busca renderFicha). */}
       <div className="h-0 w-0 overflow-hidden" aria-hidden="true">
         <div
@@ -1040,7 +989,7 @@ export function Hs3Module() {
           onClose={closePdfPreview}
         />
       )}
-    </ModuleShell>
+    </ModuleLayout>
   );
 }
 
@@ -1081,7 +1030,7 @@ function ModoToggle({
         className={[
           "flex-1 rounded px-2 py-1.5 text-[12px] transition-colors",
           active
-            ? "bg-bg-surface text-text-primary font-semibold shadow-sm"
+            ? "bg-bg-surface text-text-primary font-semibold"
             : "text-text-secondary hover:text-text-primary",
         ].join(" ")}
       >
@@ -1091,33 +1040,9 @@ function ModoToggle({
     );
   };
   return (
-    <div className="border-border-sub bg-bg-primary mt-1 flex gap-1 rounded-md border p-1">
+    <div className="border-border-sub bg-bg-primary mt-1 flex gap-1 rounded border p-1">
       {opt("rapido", "Rápido", "1 conducto")}
       {opt("avanzado", "Avanzado", "red colectiva")}
-    </div>
-  );
-}
-
-function SummaryRow({
-  k,
-  v,
-  estado,
-}: {
-  k: string;
-  v: string;
-  estado?: Veredicto;
-}) {
-  return (
-    <div className="border-border-sub flex items-baseline justify-between gap-3 border-b py-1.5">
-      <dt className="text-text-secondary">{k}</dt>
-      <dd className="flex items-baseline gap-2">
-        <span className="text-text-primary tabular-nums">{v}</span>
-        {estado && (
-          <span className={`text-[11px] font-semibold ${STATE_TEXT[estado]}`}>
-            {ESTADO_LABEL[estado]}
-          </span>
-        )}
-      </dd>
     </div>
   );
 }
@@ -1133,7 +1058,7 @@ function RedResults({ red }: { red: NonNullable<HS3Result["red"]> }) {
   return (
     <div>
       {!red.estadoRed.valida && (
-        <div className={`mb-2 rounded-md border px-3 py-2 ${STATE_TINT.fail}`}>
+        <div className={`mb-2 rounded border px-3 py-2 ${STATE_TINT.fail}`}>
           <p className={`text-[12px] font-semibold ${STATE_TEXT.fail}`}>
             Red no válida — exportación bloqueada
           </p>

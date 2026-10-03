@@ -4,7 +4,7 @@ import { resumenHe1 } from "../resumen";
 import { fmt } from "../../../lib/units/format";
 
 // =============================================================================
-// HE1 — resumen para la banda de veredicto del ModuleShell (feature-6 T5.5).
+// HE1 — resumen para la cabecera del módulo (ModuleLayout) (feature-6 T5.5).
 // Transformación PURA HE1Result → ResumenVeredicto: el resumen NO recomputa el
 // veredicto ni las cifras, solo las formatea con el mismo contenido que la
 // antigua banda inline de ui.tsx. Asserts explícitos, SIN snapshots (los
