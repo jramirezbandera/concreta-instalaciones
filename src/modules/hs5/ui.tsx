@@ -1,8 +1,16 @@
 // DB-HS5 — Pantalla del módulo de saneamiento (evacuación de aguas). Cablea el
-// motor (./calc), el render SVG (./svg) y la ficha PDF (./ficha) sobre el layout
-// compartido (Topbar + panel de inputs + panel de resultados), replicando el
-// patrón del módulo HS3 pero con un EDITOR DE ÁRBOL DE RED explícito: tramos
-// (ramal → bajante → colector) y aparatos colgando de tramos.
+// motor (./calc), el esquema de columna (./svg) y la ficha PDF (./ficha) sobre
+// el esqueleto de feature-6 (<ModuleShell>) con la ZONA DE TRABAJO de feature-7
+// (módulo patrón, UX-RECONCEPT §6/§7): un OUTLINER único de tramos y aparatos
+// (jerarquía por indentación — Enter añade, Tab/Shift-Tab anida/desanida, ↑↓
+// navega), presets de cuartos húmedos, y el esquema de columna compacto
+// (~380 px, plegable) sincronizado con la tabla (hover fila ↔ resalta elemento;
+// clic elemento ↔ selecciona fila). La tabla manda.
+//
+// La semántica del árbol vive AQUÍ (el outliner es agnóstico): anidar = colgar
+// del hermano anterior; desanidar = subir al abuelo — por construcción no se
+// pueden crear ciclos. Al borrar un tramo, sus hijos y aparatos pasan a su
+// padre (si era raíz, los aparatos quedan colgando y el motor lo avisa).
 //
 // React 19 + React Compiler: componente PURO. El cálculo es síncrono en render
 // (useMemo sobre el estado diferido); no hay efectos de cálculo. Los ids de
@@ -11,58 +19,64 @@
 // estado actual. Las mutaciones de las listas son siempre INMUTABLES.
 
 import { useDeferredValue, useMemo, useState } from "react";
-import { Trash2, Plus } from "lucide-react";
-import { useModuleState } from "../../hooks/useModuleState";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useJustificacionState } from "../../hooks/useJustificacionState";
 import { useContainerWidth } from "../../hooks/useContainerWidth";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
-import { useDrawer } from "../../components/layout/AppShell";
-import { Topbar } from "../../components/layout/Topbar";
+import {
+  ModuleShell,
+  type ResumenVeredicto,
+} from "../../components/justificacion/ModuleShell";
 import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
-import { MobileTabBar, type MobileTab } from "../../components/ui/MobileTabBar";
+import { MobileTabBar } from "../../components/ui/MobileTabBar";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
-import { Field, NumberInput, SelectInput, InputLabel } from "../../components/ui/InputLabel";
 import { showToast } from "../../components/ui/Toast";
+import { Outliner } from "../../components/outliner/Outliner";
+import type {
+  OutlinerCelda,
+  OutlinerColumna,
+  OutlinerFila,
+} from "../../components/outliner/tipos";
+import {
+  PRESETS_APARATOS,
+  type PresetAparatos,
+} from "../../data/presetsAparatos";
 import { renderFicha } from "../../lib/pdf/renderFicha";
-import { STATUS_LABEL } from "../../lib/pdf/utils";
-import { STATE_TEXT, STATE_TINT } from "../../lib/ui/veredicto";
 import { fmt } from "../../lib/units/format";
+import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
+import { useProyecto } from "../../lib/proyecto/ProyectoContext";
+import { generarHs5 } from "../../lib/proyecto/viviendaTipo";
 import {
   calcHS5,
   hs5Defaults,
   type AparatoInput,
-  type DisposicionColector,
   type HS5Inputs,
-  type HS5Result,
   type TipoTramo,
   type TramoInput,
 } from "./calc";
-import type { TipoAparato, UsoAparato } from "./tablas";
+import type { TipoAparato } from "./tablas";
 import { HS5SVG } from "./svg";
-import { HS5_PDF_SVG_ID } from "./svg-meta";
+import { HS5_PDF_SVG_ID, hs5NativeSize } from "./svg-meta";
 import { toFichaData } from "./ficha";
+import { resumenHs5 } from "./resumen";
 
 // -----------------------------------------------------------------------------
 // Opciones de los selects (declaradas a módulo: estables entre renders).
+// El tipo de fila del outliner FUSIONA tipo + disposición del colector (una sola
+// celda select por fila; "colector_colgado"/"colector_enterrado" mapean a
+// { tipo: "colector", disposicion }).
 // -----------------------------------------------------------------------------
-const USO_OPTIONS: { value: UsoAparato; label: string }[] = [
-  { value: "privado", label: "Privado (vivienda)" },
-  { value: "publico", label: "Público (no residencial)" },
-];
+type TipoFilaTramo =
+  | "ramal"
+  | "bajante"
+  | "colector_enterrado"
+  | "colector_colgado";
 
-const CUBIERTA_OPTIONS: { value: "transitable" | "no_transitable"; label: string }[] = [
-  { value: "no_transitable", label: "No transitable" },
-  { value: "transitable", label: "Transitable" },
-];
-
-const TIPO_TRAMO_OPTIONS: { value: TipoTramo; label: string }[] = [
+const TIPO_FILA_TRAMO_OPTIONS: { value: string; label: string }[] = [
   { value: "ramal", label: "Ramal colector" },
   { value: "bajante", label: "Bajante" },
-  { value: "colector", label: "Colector horizontal" },
-];
-
-const DISPOSICION_OPTIONS: { value: DisposicionColector; label: string }[] = [
-  { value: "colgado", label: "Colgado" },
-  { value: "enterrado", label: "Enterrado" },
+  { value: "colector_enterrado", label: "Colector enterrado" },
+  { value: "colector_colgado", label: "Colector colgado" },
 ];
 
 // Opciones de tipo de aparato = los TipoAparato reales del motor (Tabla 4.1).
@@ -90,22 +104,30 @@ const TIPO_APARATO_OPTIONS: { value: TipoAparato; label: string }[] = [
   { value: "cuarto_aseo_fluxometro", label: "Cuarto de aseo (fluxómetro)" },
 ];
 
-const TIPO_APARATO_LABEL: Record<TipoAparato, string> = Object.fromEntries(
-  TIPO_APARATO_OPTIONS.map((o) => [o.value, o.label]),
-) as Record<TipoAparato, string>;
-
-const TIPO_TRAMO_LABEL: Record<TipoTramo, string> = {
-  ramal: "Ramal colector",
-  bajante: "Bajante",
-  colector: "Colector horizontal",
-};
-
 const ESTADO_LABEL: Record<string, string> = {
   ok: "Cumple",
   warn: "Aviso",
   fail: "No cumple",
   neutral: "Informativo",
 };
+
+// Columnas del outliner HS5: inputs (nombre, tipo, pendiente) y resultados
+// (UD acumuladas, Ø, estado) en la MISMA fila (§6 del reconcept).
+const COLUMNAS_HS5: OutlinerColumna[] = [
+  { key: "elemento", header: "Elemento", align: "left" },
+  { key: "tipo", header: "Tipo", align: "left", width: "180px" },
+  { key: "pend", header: "Pend.", align: "right", width: "90px" },
+  { key: "ud", header: "UD", align: "right", width: "72px" },
+  { key: "dia", header: "Ø", align: "right", width: "76px" },
+  { key: "estado", header: "Estado", align: "left", width: "116px" },
+];
+
+// Pestañas móviles de feature-7 (la tabla manda; el esquema es soporte).
+type TabHs5 = "tabla" | "esquema";
+const TABS_HS5: { id: TabHs5; label: string }[] = [
+  { id: "tabla", label: "Tabla" },
+  { id: "esquema", label: "Esquema" },
+];
 
 // -----------------------------------------------------------------------------
 // Ids deterministas (contador derivado del estado actual). NO usa Math.random ni
@@ -126,28 +148,84 @@ function nextId(items: { id: string }[], prefix: string): string {
   return `${prefix}${max + 1}`;
 }
 
+/**
+ * Alias mapeado de HS5Inputs para el generic de useJustificacionState: los
+ * `interface` NO llevan index signature implícita y no satisfacen la
+ * restricción `Record<string, unknown>` del hook; el alias mapeado (idéntico
+ * estructuralmente y mutuamente asignable) sí.
+ */
+type Hs5State = { [K in keyof HS5Inputs]: HS5Inputs[K] };
+
+/** Valor del select fusionado tipo+disposición para un tramo. */
+function tipoFilaDe(t: TramoInput): TipoFilaTramo {
+  if (t.tipo === "colector") {
+    return (t.disposicion ?? "enterrado") === "colgado"
+      ? "colector_colgado"
+      : "colector_enterrado";
+  }
+  return t.tipo;
+}
+
 export function Hs5Module() {
-  const { state, setField, reset } = useModuleState<HS5Inputs>("hs5", hs5Defaults);
-  const { openDrawer } = useDrawer();
-  const [tab, setTab] = useState<MobileTab>("inputs");
+  const { state, setField, reset, herencia } = useJustificacionState<Hs5State>(
+    "hs5",
+    hs5Defaults,
+  );
+  const { proyecto, derivados } = useProyecto();
+  const [tab, setTab] = useState<TabHs5>("tabla");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [esquemaPlegado, setEsquemaPlegado] = useState(false);
 
   const deferredState = useDeferredValue(state);
   const result = useMemo(() => calcHS5(deferredState), [deferredState]);
 
   // ── Validación de entrada ──────────────────────────────────────────────────
-  // numPlantas entero ≥ 1; al menos un tramo y un aparato; todos los aparatos
-  // cuelgan de un tramo existente; árbol válido (el motor marca arbolValido).
-  const tramoIds = new Set(state.tramos.map((t) => t.id));
+  const tramoPorId = new Map(state.tramos.map((t) => [t.id, t] as const));
   const valid =
     Number.isInteger(state.numPlantas) &&
     state.numPlantas >= 1 &&
     state.tramos.length >= 1 &&
     state.aparatos.length >= 1 &&
-    state.aparatos.every((a) => tramoIds.has(a.tramoId)) &&
+    state.aparatos.every((a) => tramoPorId.has(a.tramoId)) &&
     result.arbolValido;
 
-  const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } =
-    usePdfPreview(() => renderFicha(toFichaData(deferredState, result)), valid);
+  // La selección solo es vigente si el elemento sigue existiendo (borrar la
+  // fila seleccionada no deja una selección fantasma).
+  const selVigente =
+    selectedId !== null &&
+    (tramoPorId.has(selectedId) ||
+      state.aparatos.some((a) => a.id === selectedId))
+      ? selectedId
+      : null;
+
+  // Ficha con cabecera de expediente (patrón de feature-6, sin cambios).
+  const {
+    pdfExporting,
+    pdfPreview,
+    handleExportPdf,
+    handleDownloadPdf,
+    closePdfPreview,
+  } = usePdfPreview(() => {
+    const base = toFichaData(deferredState, result);
+    return renderFicha({
+      ...base,
+      proyecto: proyecto.nombre,
+      fechaProyecto: formatearFecha(proyecto.modificado),
+      observaciones: [
+        ...(base.observaciones ?? []),
+        ...notasExcepcionesLocales({
+          key: "hs5",
+          dg: proyecto.datosGenerales,
+          d: derivados,
+          state: deferredState,
+          overrides: herencia.campos
+            .filter((c) => c.override)
+            .map((c) => c.campo),
+        }),
+      ],
+    });
+  }, valid);
 
   const handleShare = async () => {
     try {
@@ -158,50 +236,11 @@ export function Hs5Module() {
     }
   };
 
-  // ── Mutaciones inmutables de la lista de tramos ────────────────────────────
-  const addTramo = () => {
-    const nuevo: TramoInput = {
-      id: nextId(state.tramos, "t"),
-      tipo: "ramal",
-      parentId: state.tramos.length > 0 ? state.tramos[state.tramos.length - 1].id : null,
-      pendiente_pct: 2,
-    };
-    setField("tramos", [...state.tramos, nuevo]);
-  };
-
-  const removeTramo = (id: string) => {
-    // Al eliminar un tramo, los hijos que colgaban de él pasan a raíz (parentId
-    // null) y los aparatos que descargaban en él quedan sin tramo (el motor lo
-    // marcará); se mantiene el resto del árbol coherente sin mutaciones in situ.
-    setField(
-      "tramos",
-      state.tramos
-        .filter((t) => t.id !== id)
-        .map((t) => (t.parentId === id ? { ...t, parentId: null } : t)),
-    );
-  };
-
+  // ── Mutaciones inmutables ──────────────────────────────────────────────────
   const patchTramo = (id: string, patch: Partial<TramoInput>) => {
     setField(
       "tramos",
       state.tramos.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-    );
-  };
-
-  // ── Mutaciones inmutables de la lista de aparatos ──────────────────────────
-  const addAparato = () => {
-    const nuevo: AparatoInput = {
-      id: nextId(state.aparatos, "a"),
-      tipo: "lavabo",
-      tramoId: state.tramos.length > 0 ? state.tramos[0].id : "",
-    };
-    setField("aparatos", [...state.aparatos, nuevo]);
-  };
-
-  const removeAparato = (id: string) => {
-    setField(
-      "aparatos",
-      state.aparatos.filter((a) => a.id !== id),
     );
   };
 
@@ -212,197 +251,537 @@ export function Hs5Module() {
     );
   };
 
+  const cambiarTipoFila = (id: string, v: string) => {
+    if (v === "colector_enterrado" || v === "colector_colgado") {
+      patchTramo(id, {
+        tipo: "colector",
+        disposicion: v === "colector_colgado" ? "colgado" : "enterrado",
+      });
+    } else {
+      patchTramo(id, { tipo: v as TipoTramo });
+    }
+  };
+
+  /**
+   * Enter / "+ Añadir tramo". Referencia = fila desde la que se añade:
+   *  - tramo → nuevo tramo HERMANO insertado justo después (mismo padre; si la
+   *    referencia es una raíz, el nuevo cuelga de ella para no crear multi-raíz);
+   *  - aparato → nuevo aparato en el mismo tramo, insertado justo después;
+   *  - null (sin selección) → nuevo ramal colgando de la primera bajante (o de
+   *    la raíz si no hay bajantes), al final de la lista.
+   */
+  const handleAdd = (afterId: string | null) => {
+    const refAparato = afterId
+      ? state.aparatos.find((a) => a.id === afterId)
+      : undefined;
+    if (refAparato) {
+      const nuevo: AparatoInput = {
+        id: nextId(state.aparatos, "a"),
+        tipo: "lavabo",
+        tramoId: refAparato.tramoId,
+      };
+      const i = state.aparatos.findIndex((a) => a.id === refAparato.id);
+      setField("aparatos", [
+        ...state.aparatos.slice(0, i + 1),
+        nuevo,
+        ...state.aparatos.slice(i + 1),
+      ]);
+      setSelectedId(nuevo.id);
+      return;
+    }
+
+    const refTramo = afterId ? tramoPorId.get(afterId) : undefined;
+    const parentId = refTramo
+      ? (refTramo.parentId ?? refTramo.id)
+      : (state.tramos.find((t) => t.tipo === "bajante")?.id ??
+        state.tramos.find((t) => t.parentId === null)?.id ??
+        null);
+    const nuevo: TramoInput = {
+      id: nextId(state.tramos, "t"),
+      tipo: "ramal",
+      parentId,
+      pendiente_pct: 2,
+    };
+    const i = refTramo
+      ? state.tramos.findIndex((t) => t.id === refTramo.id)
+      : -1;
+    setField(
+      "tramos",
+      i >= 0
+        ? [...state.tramos.slice(0, i + 1), nuevo, ...state.tramos.slice(i + 1)]
+        : [...state.tramos, nuevo],
+    );
+    setSelectedId(nuevo.id);
+  };
+
+  /** Tab: colgar del hermano ANTERIOR (mismo padre). Sin hermano anterior, no-op. */
+  const handleNest = (id: string) => {
+    const t = tramoPorId.get(id);
+    if (!t) return;
+    const hermanos = state.tramos.filter(
+      (x) => x.parentId === t.parentId && x.id !== id,
+    );
+    const idx = state.tramos.findIndex((x) => x.id === id);
+    const anterior = [...hermanos]
+      .reverse()
+      .find((x) => state.tramos.findIndex((y) => y.id === x.id) < idx);
+    if (anterior) patchTramo(id, { parentId: anterior.id });
+  };
+
+  /** Shift-Tab: subir al abuelo. En una raíz, no-op. */
+  const handleUnnest = (id: string) => {
+    const t = tramoPorId.get(id);
+    if (!t || t.parentId === null) return;
+    const padre = tramoPorId.get(t.parentId);
+    patchTramo(id, { parentId: padre?.parentId ?? null });
+  };
+
+  /**
+   * Borrado: un tramo pasa sus hijos y aparatos a su PADRE (si era raíz, hijos a
+   * raíz y aparatos quedan colgando — el motor lo marca). Un aparato se borra sin
+   * más. Se exige conservar al menos un tramo y un aparato (paridad con la UI
+   * anterior; el outliner ya deshabilita vía `borrable`).
+   */
+  const handleRemove = (id: string) => {
+    const t = tramoPorId.get(id);
+    if (t) {
+      if (state.tramos.length <= 1) return;
+      const nuevoPadre = t.parentId;
+      setField(
+        "tramos",
+        state.tramos
+          .filter((x) => x.id !== id)
+          .map((x) => (x.parentId === id ? { ...x, parentId: nuevoPadre } : x)),
+      );
+      if (nuevoPadre !== null && state.aparatos.some((a) => a.tramoId === id)) {
+        setField(
+          "aparatos",
+          state.aparatos.map((a) =>
+            a.tramoId === id ? { ...a, tramoId: nuevoPadre } : a,
+          ),
+        );
+      }
+    } else {
+      if (state.aparatos.length <= 1) return;
+      setField(
+        "aparatos",
+        state.aparatos.filter((a) => a.id !== id),
+      );
+    }
+    if (selectedId === id) setSelectedId(null);
+  };
+
+  /**
+   * Preset (§6.1): crea un ramal nuevo con el nombre del cuarto y sus aparatos
+   * colgando (Tabla 4.1 vía el motor). Cuelga de la primera bajante (o de la
+   * raíz). Ids deterministas; todo editable después.
+   */
+  const aplicarPreset = (p: PresetAparatos) => {
+    const idRamal = nextId(state.tramos, "t");
+    const parentId =
+      state.tramos.find((t) => t.tipo === "bajante")?.id ??
+      state.tramos.find((t) => t.parentId === null)?.id ??
+      null;
+    setField("tramos", [
+      ...state.tramos,
+      {
+        id: idRamal,
+        nombre: `Ramal ${p.label.toLowerCase()}`,
+        tipo: "ramal",
+        parentId,
+        pendiente_pct: 2,
+      },
+    ]);
+    const nuevos: AparatoInput[] = [];
+    for (const { tipo } of p.hs5) {
+      nuevos.push({
+        id: nextId([...state.aparatos, ...nuevos], "a"),
+        tipo,
+        tramoId: idRamal,
+      });
+    }
+    setField("aparatos", [...state.aparatos, ...nuevos]);
+    setSelectedId(idRamal);
+  };
+
+  // ── Generar desde viviendas tipo (feature-8 §C) ────────────────────────────
+  // Dos pulsaciones: la primera ARMA la confirmación (el botón cambia a
+  // "¿Reemplazar la red actual?"), la segunda aplica el generador puro y
+  // REEMPLAZA tramos+aparatos (todo editable después). Nunca escribe sin
+  // confirmar; blur desarma.
+  const puedeGenerarVT = (proyecto.viviendasTipo?.length ?? 0) > 0;
+  const [confirmarGenerarVT, setConfirmarGenerarVT] = useState(false);
+  const handleGenerarVT = () => {
+    if (!confirmarGenerarVT) {
+      setConfirmarGenerarVT(true);
+      return;
+    }
+    const gen = generarHs5(proyecto.viviendasTipo ?? [], proyecto.repartoPlantas);
+    setField("tramos", gen.tramos);
+    setField("aparatos", gen.aparatos);
+    setConfirmarGenerarVT(false);
+    setSelectedId(null);
+    showToast("Red generada desde las viviendas tipo del proyecto", { autoDismiss: 3000 });
+  };
+
+  // ── Proyección estado+resultado → filas del outliner ───────────────────────
+  // DFS desde las raíces en orden estable de entrada: fila del tramo, después
+  // sus aparatos (depth+1), después sus tramos hijos (depth+1). Tramos en ciclo
+  // y aparatos huérfanos se listan al final a depth 0 (el motor ya los avisa).
+  const resultadoTramo = new Map(
+    result.porTramo.map((r) => [r.id, r] as const),
+  );
+  const resultadoAparato = new Map(
+    result.porAparato.map((r) => [r.id, r] as const),
+  );
+
+  const filaTramo = (t: TramoInput, depth: number): OutlinerFila => {
+    const r = resultadoTramo.get(t.id);
+    const celdas: OutlinerCelda[] = [
+      {
+        tipo: "nombre",
+        valor: t.nombre ?? t.id,
+        onChange: (v) => patchTramo(t.id, { nombre: v }),
+      },
+      {
+        tipo: "select",
+        valor: tipoFilaDe(t),
+        opciones: TIPO_FILA_TRAMO_OPTIONS,
+        onChange: (v) => cambiarTipoFila(t.id, v),
+      },
+      t.tipo === "bajante"
+        ? { tipo: "texto", valor: "—", dim: true }
+        : {
+            tipo: "numero",
+            valor: t.pendiente_pct ?? 2,
+            onChange: (v) => patchTramo(t.id, { pendiente_pct: v }),
+            min: 0,
+            step: 0.5,
+            unidad: "%",
+          },
+      { tipo: "texto", valor: r ? fmt(r.udAcumuladas) : "—", mono: true },
+      {
+        tipo: "texto",
+        valor:
+          r?.diametro_mm != null ? `Ø${fmt(r.diametro_mm, undefined, 0)}` : "—",
+        mono: true,
+      },
+      r
+        ? { tipo: "estado", veredicto: r.estado }
+        : { tipo: "texto", valor: "—", dim: true },
+    ];
+    return {
+      id: t.id,
+      depth,
+      kind: "tramo",
+      anidable: true,
+      borrable: state.tramos.length > 1,
+      celdas,
+    };
+  };
+
+  const filaAparato = (a: AparatoInput, depth: number): OutlinerFila => {
+    const r = resultadoAparato.get(a.id);
+    const celdas: OutlinerCelda[] = [
+      {
+        tipo: "nombre",
+        valor: a.nombre ?? a.id,
+        onChange: (v) => patchAparato(a.id, { nombre: v }),
+      },
+      {
+        tipo: "select",
+        valor: a.tipo,
+        opciones: TIPO_APARATO_OPTIONS,
+        onChange: (v) => patchAparato(a.id, { tipo: v as TipoAparato }),
+      },
+      { tipo: "texto", valor: "", dim: true },
+      { tipo: "texto", valor: r ? fmt(r.ud) : "—", mono: true },
+      {
+        tipo: "texto",
+        valor:
+          r?.diametroMin_mm != null
+            ? `Ø${fmt(r.diametroMin_mm, undefined, 0)}`
+            : "—",
+        mono: true,
+      },
+      r
+        ? { tipo: "estado", veredicto: r.estado }
+        : { tipo: "texto", valor: "—", dim: true },
+    ];
+    return {
+      id: a.id,
+      depth,
+      kind: "aparato",
+      anidable: false,
+      borrable: state.aparatos.length > 1,
+      celdas,
+    };
+  };
+
+  const filas: OutlinerFila[] = [];
+  {
+    const visto = new Set<string>();
+    const empujar = (t: TramoInput, depth: number) => {
+      if (visto.has(t.id)) return;
+      visto.add(t.id);
+      filas.push(filaTramo(t, depth));
+      for (const a of state.aparatos.filter((a) => a.tramoId === t.id)) {
+        filas.push(filaAparato(a, depth + 1));
+      }
+      for (const h of state.tramos.filter((x) => x.parentId === t.id)) {
+        empujar(h, depth + 1);
+      }
+    };
+    const raices = state.tramos.filter(
+      (t) => t.parentId === null || !tramoPorId.has(t.parentId),
+    );
+    for (const r of raices) empujar(r, 0);
+    for (const t of state.tramos) if (!visto.has(t.id)) empujar(t, 0);
+    for (const a of state.aparatos.filter((a) => !tramoPorId.has(a.tramoId))) {
+      filas.push(filaAparato(a, 0));
+    }
+  }
+
+  // Etiquetas legibles (id→nombre) para el esquema y el pie de selección.
+  const etiquetas: Record<string, string> = {};
+  for (const t of state.tramos) if (t.nombre) etiquetas[t.id] = t.nombre;
+  for (const a of state.aparatos) if (a.nombre) etiquetas[a.id] = a.nombre;
+
+  // Pie de selección del panel de esquema ("Seleccionado: Ramal cocina — Ø63 · 9 UD · Cumple").
+  let textoSeleccion: string | null = null;
+  if (selVigente) {
+    const nombre = etiquetas[selVigente] ?? selVigente;
+    const rt = resultadoTramo.get(selVigente);
+    const ra = resultadoAparato.get(selVigente);
+    if (rt) {
+      textoSeleccion = `${nombre} — ${rt.diametro_mm != null ? `Ø${fmt(rt.diametro_mm, undefined, 0)}` : "Ø —"} · ${fmt(rt.udAcumuladas, "UD")} · ${ESTADO_LABEL[rt.estado]}`;
+    } else if (ra) {
+      textoSeleccion = `${nombre} — ${fmt(ra.ud, "UD")} · Ø mín ${ra.diametroMin_mm != null ? fmt(ra.diametroMin_mm, "mm", 0) : "—"} · ${ESTADO_LABEL[ra.estado]}`;
+    }
+  }
+
+  // Tamaño del esquema: el ancho lo da el panel; el alto conserva la proporción
+  // del viewBox nativo (hs5NativeSize, misma fuente de verdad que el PDF).
   const [canvasRef, canvasWidth] = useContainerWidth();
+  const { nativeW, nativeH } = hs5NativeSize(result);
   const svgW =
     canvasWidth !== undefined && canvasWidth > 0
-      ? Math.min(640, Math.max(280, canvasWidth - 32))
-      : 480;
-  const svgH = Math.round(svgW * 0.6);
+      ? Math.max(240, Math.min(560, canvasWidth - 24))
+      : 348;
+  const svgH = Math.round(
+    nativeW > 0 ? (svgW * nativeH) / nativeW : svgW * 1.2,
+  );
 
-  const cubiertaValue: "transitable" | "no_transitable" = state.cubiertaTransitable
-    ? "transitable"
-    : "no_transitable";
+  const resumen: ResumenVeredicto | null = useMemo(
+    () => (valid ? resumenHs5(result) : null),
+    [valid, result],
+  );
 
-  const dBajante = diametroDe(result, "bajante");
-  const dColector = diametroDe(result, "colector");
+  const v = result.ventilacion;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <Topbar
-        moduleLabel="HS5 Saneamiento"
-        moduleGroup="Salubridad (DB-HS) · evacuación de aguas"
-        onExportPdf={handleExportPdf}
-        pdfExporting={pdfExporting}
-        onShare={handleShare}
-        onReset={reset}
-        onMenuOpen={openDrawer}
-      />
-      <MobileTabBar tab={tab} setTab={setTab} />
+    <ModuleShell
+      justificacionKey="hs5"
+      resultado={resumen}
+      herencia={herencia}
+      acciones={{
+        onExportPdf: handleExportPdf,
+        pdfExporting,
+        onShare: handleShare,
+        onReset: reset,
+      }}
+    >
+      <MobileTabBar<TabHs5> tab={tab} setTab={setTab} tabs={TABS_HS5} />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Left: inputs */}
+        {/* Tabla (outliner) + detalle. En móvil, pestaña "tabla". */}
         <div
           className={[
-            "bg-bg-surface flex min-h-0 flex-col overflow-hidden",
-            "lg:border-border-main lg:w-80 lg:shrink-0 lg:border-r",
-            tab === "inputs" ? "max-lg:flex-1" : "max-lg:hidden",
-            "lg:flex",
+            "scroll-hide min-w-0 flex-col overflow-y-auto px-4 py-4 lg:px-6",
+            "lg:flex lg:flex-1",
+            tab === "tabla" ? "flex flex-1" : "hidden",
           ].join(" ")}
         >
-          <div className="scroll-hide flex-1 overflow-y-auto px-4 py-3">
-            <CollapsibleSection label="Edificio" refNorma="DB-HS5 ap. 4.1">
-              <Field
-                id="num-plantas"
-                label="Plantas"
-                sub="nº"
-                help="Número de plantas servidas por las bajantes. Fija la columna de la Tabla 4.4 (hasta 3 / más de 3) y dispara la ventilación secundaria/terciaria de red."
-                refText="DB-HS5 Tabla 4.4"
-              >
-                <NumberInput
-                  id="num-plantas"
-                  value={state.numPlantas}
-                  onChange={(v) => setField("numPlantas", v)}
-                  min={1}
-                  step={1}
-                />
-              </Field>
-              <Field
-                id="cubierta"
-                label="Cubierta"
-                help="Tipo de cubierta. Afecta a la prolongación mínima de la ventilación primaria por encima de la cubierta (transitable exige mayor altura)."
-                refText="DB-HS5 ventilación primaria"
-              >
-                <SelectInput<"transitable" | "no_transitable">
-                  id="cubierta"
-                  value={cubiertaValue}
-                  options={CUBIERTA_OPTIONS}
-                  onChange={(v) => setField("cubiertaTransitable", v === "transitable")}
-                />
-              </Field>
-              <Field
-                id="uso"
-                label="Uso"
-                help="Uso de la instalación: privado (vivienda) o público (no residencial). Selecciona la columna de UD y Ø mínimo de la Tabla 4.1."
-                refText="DB-HS5 Tabla 4.1"
-              >
-                <SelectInput<UsoAparato>
-                  id="uso"
-                  value={state.uso}
-                  options={USO_OPTIONS}
-                  onChange={(v) => setField("uso", v)}
-                />
-              </Field>
-            </CollapsibleSection>
+          {!result.arbolValido && (
+            <div className="text-state-fail mb-3 text-[12px] font-semibold">
+              La red de tramos no es un árbol válido (hay un ciclo, un huérfano
+              o varias raíces): revisa la jerarquía con Tab/Shift-Tab.
+            </div>
+          )}
 
-            <CollapsibleSection label="Tramos de la red" refNorma="DB-HS5 Tablas 4.3–4.5">
-              <div className="flex flex-col gap-2.5">
-                {state.tramos.map((t) => (
-                  <TramoRow
-                    key={t.id}
-                    tramo={t}
-                    tramos={state.tramos}
-                    onPatch={(patch) => patchTramo(t.id, patch)}
-                    onRemove={() => removeTramo(t.id)}
-                    canRemove={state.tramos.length > 1}
-                  />
+          <Outliner
+            columnas={COLUMNAS_HS5}
+            filas={filas}
+            selectedId={selVigente}
+            onSelect={setSelectedId}
+            onHover={setHoverId}
+            onAdd={handleAdd}
+            onNest={handleNest}
+            onUnnest={handleUnnest}
+            onRemove={handleRemove}
+            etiquetaAdd="+ Añadir tramo"
+            toolbar={
+              <div className="flex items-center gap-1.5">
+                {puedeGenerarVT && (
+                  <button
+                    type="button"
+                    onClick={handleGenerarVT}
+                    onBlur={() => setConfirmarGenerarVT(false)}
+                    title="Reemplaza la red actual por la propuesta derivada de las viviendas tipo del proyecto"
+                    className={[
+                      "rounded border px-2 py-0.5 text-[11px] transition-colors",
+                      confirmarGenerarVT
+                        ? "border-state-warn text-state-warn font-medium"
+                        : "border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary",
+                    ].join(" ")}
+                  >
+                    {confirmarGenerarVT
+                      ? "¿Reemplazar la red actual?"
+                      : "Generar desde viviendas tipo"}
+                  </button>
+                )}
+                {PRESETS_APARATOS.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => aplicarPreset(p)}
+                    title={`Añadir un ramal de ${p.label.toLowerCase()} con sus aparatos`}
+                    className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors"
+                  >
+                    + {p.label}
+                  </button>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={addTramo}
-                className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-[13px] transition-colors"
-              >
-                <Plus size={14} />
-                Añadir tramo
-              </button>
+            }
+          />
+
+          <div className="mt-4 max-w-2xl">
+            <CollapsibleSection
+              label="Ventilación de red (informativa)"
+              refNorma="DB-HS5 ap. 4.3"
+            >
+              <dl className="text-[13px]">
+                <SummaryRow
+                  k="Ventilación primaria"
+                  v={
+                    v.primaria.suficienteSola
+                      ? "Suficiente sola"
+                      : "Requiere secundaria"
+                  }
+                  sub={`≥ ${fmt(v.primaria.prolongacionMin_m, "m")} sobre cubierta`}
+                />
+                <SummaryRow
+                  k="Ventilación secundaria (columna)"
+                  v={
+                    v.secundaria.diametroColumna_mm != null
+                      ? `Ø${fmt(v.secundaria.diametroColumna_mm, "mm", 0)}`
+                      : "No requerida"
+                  }
+                  sub={
+                    v.secundaria.modo === "no_requerida"
+                      ? "no requerida"
+                      : v.secundaria.modo === "alternas"
+                        ? "plantas alternas (4.10)"
+                        : "cada planta (4.11)"
+                  }
+                />
+                <SummaryRow
+                  k="Ventilación terciaria (ramales)"
+                  v={v.terciaria.obligatoria ? "Obligatoria" : "No requerida"}
+                  sub={
+                    v.terciaria.ramalesAfectados.length > 0
+                      ? `ramales: ${v.terciaria.ramalesAfectados.join(", ")}`
+                      : undefined
+                  }
+                />
+              </dl>
+              <p className="text-text-disabled mt-2 text-[11px] leading-snug">
+                El dimensionado de la ventilación de red es un resultado
+                informativo y no entra en el veredicto global (
+                {fmt(result.udTotales, "UD")} totales).
+              </p>
             </CollapsibleSection>
 
-            <CollapsibleSection label="Aparatos sanitarios" refNorma="DB-HS5 Tabla 4.1">
-              <div className="flex flex-col gap-2.5">
-                {state.aparatos.map((a) => (
-                  <AparatoRow
-                    key={a.id}
-                    aparato={a}
-                    tramos={state.tramos}
-                    onPatch={(patch) => patchAparato(a.id, patch)}
-                    onRemove={() => removeAparato(a.id)}
-                    canRemove={state.aparatos.length > 1}
-                  />
+            {result.warnings.length > 0 && (
+              <ul className="text-state-warn mt-3 list-disc space-y-1 pl-5 text-[12px]">
+                {result.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
                 ))}
-              </div>
-              <button
-                type="button"
-                onClick={addAparato}
-                className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-[13px] transition-colors"
-              >
-                <Plus size={14} />
-                Añadir aparato
-              </button>
-            </CollapsibleSection>
+              </ul>
+            )}
           </div>
         </div>
 
-        {/* Right: SVG + results. En lg se apila junto (banner → lienzo → tablas);
-            en móvil se reparte por pestaña: "diagramas" = solo el lienzo,
-            "results" = veredicto + tablas. Cada bloque se gatea por separado
-            manteniendo intacto el orden y el layout en lg (lg:flex / lg:block). */}
-        <div
+        {/* Esquema de columna: soporte compacto, plegable en lg; pestaña en móvil. */}
+        <aside
+          aria-label="Esquema de columna"
           className={[
-            "scroll-hide flex min-w-0 flex-col overflow-y-auto",
-            "lg:flex-1",
-            tab === "results" || tab === "diagramas" ? "flex-1" : "hidden",
-            "lg:flex",
+            "border-border-main bg-bg-surface min-h-0 flex-col overflow-hidden",
+            "lg:flex lg:shrink-0 lg:border-l",
+            esquemaPlegado ? "lg:w-10" : "lg:w-[380px]",
+            tab === "esquema" ? "flex flex-1" : "hidden",
           ].join(" ")}
         >
-          {/* Verdict banner (parte del resultado: tab "results" en móvil). */}
-          <div
-            className={[
-              `border-b px-6 py-2.5 ${STATE_TINT[result.veredictoGlobal]}`,
-              tab === "results" ? "block" : "hidden",
-              "lg:block",
-            ].join(" ")}
-          >
-            <span className="text-text-secondary text-[13px]">
-              Red de evacuación ({result.uso === "privado" ? "uso privado" : "uso público"}) —{" "}
-              <span className={`font-semibold ${STATE_TEXT[result.veredictoGlobal]}`}>
-                {STATUS_LABEL[result.veredictoGlobal]}
-              </span>{" "}
-              <span className="text-text-disabled">
-                ({fmt(result.udTotales, "UD")} totales · bajante{" "}
-                {dBajante == null ? "Ø —" : `Ø${fmt(dBajante, "mm", 0)}`} · colector{" "}
-                {dColector == null ? "Ø —" : `Ø${fmt(dColector, "mm", 0)}`})
-              </span>
-            </span>
-          </div>
-
-          {/* Lienzo del diagrama (tab "diagramas" en móvil; siempre en lg). */}
-          <div
-            ref={canvasRef}
-            className={[
-              "border-border-main canvas-dot-grid items-center justify-center border-b px-4 py-6",
-              tab === "diagramas" ? "flex" : "hidden",
-              "lg:flex",
-            ].join(" ")}
-          >
-            <HS5SVG result={result} mode="screen" width={svgW} height={svgH} />
-          </div>
-
-          {/* Tablas/resultados (tab "results" en móvil; siempre en lg). */}
-          <div
-            className={[
-              "px-6 py-4",
-              tab === "results" ? "block" : "hidden",
-              "lg:block",
-            ].join(" ")}
-          >
-            <ResultsTable result={result} />
-          </div>
-        </div>
+          {esquemaPlegado ? (
+            <button
+              type="button"
+              onClick={() => setEsquemaPlegado(false)}
+              aria-label="Mostrar esquema de columna"
+              title="Mostrar esquema"
+              className="text-text-disabled hover:text-text-primary hidden h-full w-full items-start justify-center pt-3 transition-colors lg:flex"
+            >
+              <ChevronLeft size={15} />
+            </button>
+          ) : (
+            <>
+              <div className="border-border-sub flex items-center justify-between border-b px-3.5 py-2.5">
+                <span className="text-text-disabled text-[10px] font-semibold tracking-[0.07em] uppercase">
+                  Esquema de columna
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEsquemaPlegado(true)}
+                  aria-label="Plegar esquema de columna"
+                  title="Plegar esquema"
+                  className="text-text-disabled hover:text-text-primary hidden transition-colors lg:block"
+                >
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+              <div
+                ref={canvasRef}
+                className="scroll-hide flex flex-1 items-start justify-center overflow-y-auto px-3 py-4"
+              >
+                <HS5SVG
+                  result={result}
+                  mode="screen"
+                  width={svgW}
+                  height={svgH}
+                  selectedId={selVigente}
+                  hoverId={hoverId}
+                  onSelect={setSelectedId}
+                  etiquetas={etiquetas}
+                />
+              </div>
+              {textoSeleccion && (
+                <div className="border-border-sub bg-tint-accent flex items-center gap-2 border-t px-3.5 py-2">
+                  <span className="bg-accent h-[3px] w-3.5 shrink-0 rounded-full" />
+                  <span className="text-text-primary text-[11.5px]">
+                    Seleccionado: {textoSeleccion}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </aside>
       </div>
 
       {/* Clon oculto del SVG para el raster del PDF (mismo id que busca renderFicha). */}
       <div className="h-0 w-0 overflow-hidden" aria-hidden="true">
-        <div id={HS5_PDF_SVG_ID} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+        <div
+          id={HS5_PDF_SVG_ID}
+          style={{ position: "absolute", left: "-9999px", top: 0 }}
+        >
           <HS5SVG result={result} mode="pdf" width={420} height={315} />
         </div>
       </div>
@@ -416,324 +795,23 @@ export function Hs5Module() {
           onClose={closePdfPreview}
         />
       )}
-    </div>
+    </ModuleShell>
   );
 }
 
-/** Ø del mayor tramo de un tipo (mm) o `null` si no hay / no dimensiona. */
-function diametroDe(result: HS5Result, tipo: TipoTramo): number | null {
-  const ds = result.porTramo
-    .filter((t) => t.tipo === tipo && t.diametro_mm != null)
-    .map((t) => t.diametro_mm as number);
-  return ds.length ? Math.max(...ds) : null;
-}
-
-// -----------------------------------------------------------------------------
-// Fila editable de un TRAMO de la red (lista dinámica). Selector de tipo, de
-// padre ("cuelga de" — entre los OTROS tramos + opción raíz, nunca a sí mismo
-// para evitar el ciclo trivial; el motor valida el resto) y, según el tipo, la
-// pendiente (ramal/colector) y la disposición (colector).
-// -----------------------------------------------------------------------------
-function TramoRow({
-  tramo,
-  tramos,
-  onPatch,
-  onRemove,
-  canRemove,
-}: {
-  tramo: TramoInput;
-  tramos: TramoInput[];
-  onPatch: (patch: Partial<TramoInput>) => void;
-  onRemove: () => void;
-  canRemove: boolean;
-}) {
-  // Padres ofertados = todos los tramos menos el propio (impide el ciclo
-  // trivial). El selector usa "" como sentinela de "— (raíz)" (parentId null).
-  const parentOptions: { value: string; label: string }[] = [
-    { value: "", label: "— (raíz / acometida)" },
-    ...tramos
-      .filter((t) => t.id !== tramo.id)
-      .map((t) => ({ value: t.id, label: `${TIPO_TRAMO_LABEL[t.tipo]} · ${t.id}` })),
-  ];
-
-  const muestraPendiente = tramo.tipo === "ramal" || tramo.tipo === "colector";
-  const esColector = tramo.tipo === "colector";
-
-  return (
-    <div className="border-border-sub bg-bg-primary rounded-md border p-2.5">
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <SelectInput<TipoTramo>
-            id={`tipo-tramo-${tramo.id}`}
-            value={tramo.tipo}
-            options={TIPO_TRAMO_OPTIONS}
-            onChange={(v) => onPatch({ tipo: v })}
-          />
-        </div>
-        <span className="text-text-disabled shrink-0 font-mono text-[11px]">{tramo.id}</span>
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={!canRemove}
-          aria-label="Quitar tramo"
-          title={canRemove ? "Quitar tramo" : "Debe haber al menos un tramo"}
-          className="text-text-disabled hover:text-state-fail shrink-0 rounded p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Trash2 size={15} />
-        </button>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <InputLabel htmlFor={`parent-${tramo.id}`} label="Cuelga de" />
-        <div className="w-40 shrink-0">
-          <SelectInput<string>
-            id={`parent-${tramo.id}`}
-            value={tramo.parentId ?? ""}
-            options={parentOptions}
-            onChange={(v) => onPatch({ parentId: v === "" ? null : v })}
-          />
-        </div>
-      </div>
-
-      {muestraPendiente && (
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <InputLabel htmlFor={`pendiente-${tramo.id}`} label="Pendiente" sub="i" />
-          <div className="flex w-32 shrink-0 items-center gap-1.5">
-            <div className="flex-1">
-              <NumberInput
-                id={`pendiente-${tramo.id}`}
-                value={tramo.pendiente_pct ?? 2}
-                onChange={(v) => onPatch({ pendiente_pct: v })}
-                min={0}
-                step={0.5}
-              />
-            </div>
-            <span className="text-text-disabled w-8 shrink-0 text-[11px]">%</span>
-          </div>
-        </div>
-      )}
-
-      {esColector && (
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <InputLabel htmlFor={`disposicion-${tramo.id}`} label="Disposición" />
-          <div className="w-40 shrink-0">
-            <SelectInput<DisposicionColector>
-              id={`disposicion-${tramo.id}`}
-              value={tramo.disposicion ?? "enterrado"}
-              options={DISPOSICION_OPTIONS}
-              onChange={(v) => onPatch({ disposicion: v })}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Fila editable de un APARATO sanitario (lista dinámica). Tipo de aparato (los
-// TipoAparato reales del motor) y el tramo al que descarga (entre los tramos
-// existentes).
-// -----------------------------------------------------------------------------
-function AparatoRow({
-  aparato,
-  tramos,
-  onPatch,
-  onRemove,
-  canRemove,
-}: {
-  aparato: AparatoInput;
-  tramos: TramoInput[];
-  onPatch: (patch: Partial<AparatoInput>) => void;
-  onRemove: () => void;
-  canRemove: boolean;
-}) {
-  const tramoOptions: { value: string; label: string }[] = tramos.map((t) => ({
-    value: t.id,
-    label: `${TIPO_TRAMO_LABEL[t.tipo]} · ${t.id}`,
-  }));
-
-  return (
-    <div className="border-border-sub bg-bg-primary rounded-md border p-2.5">
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <SelectInput<TipoAparato>
-            id={`tipo-aparato-${aparato.id}`}
-            value={aparato.tipo}
-            options={TIPO_APARATO_OPTIONS}
-            onChange={(v) => onPatch({ tipo: v })}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={!canRemove}
-          aria-label="Quitar aparato"
-          title={canRemove ? "Quitar aparato" : "Debe haber al menos un aparato"}
-          className="text-text-disabled hover:text-state-fail shrink-0 rounded p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Trash2 size={15} />
-        </button>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <InputLabel htmlFor={`tramo-aparato-${aparato.id}`} label="Descarga a" />
-        <div className="w-40 shrink-0">
-          {tramoOptions.length > 0 ? (
-            <SelectInput<string>
-              id={`tramo-aparato-${aparato.id}`}
-              value={aparato.tramoId}
-              options={tramoOptions}
-              onChange={(v) => onPatch({ tramoId: v })}
-            />
-          ) : (
-            <span className="text-state-warn text-[11px]">Sin tramos disponibles</span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Tabla de resultados ACCESIBLE (WCAG: el dato numérico SIEMPRE en texto/tabla,
-// no solo en el SVG). Por tramo: tipo · Ø resultante · UD acumuladas · pendiente
-// · estado. Después, las filas de ventilación de red (resultado NEUTRAL: no
-// degrada el veredicto global).
-// -----------------------------------------------------------------------------
-function ResultsTable({ result }: { result: HS5Result }) {
-  const v = result.ventilacion;
-  return (
-    <div className="max-w-2xl">
-      {!result.arbolValido && (
-        <div className="text-state-fail mb-3 text-[12px] font-semibold">
-          La red de tramos no es un árbol válido (hay un ciclo o un padre
-          inexistente): corrige las conexiones «cuelga de».
-        </div>
-      )}
-
-      <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-        Dimensionado por tramo
-      </div>
-      <table className="w-full text-[13px]">
-        <thead>
-          <tr className="text-text-disabled border-border-sub border-b text-left text-[11px] uppercase">
-            <th scope="col" className="py-1.5 font-medium">Tramo</th>
-            <th scope="col" className="py-1.5 text-right font-medium">Ø</th>
-            <th scope="col" className="py-1.5 text-right font-medium">UD acum.</th>
-            <th scope="col" className="py-1.5 text-right font-medium">Pendiente</th>
-            <th scope="col" className="py-1.5 text-right font-medium">Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {result.porTramo.map((t) => (
-            <tr key={t.id} className="border-border-sub border-b">
-              <td className="text-text-secondary py-1.5">
-                {TIPO_TRAMO_LABEL[t.tipo]}{" "}
-                <span className="text-text-disabled font-mono text-[11px]">({t.id})</span>
-              </td>
-              <td className="text-text-primary py-1.5 text-right tabular-nums">
-                {t.diametro_mm == null ? "—" : `Ø${fmt(t.diametro_mm, "mm", 0)}`}
-              </td>
-              <td className="text-text-secondary py-1.5 text-right tabular-nums">
-                {fmt(t.udAcumuladas, "UD")}
-              </td>
-              <td className="text-text-secondary py-1.5 text-right tabular-nums">
-                {t.tipo === "bajante" ? "—" : fmt(t.pendiente_pct, "%")}
-              </td>
-              <td className={`py-1.5 text-right font-semibold ${STATE_TEXT[t.estado]}`}>
-                {ESTADO_LABEL[t.estado]}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className="text-text-disabled mt-5 mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-        Verificación por aparato
-      </div>
-      <table className="w-full text-[13px]">
-        <thead>
-          <tr className="text-text-disabled border-border-sub border-b text-left text-[11px] uppercase">
-            <th scope="col" className="py-1.5 font-medium">Aparato</th>
-            <th scope="col" className="py-1.5 text-right font-medium">UD</th>
-            <th scope="col" className="py-1.5 text-right font-medium">Ø mín.</th>
-            <th scope="col" className="py-1.5 text-right font-medium">Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {result.porAparato.map((a) => (
-            <tr key={a.id} className="border-border-sub border-b">
-              <td className="text-text-secondary py-1.5">
-                {TIPO_APARATO_LABEL[a.tipo]}{" "}
-                <span className="text-text-disabled text-[11px]">
-                  (→ {a.tramoId}
-                  {a.agrupado ? " · agrupado" : ""})
-                </span>
-              </td>
-              <td className="text-text-primary py-1.5 text-right tabular-nums">
-                {fmt(a.ud, "UD")}
-              </td>
-              <td className="text-text-secondary py-1.5 text-right tabular-nums">
-                {a.diametroMin_mm == null ? "—" : `Ø${fmt(a.diametroMin_mm, "mm", 0)}`}
-              </td>
-              <td className={`py-1.5 text-right font-semibold ${STATE_TEXT[a.estado]}`}>
-                {ESTADO_LABEL[a.estado]}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className="text-text-disabled mt-5 mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-        Ventilación de red (informativa)
-      </div>
-      <dl className="text-[13px]">
-        <SummaryRow
-          k="Ventilación primaria"
-          v={v.primaria.suficienteSola ? "Suficiente sola" : "Requiere secundaria"}
-          sub={`≥ ${fmt(v.primaria.prolongacionMin_m, "m")} sobre cubierta`}
-        />
-        <SummaryRow
-          k="Ventilación secundaria (columna)"
-          v={
-            v.secundaria.diametroColumna_mm != null
-              ? `Ø${fmt(v.secundaria.diametroColumna_mm, "mm", 0)}`
-              : "No requerida"
-          }
-          sub={
-            v.secundaria.modo === "no_requerida"
-              ? "no requerida"
-              : v.secundaria.modo === "alternas"
-                ? "plantas alternas (4.10)"
-                : "cada planta (4.11)"
-          }
-        />
-        <SummaryRow
-          k="Ventilación terciaria (ramales)"
-          v={v.terciaria.obligatoria ? "Obligatoria" : "No requerida"}
-          sub={
-            v.terciaria.ramalesAfectados.length > 0
-              ? `ramales: ${v.terciaria.ramalesAfectados.join(", ")}`
-              : undefined
-          }
-        />
-      </dl>
-
-      <p className="text-text-disabled mt-2 text-[11px] leading-snug">
-        El dimensionado de la ventilación de red es un resultado informativo y no
-        entra en el veredicto global ({fmt(result.udTotales, "UD")} totales).
-      </p>
-
-      {result.warnings.length > 0 && (
-        <ul className="text-state-warn mt-3 list-disc space-y-1 pl-5 text-[12px]">
-          {result.warnings.map((w, i) => (
-            <li key={i}>{w}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+/**
+ * "22 ago 2026" — fecha corta es-ES a partir de un ISO (mismo formato que el
+ * listado de expedientes de InicioPage). Solo para la cabecera de la ficha; el
+ * ISO llega ya construido desde la persistencia (aquí no hay Date.now).
+ */
+function formatearFecha(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-ES", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(d);
 }
 
 function SummaryRow({ k, v, sub }: { k: string; v: string; sub?: string }) {

@@ -1,17 +1,33 @@
-// DB-HS3 — Planta esquemática de ventilación. RENDER SVG (visual primero).
+// DB-HS3 — Planta esquemática de ventilación. RENDER SVG (feature-8,
+// UX-RECONCEPT §7: el esquema es soporte compacto sincronizado con la
+// tabla/outliner — la tabla manda).
 //
 // Componente PURO de render (React 19 + React Compiler): consume `HS3Result`
 // (→ ./calc) y pinta SOLO con las primitivas compartidas de ../../lib/svg/*.
 // No muta props, no usa efectos, no usa Date/Math.random (layout determinista
 // por índice). Compatible con el export PDF (svg2pdf): solo primitivas planas.
 //
-// Diferencial "visual primero": planta de la vivienda con el checker
-// verde/rojo por estancia (codificación MULTICANAL, WCAG 1.4.1) y las flechas
-// de flujo admisión (locales secos) → extracción (locales húmedos), reflejando
-// el sentido seco→húmedo del DB-HS3.
+// DOS diagramas (como en feature-4/6):
+//   • PLANTA esquemática: rejilla de cajas-estancia con checker verde/rojo y
+//     flechas de flujo admisión (secos) → extracción (húmedos), el sentido
+//     seco→húmedo del DB-HS3.
+//   • RED de columnas (si `result.red` existe, modo avanzado): una columna
+//     vertical por colectivo, boca arriba y plantas descendiendo.
+//
+// MULTICANAL (WCAG 1.4.1): el elemento crítico se distingue por color + trazo
+// grueso/discontinuo (kind="critical") + marca textual («✗ INCUMPLE» en las
+// estancias, «◆ manda» en la red) — NUNCA solo color. Selección (contrato
+// feature-7): acento + trazo grueso + anillo (Ring); hover: refuerzo
+// intermedio. En mode="pdf" no hay interactividad ni estados de selección.
+//
+// COMPACTO (feature-8): por debajo de COMPACT_WIDTH (→ ./svg-meta, patrón HE1)
+// se ocultan las microetiquetas densas y se agrandan las restantes, SIN cambiar
+// la geometría (la UI dimensiona el alto con hs3NativeSize/hs3RedNativeSize y
+// el aspecto debe coincidir). Nunca en PDF.
 
-import { DiagramSvg, Seg, Arrow, Tag, type SvgMode } from "../../lib/svg/primitives";
-import { fitViewBox } from "../../lib/svg/helpers";
+import type { ReactNode } from "react";
+import { DiagramSvg, Seg, Arrow, Tag, Ring, type SvgMode } from "../../lib/svg/primitives";
+import { fitViewBox, type Kind } from "../../lib/svg/helpers";
 import { fmt } from "../../lib/units/format";
 import type {
   HS3Result,
@@ -41,6 +57,7 @@ import {
   R_NODE_H,
   R_GAP_Y,
   R_PAD,
+  esCompacto,
 } from "./svg-meta";
 
 interface HS3SVGProps {
@@ -48,6 +65,80 @@ interface HS3SVGProps {
   mode: SvgMode;
   width: number;
   height: number;
+  /** Id (estancia o tramo de la red) seleccionado en la tabla — acento + anillo. */
+  selectedId?: string | null;
+  /** Id bajo el cursor en la tabla — refuerzo intermedio. */
+  hoverId?: string | null;
+  /** Clic en un elemento del esquema → selecciona la fila en la tabla. */
+  onSelect?: (id: string) => void;
+  /** Nombres legibles por id (feature-7); sin entrada, el rótulo por defecto. */
+  etiquetas?: Record<string, string>;
+}
+
+// -----------------------------------------------------------------------------
+// Kit de interacción (contrato feature-7). En mode="pdf" el kit queda inerte
+// (sin handlers ni estados) y el render es idéntico al de feature-6.
+// -----------------------------------------------------------------------------
+interface Kit {
+  interactivo: boolean;
+  sel: string | null;
+  hov: string | null;
+  onSelect?: (id: string) => void;
+  etiquetas?: Record<string, string>;
+}
+
+/** Estilo MULTICANAL resuelto de un elemento (trazo + anillo). */
+interface Trazo {
+  kind: Kind;
+  base: number;
+  ring: boolean;
+}
+
+/**
+ * Trazo MULTICANAL: fallo manda (crítico); luego selección/hover (acento).
+ * Los grosores están a escala de ESTE viewBox (cajas de 60×42, fuentes ~4):
+ * el 3.5 del patrón hs4/hs5 (fuentes 8–10) equivale aquí a ~2.4.
+ */
+function trazoDe(kit: Kit, ids: readonly string[], fallo: boolean, base: number): Trazo {
+  const esSel = ids.some((i) => i === kit.sel);
+  const esHov = ids.some((i) => i === kit.hov);
+  if (fallo) {
+    // criticalStroke duplica el grosor y aplica trazo discontinuo.
+    return { kind: "critical", base: esSel ? base * 1.35 : esHov ? base * 1.15 : base, ring: esSel };
+  }
+  if (esSel) return { kind: "flow", base: 2.4, ring: true };
+  if (esHov) return { kind: "flow", base: Math.min(2, base + 0.6), ring: false };
+  return { kind: "normal", base, ring: false };
+}
+
+/** Envoltorio interactivo: clic → onSelect(id); `hit` es la zona de golpeo. */
+function envolver(kit: Kit, key: string, id: string, contenido: ReactNode, hit: ReactNode): ReactNode {
+  return kit.interactivo ? (
+    <g
+      key={key}
+      data-el={id}
+      style={{ cursor: "pointer" }}
+      onClick={(e) => {
+        e.stopPropagation();
+        kit.onSelect?.(id);
+      }}
+    >
+      {contenido}
+      {hit}
+    </g>
+  ) : (
+    <g key={key}>{contenido}</g>
+  );
+}
+
+/** Rectángulo invisible de golpeo (solo pantalla interactiva). */
+function hitRect(kit: Kit, x: number, y: number, w: number, h: number): ReactNode {
+  return kit.interactivo ? <rect x={x} y={y} width={w} height={h} fill="transparent" /> : null;
+}
+
+/** Nombre legible: `etiquetas[id]`; sin entrada, el rótulo por defecto. */
+function nombreDe(kit: Kit, id: string, porDefecto: string): string {
+  return kit.etiquetas?.[id] ?? porDefecto;
 }
 
 /** Nombre legible (es-ES) del tipo de estancia para la etiqueta. */
@@ -89,42 +180,78 @@ function colocar(estancias: ResultadoEstancia[]): Caja[] {
 //   (1) color crítico  +  (2) trazo grueso/discontinuo (kind="critical")  +
 //   (3) marca textual "✗ INCUMPLE" en <Tag critical>.
 // Una que cumple lleva "✓" — nunca se depende solo del color.
+//
+// COMPACTO: se ocultan la línea fina «caudal · rol» y el «mín. …» (los datos
+// finos viven en el outliner) y suben los cuerpos del nombre, el caudal y el
+// checker. La geometría de la caja NO cambia.
 // -----------------------------------------------------------------------------
-function CajaEstancia({ caja, mode }: { caja: Caja; mode: SvgMode }) {
+function CajaEstancia({
+  caja,
+  mode,
+  compact,
+  titulo,
+  tr,
+}: {
+  caja: Caja;
+  mode: SvgMode;
+  compact: boolean;
+  /** Nombre legible resuelto (etiquetas[id] o el tipo de estancia). */
+  titulo: string;
+  /** Trazo MULTICANAL resuelto (fallo/selección/hover). */
+  tr: Trazo;
+}) {
   const { e, x, y, cx } = caja;
   const critico = !e.cumple;
-  const kind = critico ? "critical" : "normal";
-  const nombre = NOMBRE_ESTANCIA[e.tipo];
 
   return (
     <g>
       {/* Rectángulo de la estancia (4 segmentos). */}
-      <Seg x1={x} y1={y} x2={x + BOX_W} y2={y} mode={mode} kind={kind} />
-      <Seg x1={x + BOX_W} y1={y} x2={x + BOX_W} y2={y + BOX_H} mode={mode} kind={kind} />
-      <Seg x1={x + BOX_W} y1={y + BOX_H} x2={x} y2={y + BOX_H} mode={mode} kind={kind} />
-      <Seg x1={x} y1={y + BOX_H} x2={x} y2={y} mode={mode} kind={kind} />
+      <Seg x1={x} y1={y} x2={x + BOX_W} y2={y} mode={mode} kind={tr.kind} base={tr.base} />
+      <Seg x1={x + BOX_W} y1={y} x2={x + BOX_W} y2={y + BOX_H} mode={mode} kind={tr.kind} base={tr.base} />
+      <Seg x1={x + BOX_W} y1={y + BOX_H} x2={x} y2={y + BOX_H} mode={mode} kind={tr.kind} base={tr.base} />
+      <Seg x1={x} y1={y + BOX_H} x2={x} y2={y} mode={mode} kind={tr.kind} base={tr.base} />
 
-      {/* Nombre de la estancia. */}
-      <Tag x={cx} y={y + 11} mode={mode} size={4.4}>
-        {nombre}
-      </Tag>
+      {compact ? (
+        <>
+          {/* Nombre + caudal propuesto + checker, en cuerpos legibles. */}
+          <Tag x={cx} y={y + 12} mode={mode} size={5.4}>
+            {titulo}
+          </Tag>
+          <Tag x={cx} y={y + 22} mode={mode} size={4.6}>
+            {fmt(e.caudalPropuesto_l_s, "l/s")}
+          </Tag>
+          <Tag x={cx} y={y + 34} mode={mode} size={5.2} critical={critico}>
+            {critico ? "✗ INCUMPLE" : "✓ Cumple"}
+          </Tag>
+        </>
+      ) : (
+        <>
+          {/* Nombre de la estancia. */}
+          <Tag x={cx} y={y + 11} mode={mode} size={4.4}>
+            {titulo}
+          </Tag>
 
-      {/* Caudal propuesto + rol (admisión / extracción). */}
-      <Tag x={cx} y={y + 19} mode={mode} size={3.6}>
-        {`${fmt(e.caudalPropuesto_l_s, "l/s")} · ${
-          e.tipoAbertura === "extraccion" ? "extracción" : "admisión"
-        }`}
-      </Tag>
+          {/* Caudal propuesto + rol (admisión / extracción). */}
+          <Tag x={cx} y={y + 19} mode={mode} size={3.6}>
+            {`${fmt(e.caudalPropuesto_l_s, "l/s")} · ${
+              e.tipoAbertura === "extraccion" ? "extracción" : "admisión"
+            }`}
+          </Tag>
 
-      {/* Checker MULTICANAL: marca textual + color (refuerza al trazo). */}
-      <Tag x={cx} y={y + 30} mode={mode} size={4.6} critical={critico}>
-        {critico ? "✗ INCUMPLE" : "✓ Cumple"}
-      </Tag>
+          {/* Checker MULTICANAL: marca textual + color (refuerza al trazo). */}
+          <Tag x={cx} y={y + 30} mode={mode} size={4.6} critical={critico}>
+            {critico ? "✗ INCUMPLE" : "✓ Cumple"}
+          </Tag>
 
-      {/* Mínimo exigido (resultado numérico también en texto, no solo color). */}
-      <Tag x={cx} y={y + 37} mode={mode} size={3.2}>
-        {`mín. ${fmt(e.caudalRequerido_l_s, "l/s")}`}
-      </Tag>
+          {/* Mínimo exigido (resultado numérico también en texto, no solo color). */}
+          <Tag x={cx} y={y + 37} mode={mode} size={3.2}>
+            {`mín. ${fmt(e.caudalRequerido_l_s, "l/s")}`}
+          </Tag>
+        </>
+      )}
+
+      {/* Anillo de selección (contrato feature-7), en el borde superior. */}
+      {tr.ring && <Ring x={cx} y={y} mode={mode} kind={tr.kind} />}
     </g>
   );
 }
@@ -209,11 +336,15 @@ function RedDiagram({
   mode,
   width,
   height,
+  compact,
+  kit,
 }: {
   red: NonNullable<HS3Result["red"]>;
   mode: SvgMode;
   width: number;
   height: number;
+  compact: boolean;
+  kit: Kit;
 }) {
   const columnas = red.colectivos.map((col, j) => {
     const x = R_ORIGIN_X + j * (R_COL_W + R_GAP_X);
@@ -268,35 +399,71 @@ function RedDiagram({
           ))}
           {/* Etiqueta de clase de tiro del colectivo (encima de la boca). */}
           {nodos[0] && (
-            <Tag x={nodos[0].cx} y={R_ORIGIN_Y - 5} mode={mode} size={3.6}>
+            <Tag x={nodos[0].cx} y={R_ORIGIN_Y - 5} mode={mode} size={compact ? 4.4 : 3.6}>
               {`clase ${col.claseTiro} · ${col.plantasServidas} pl.`}
             </Tag>
           )}
           {nodos.map((n) => {
             const dim = n.t.esDimensionante;
-            const kind = dim ? "critical" : "normal";
+            const tr = trazoDe(kit, [n.t.id], dim, 1.2);
             const esBoca = n.t.nivel === null;
-            return (
-              <g key={n.t.id}>
-                <Seg x1={n.x} y1={n.y} x2={n.x + R_NODE_W} y2={n.y} mode={mode} kind={kind} />
-                <Seg x1={n.x + R_NODE_W} y1={n.y} x2={n.x + R_NODE_W} y2={n.y + R_NODE_H} mode={mode} kind={kind} />
-                <Seg x1={n.x + R_NODE_W} y1={n.y + R_NODE_H} x2={n.x} y2={n.y + R_NODE_H} mode={mode} kind={kind} />
-                <Seg x1={n.x} y1={n.y + R_NODE_H} x2={n.x} y2={n.y} mode={mode} kind={kind} />
-                <Tag x={n.cx} y={n.y + 9} mode={mode} size={4} critical={dim}>
-                  {esBoca ? `Boca · ${col.id}` : `Planta ${n.t.nivel}`}
-                </Tag>
-                <Tag x={n.cx} y={n.y + 17} mode={mode} size={3.6}>
-                  {`qvt ${fmt(n.t.qvtAcum_l_s, "l/s")}`}
-                </Tag>
-                <Tag x={n.cx} y={n.y + 25} mode={mode} size={3.6} critical={dim}>
-                  {fmt(n.t.seccionRequerida_cm2, "cm²", 0)}
-                </Tag>
-                {n.t.esManda && (
-                  <Tag x={n.cx} y={n.y + 33} mode={mode} size={3.8} critical>
-                    ◆ manda
-                  </Tag>
+            // El nombre legible de la tabla (etiquetas[id]) sustituye al rótulo
+            // por defecto de la caja cuando existe (contrato feature-7).
+            const titulo = nombreDe(
+              kit,
+              n.t.id,
+              esBoca ? `Boca · ${nombreDe(kit, col.id, col.id)}` : `Planta ${n.t.nivel}`,
+            );
+            const contenido = (
+              <>
+                <Seg x1={n.x} y1={n.y} x2={n.x + R_NODE_W} y2={n.y} mode={mode} kind={tr.kind} base={tr.base} />
+                <Seg x1={n.x + R_NODE_W} y1={n.y} x2={n.x + R_NODE_W} y2={n.y + R_NODE_H} mode={mode} kind={tr.kind} base={tr.base} />
+                <Seg x1={n.x + R_NODE_W} y1={n.y + R_NODE_H} x2={n.x} y2={n.y + R_NODE_H} mode={mode} kind={tr.kind} base={tr.base} />
+                <Seg x1={n.x} y1={n.y + R_NODE_H} x2={n.x} y2={n.y} mode={mode} kind={tr.kind} base={tr.base} />
+                {compact ? (
+                  <>
+                    {/* COMPACTO: sin la línea fina de qvt (vive en el outliner);
+                        cuerpos mayores para el título y la sección exigida. */}
+                    <Tag x={n.cx} y={n.y + 11} mode={mode} size={4.8} critical={dim}>
+                      {titulo}
+                    </Tag>
+                    <Tag x={n.cx} y={n.y + 21} mode={mode} size={4.6} critical={dim}>
+                      {fmt(n.t.seccionRequerida_cm2, "cm²", 0)}
+                    </Tag>
+                    {n.t.esManda && (
+                      <Tag x={n.cx} y={n.y + 31} mode={mode} size={4.6} critical>
+                        ◆ manda
+                      </Tag>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Tag x={n.cx} y={n.y + 9} mode={mode} size={4} critical={dim}>
+                      {titulo}
+                    </Tag>
+                    <Tag x={n.cx} y={n.y + 17} mode={mode} size={3.6}>
+                      {`qvt ${fmt(n.t.qvtAcum_l_s, "l/s")}`}
+                    </Tag>
+                    <Tag x={n.cx} y={n.y + 25} mode={mode} size={3.6} critical={dim}>
+                      {fmt(n.t.seccionRequerida_cm2, "cm²", 0)}
+                    </Tag>
+                    {n.t.esManda && (
+                      <Tag x={n.cx} y={n.y + 33} mode={mode} size={3.8} critical>
+                        ◆ manda
+                      </Tag>
+                    )}
+                  </>
                 )}
-              </g>
+                {/* Anillo de selección (contrato feature-7), borde superior. */}
+                {tr.ring && <Ring x={n.cx} y={n.y} mode={mode} kind={tr.kind} />}
+              </>
+            );
+            return envolver(
+              kit,
+              `nodo-${n.t.id}`,
+              n.t.id,
+              contenido,
+              hitRect(kit, n.x, n.y, R_NODE_W, R_NODE_H),
             );
           })}
         </g>
@@ -305,10 +472,31 @@ function RedDiagram({
   );
 }
 
-export function HS3SVG({ result, mode, width, height }: HS3SVGProps) {
+export function HS3SVG({
+  result,
+  mode,
+  width,
+  height,
+  selectedId = null,
+  hoverId = null,
+  onSelect,
+  etiquetas,
+}: HS3SVGProps) {
+  // En PDF no hay interactividad NI estados de selección/hover (contrato).
+  const kit: Kit = {
+    interactivo: mode === "screen" && onSelect !== undefined,
+    sel: mode === "screen" ? selectedId : null,
+    hov: mode === "screen" ? hoverId : null,
+    onSelect,
+    etiquetas,
+  };
+  const compact = esCompacto(mode, width);
+
   // Modo avanzado: el diagrama es la red colectiva (árbol), no la rejilla.
   if (result.red) {
-    return <RedDiagram red={result.red} mode={mode} width={width} height={height} />;
+    return (
+      <RedDiagram red={result.red} mode={mode} width={width} height={height} compact={compact} kit={kit} />
+    );
   }
 
   const cajas = colocar(result.porEstancia);
@@ -368,13 +556,26 @@ export function HS3SVG({ result, mode, width, height }: HS3SVGProps) {
         />
       ))}
 
-      {/* Cajas-estancia con checker multicanal. */}
-      {cajas.map((caja) => (
-        <CajaEstancia key={caja.e.id} caja={caja} mode={mode} />
-      ))}
+      {/* Cajas-estancia con checker multicanal + selección/hover (feature-7). */}
+      {cajas.map((caja) => {
+        const tr = trazoDe(kit, [caja.e.id], !caja.e.cumple, 1.2);
+        return envolver(
+          kit,
+          `caja-${caja.e.id}`,
+          caja.e.id,
+          <CajaEstancia
+            caja={caja}
+            mode={mode}
+            compact={compact}
+            titulo={nombreDe(kit, caja.e.id, NOMBRE_ESTANCIA[caja.e.tipo])}
+            tr={tr}
+          />,
+          hitRect(kit, caja.x, caja.y, BOX_W, BOX_H),
+        );
+      })}
 
       {/* Banda de totales (el dato numérico también va en texto, no solo SVG). */}
-      <Tag x={xTotales} y={yTotales} mode={mode} size={4}>
+      <Tag x={xTotales} y={yTotales} mode={mode} size={compact ? 4.6 : 4}>
         {`Admisión ${fmt(result.totalAdmision_l_s, "l/s")} → Extracción ${fmt(
           result.totalExtraccion_l_s,
           "l/s",

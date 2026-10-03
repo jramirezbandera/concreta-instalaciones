@@ -9,11 +9,32 @@
 // esas constantes para pintar, de modo que `hs3NativeSize` y `HS3SVG` no puedan
 // divergir.
 
+import type { SvgMode } from "../../lib/svg/helpers";
 import type { HS3Result } from "./calc";
 
 // Id del clon oculto que la ficha PDF clona y pasa a svg2pdf. Única fuente de
 // verdad: lo importan ./ficha.ts (toFichaData) y ./ui.tsx (montaje del clon).
 export const HS3_PDF_SVG_ID = "hs3-svg-pdf";
+
+// -----------------------------------------------------------------------------
+// Render RESPONSIVE (feature-8, patrón de he1/svg-meta). Por debajo de este
+// ancho de render en px CSS (el aside de 380 px del patrón feature-7, móvil…)
+// las microetiquetas densas (caudal·rol y mínimo por estancia; qvt por tramo de
+// la red) encogen al escalar el viewBox y quedan ilegibles. En "compacto" el SVG
+// se reduce a ESQUEMA legible (formas + checker multicanal + cifras grandes) y
+// oculta esas microetiquetas; los datos finos NO se pierden (viven en la
+// tabla/outliner — la tabla manda, UX-RECONCEPT §7).
+//
+// CRITERIO: el modo compacto NO cambia la geometría (misma rejilla, mismo
+// viewBox): la UI dimensiona el alto con la proporción de hs3NativeSize /
+// hs3RedNativeSize y el aspecto debe coincidir SIEMPRE. Solo aplica en pantalla;
+// el clon PDF se rasteriza a `nativeW` (grande) y lleva todo el detalle.
+export const COMPACT_WIDTH = 520; // umbral de ancho de render (px CSS) para compacto
+
+/** ¿Render compacto? Solo en pantalla y por debajo del umbral. PDF nunca. */
+export function esCompacto(mode: SvgMode, width: number): boolean {
+  return mode === "screen" && width < COMPACT_WIDTH;
+}
 
 // -----------------------------------------------------------------------------
 // Geometría de la rejilla (en unidades del dominio, mm-ish). ÚNICA fuente de

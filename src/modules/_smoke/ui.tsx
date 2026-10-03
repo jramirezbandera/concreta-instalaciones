@@ -1,25 +1,44 @@
-import { useDeferredValue, useMemo, useState } from "react";
-import { useModuleState } from "../../hooks/useModuleState";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useContainerWidth } from "../../hooks/useContainerWidth";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
-import { useDrawer } from "../../components/layout/AppShell";
-import { Topbar } from "../../components/layout/Topbar";
+import { ModuleShell, type ResumenVeredicto } from "../../components/justificacion/ModuleShell";
 import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
 import { MobileTabBar, type MobileTab } from "../../components/ui/MobileTabBar";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
 import { Field, NumberInput } from "../../components/ui/InputLabel";
-import { showToast } from "../../components/ui/Toast";
 import { renderFicha } from "../../lib/pdf/renderFicha";
-import { STATUS_LABEL } from "../../lib/pdf/utils";
-import { STATE_TEXT, STATE_TINT } from "../../lib/ui/veredicto";
 import { fmt } from "../../lib/units/format";
-import { calcSmoke, smokeDefaults } from "./calc";
+import { calcSmoke, smokeDefaults, type SmokeInputs } from "./calc";
 import { SmokeSVG } from "./svg";
 import { toFichaData, SMOKE_PDF_SVG_ID } from "./ficha";
 
+// feature-6 T5.0: _smoke migrado al esqueleto nuevo como banco de pruebas del
+// SHELL. Topbar + banda de veredicto inline desaparecen: los aporta
+// <ModuleShell justificacionKey="smoke">; aquí solo queda la zona de trabajo
+// (MobileTabBar + paneles) como children.
+//
+// DECISIÓN DE SANDBOX (documentada): _smoke usa un mini-estado LOCAL (useState
+// + setField + reset, sin persistencia ni URL) en vez de useJustificacionState
+// porque (1) useJustificacionState llama a useProyecto(), que LANZA fuera de
+// <ProyectoProvider> — y /_smoke se monta sin provider a propósito —, y (2) su
+// `key` está tipada como JustificacionKey, que no incluye "smoke". Al ser un
+// banco de pruebas de desarrollo, no necesita guardar ni compartir estado: con
+// la retirada del hook legacy (T6.2) desaparecen también la persistencia
+// localStorage/URL y la acción "Compartir" (una URL sin estado no comparte
+// nada). ModuleShell sí tolera contexto null (useContext directo), así que
+// valida el shell sin necesidad de proyecto sintético ni wrapper SmokeSandbox.
+// El sandbox con proyecto efímero (ProyectoProvider persistir={false}) queda
+// para cuando haga falta validar el hook nuevo.
+
 export function SmokeModule() {
-  const { state, setField, reset } = useModuleState("smoke", smokeDefaults);
-  const { openDrawer } = useDrawer();
+  const [state, setState] = useState<SmokeInputs>(smokeDefaults);
+  const setField = useCallback(
+    <K extends keyof SmokeInputs>(field: K, value: SmokeInputs[K]) => {
+      setState((prev) => ({ ...prev, [field]: value }));
+    },
+    [],
+  );
+  const reset = useCallback(() => setState(smokeDefaults), []);
   const [tab, setTab] = useState<MobileTab>("inputs");
 
   const deferredState = useDeferredValue(state);
@@ -34,14 +53,20 @@ export function SmokeModule() {
   const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } =
     usePdfPreview(() => renderFicha(toFichaData(deferredState, result)), valid);
 
-  const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      showToast("Enlace copiado al portapapeles", { autoDismiss: 2500 });
-    } catch {
-      showToast("No se pudo copiar el enlace", { autoDismiss: 3000 });
-    }
-  };
+  // Resumen para la banda del shell, construido inline (smoke no necesita
+  // resumen.ts propio): misma frase que la banda inline anterior. `null` con
+  // datos inválidos → banda neutra "Datos insuficientes" del shell.
+  const resumen: ResumenVeredicto | null = useMemo(
+    () =>
+      valid
+        ? {
+            veredicto: result.estado,
+            sujeto: "Extracción de cocción",
+            metricas: `${fmt(result.caudalPropuesto_l_s, "l/s")} vs mín. ${fmt(result.caudalRequerido_l_s, "l/s")}`,
+          }
+        : null,
+    [valid, result],
+  );
 
   const [canvasRef, canvasWidth] = useContainerWidth();
   const svgW =
@@ -51,16 +76,15 @@ export function SmokeModule() {
   const svgH = Math.round(svgW * 0.75);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <Topbar
-        moduleLabel="Demo cimientos"
-        moduleGroup="feature-0 · vertical completo"
-        onExportPdf={handleExportPdf}
-        pdfExporting={pdfExporting}
-        onShare={handleShare}
-        onReset={reset}
-        onMenuOpen={openDrawer}
-      />
+    <ModuleShell
+      justificacionKey="smoke"
+      resultado={resumen}
+      acciones={{
+        onExportPdf: handleExportPdf,
+        pdfExporting,
+        onReset: reset,
+      }}
+    >
       <MobileTabBar tab={tab} setTab={setTab} />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -109,10 +133,11 @@ export function SmokeModule() {
           </div>
         </div>
 
-        {/* Right: SVG + results. En lg se apila junto (banner → lienzo → tablas);
-            en móvil se reparte por pestaña: "diagramas" = solo el lienzo,
-            "results" = veredicto + tablas. Cada bloque se gatea por separado
-            manteniendo intacto el orden y el layout en lg (lg:flex / lg:block). */}
+        {/* Right: SVG + results. En lg se apila junto (lienzo → tablas); en
+            móvil se reparte por pestaña: "diagramas" = solo el lienzo,
+            "results" = tablas (el veredicto vive ya en la banda del shell).
+            Cada bloque se gatea por separado manteniendo intacto el orden y el
+            layout en lg (lg:flex / lg:block). */}
         <div
           className={[
             "scroll-hide flex min-w-0 flex-col overflow-y-auto",
@@ -121,30 +146,11 @@ export function SmokeModule() {
             "lg:flex",
           ].join(" ")}
         >
-          {/* Verdict banner (parte del resultado: tab "results" en móvil). */}
-          <div
-            className={[
-              `border-b px-6 py-2.5 ${STATE_TINT[result.estado]}`,
-              tab === "results" ? "block" : "hidden",
-              "lg:block",
-            ].join(" ")}
-          >
-            <span className="text-text-secondary text-[13px]">
-              Extracción de cocción —{" "}
-              <span className={`font-semibold ${STATE_TEXT[result.estado]}`}>
-                {STATUS_LABEL[result.estado]}
-              </span>{" "}
-              <span className="text-text-disabled">
-                ({fmt(result.caudalPropuesto_l_s, "l/s")} vs mín. {fmt(result.caudalRequerido_l_s, "l/s")})
-              </span>
-            </span>
-          </div>
-
           {/* Lienzo del diagrama (tab "diagramas" en móvil; siempre en lg). */}
           <div
             ref={canvasRef}
             className={[
-              "border-border-main canvas-dot-grid items-center justify-center border-b px-4 py-6",
+              "border-border-main items-center justify-center border-b px-4 py-6",
               tab === "diagramas" ? "flex" : "hidden",
               "lg:flex",
             ].join(" ")}
@@ -181,7 +187,7 @@ export function SmokeModule() {
           onClose={closePdfPreview}
         />
       )}
-    </div>
+    </ModuleShell>
   );
 }
 

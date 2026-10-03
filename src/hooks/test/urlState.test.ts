@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { parseUrlParams, toUrlParams } from "../useModuleState";
+import { parseUrlParams, toUrlParams } from "../urlState";
 
 // =============================================================================
-// (De)serialización de estado ↔ URL del hook compartido useModuleState.
+// (De)serialización de estado ↔ URL (helpers puros de src/hooks/urlState.ts).
 // Lógica pura: primitivos como texto, no-primitivos (arrays/objetos) como JSON.
 // Endurecida contra URLs malformadas/hostiles (forma raíz + nº finitos).
 // =============================================================================

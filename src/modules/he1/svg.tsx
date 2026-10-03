@@ -19,8 +19,19 @@
 //
 // Todos los resultados numéricos van TAMBIÉN en texto (la ficha/UI los tabula);
 // el SVG complementa, nunca sustituye, al texto (WCAG 1.4.1).
+//
+// feature-8 — CONTRATO INTERACTIVO (patrón feature-7) + MODO "UNO":
+//   • Props opcionales `selectedId`/`hoverId`/`onSelect`/`etiquetas`: selección
+//     = acento + trazo grueso + anillo (Ring); hover = refuerzo intermedio.
+//     Clic en una fila/panel → onSelect(cerramiento.id); clic en una CAPA de la
+//     sección → onSelect(capa.id). En mode="pdf" no hay interactividad ni
+//     estados de selección (svg2pdf/raster-safe, la ficha no cambia).
+//   • `soloCerramientoId` (solo pantalla): pinta ÚNICAMENTE ese cerramiento con
+//     los tres paneles APILADOS EN VERTICAL (sección → barra U → Glaser),
+//     pensado para el aside de ~350 px (layout uno de ./svg-meta). Sin esa prop
+//     el comportamiento multi se mantiene; el PDF SIEMPRE pinta el multi.
 
-import { DiagramSvg, Seg, Dot, Tag, type SvgMode } from "../../lib/svg/primitives";
+import { DiagramSvg, Seg, Dot, Tag, Ring, type SvgMode } from "../../lib/svg/primitives";
 import { palette, type Kind } from "../../lib/svg/helpers";
 import { fitViewBox } from "../../lib/svg/helpers";
 import { fmt } from "../../lib/units/format";
@@ -40,7 +51,10 @@ import {
   VB_PAD,
   BANDA_TOTALES,
   SEC_AXIS_H,
+  UNO_W,
+  UNO_CONTENT_H,
   calcularLayout,
+  calcularLayoutUno,
   esCompacto,
   type CerramientoGeom,
   type SeccionGeom,
@@ -51,6 +65,46 @@ interface He1SVGProps {
   mode: SvgMode;
   width: number;
   height: number;
+  /** Id (cerramiento o capa) seleccionado en la tabla — acento + anillo. */
+  selectedId?: string | null;
+  /** Id bajo el cursor en la tabla — refuerzo intermedio. */
+  hoverId?: string | null;
+  /** Clic en un elemento del esquema → selecciona la fila en la tabla. */
+  onSelect?: (id: string) => void;
+  /** Nombres legibles por id (feature-7); sin entrada, el nombre del resultado. */
+  etiquetas?: Record<string, string>;
+  /**
+   * Solo pantalla (feature-8): pinta ÚNICAMENTE ese cerramiento con los tres
+   * paneles apilados en vertical (layout uno). `null`/ausente → multi. El modo
+   * "pdf" lo ignora SIEMPRE (la ficha pinta todos los cerramientos).
+   */
+  soloCerramientoId?: string | null;
+}
+
+// -----------------------------------------------------------------------------
+// Kit de interacción (contrato feature-7). En mode="pdf" el kit queda inerte
+// (sin handlers ni estados) y el render es idéntico al de feature-4.
+// -----------------------------------------------------------------------------
+interface Kit {
+  interactivo: boolean;
+  sel: string | null;
+  hov: string | null;
+  onSelect?: (id: string) => void;
+}
+
+/**
+ * Kit INERTE: el del modo "pdf" y el default de los paneles. Sin handlers y sin
+ * estados de selección → el render es idéntico al de feature-4 (la ficha no
+ * cambia). Constante de módulo: identidad estable entre renders.
+ */
+const KIT_INERTE: Kit = { interactivo: false, sel: null, hov: null };
+
+/** Estilo del marco de una capa según selección/hover (escala de ESTE viewBox:
+ *  fuentes ~3–4,6, así que el «trazo 3,5» del patrón hs4/hs5 equivale a ~2,2). */
+function trazoCapa(kit: Kit, id: string): { kind: Kind; base: number; ring: boolean } {
+  if (kit.sel === id) return { kind: "flow", base: 2.2, ring: true };
+  if (kit.hov === id) return { kind: "flow", base: 1.7, ring: false };
+  return { kind: "normal", base: 1.2, ring: false };
 }
 
 // Materiales de la tabla CEC considerados AISLANTES térmicos: se destacan en la
@@ -92,12 +146,15 @@ function RellenoCapa({
   bodyY,
   bodyH,
   mode,
+  tr = { kind: "normal", base: 1.2, ring: false },
 }: {
   capa: ResultadoCapaHE1;
   geom: { x: number; w: number; cx: number };
   bodyY: number;
   bodyH: number;
   mode: SvgMode;
+  /** Trazo del marco según selección/hover (feature-7); por defecto, neutro. */
+  tr?: { kind: Kind; base: number; ring: boolean };
 }) {
   const pal = palette(mode);
   const aislante = esCapaAislante(capa);
@@ -114,10 +171,13 @@ function RellenoCapa({
   return (
     <g>
       {/* Marco del rectángulo de la capa (4 segmentos planos). */}
-      <Seg x1={geom.x} y1={bodyY} x2={geom.x + geom.w} y2={bodyY} mode={mode} />
-      <Seg x1={geom.x + geom.w} y1={bodyY} x2={geom.x + geom.w} y2={bodyY + bodyH} mode={mode} />
-      <Seg x1={geom.x + geom.w} y1={bodyY + bodyH} x2={geom.x} y2={bodyY + bodyH} mode={mode} />
-      <Seg x1={geom.x} y1={bodyY + bodyH} x2={geom.x} y2={bodyY} mode={mode} />
+      <Seg x1={geom.x} y1={bodyY} x2={geom.x + geom.w} y2={bodyY} mode={mode} kind={tr.kind} base={tr.base} />
+      <Seg x1={geom.x + geom.w} y1={bodyY} x2={geom.x + geom.w} y2={bodyY + bodyH} mode={mode} kind={tr.kind} base={tr.base} />
+      <Seg x1={geom.x + geom.w} y1={bodyY + bodyH} x2={geom.x} y2={bodyY + bodyH} mode={mode} kind={tr.kind} base={tr.base} />
+      <Seg x1={geom.x} y1={bodyY + bodyH} x2={geom.x} y2={bodyY} mode={mode} kind={tr.kind} base={tr.base} />
+
+      {/* Anillo de selección de la capa (contrato feature-7), borde superior. */}
+      {tr.ring && <Ring x={geom.cx} y={bodyY} mode={mode} kind={tr.kind} />}
 
       {/* Relleno rayado de la capa aislante (diagonales recortadas a la caja). */}
       {aislante && (
@@ -162,12 +222,15 @@ function PanelSeccion({
   seccion,
   mode,
   compact,
+  kit = KIT_INERTE,
 }: {
   cer: ResultadoCerramientoHE1;
   seccion: SeccionGeom;
   mode: SvgMode;
   /** Esquema compacto (móvil): oculta las microetiquetas densas por capa. */
   compact: boolean;
+  /** Interacción feature-7 (clic en capa → onSelect(capa.id)); inerte en PDF. */
+  kit?: Kit;
 }) {
   const { bodyY, bodyH, capas } = seccion;
   const yEtiquetas = bodyY + bodyH + 8;
@@ -185,18 +248,31 @@ function PanelSeccion({
         exterior →
       </Tag>
 
-      {/* Rectángulos de capa (interior → exterior). */}
+      {/* Rectángulos de capa (interior → exterior). Con interacción, cada capa
+          es clicable (onSelect(capa.id)); stopPropagation evita que el clic
+          suba al envoltorio de la fila (que seleccionaría el cerramiento). */}
       {capas.map((g) => {
         const capa = cer.capas[g.i];
-        return (
-          <RellenoCapa
+        const tr = trazoCapa(kit, capa.id);
+        const contenido = (
+          <RellenoCapa capa={capa} geom={g} bodyY={bodyY} bodyH={bodyH} mode={mode} tr={tr} />
+        );
+        return kit.interactivo ? (
+          <g
             key={`capa-${capa.id}`}
-            capa={capa}
-            geom={g}
-            bodyY={bodyY}
-            bodyH={bodyH}
-            mode={mode}
-          />
+            data-el={capa.id}
+            style={{ cursor: "pointer" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              kit.onSelect?.(capa.id);
+            }}
+          >
+            {contenido}
+            {/* Zona de golpeo: todo el rectángulo de la capa. */}
+            <rect x={g.x} y={bodyY} width={g.w} height={bodyH} fill="transparent" />
+          </g>
+        ) : (
+          <g key={`capa-${capa.id}`}>{contenido}</g>
         );
       })}
 
@@ -492,27 +568,69 @@ function FilaCerramiento({
   fila,
   mode,
   compact,
+  kit = KIT_INERTE,
+  etiquetas,
 }: {
   fila: CerramientoGeom;
   mode: SvgMode;
   compact: boolean;
+  /** Interacción feature-7 (clic en la fila → onSelect(cerramiento.id)). */
+  kit?: Kit;
+  /** Nombres legibles por id (feature-7); sin entrada, el nombre del resultado. */
+  etiquetas?: Record<string, string>;
 }) {
   const { cer, rowY, seccion, ubar, glaser } = fila;
   const critico = cer.estado === "fail";
-  return (
-    <g>
+  const nombre = etiquetas?.[cer.id] ?? cer.nombre;
+  // El título refuerza la selección del CERRAMIENTO (una capa seleccionada
+  // marca su propio rectángulo, no el título): acento + anillo, multicanal
+  // junto al texto del veredicto que ya lleva.
+  const seleccionado = kit.sel === cer.id;
+  const contenido = (
+    <>
       {/* Título de la fila: nombre del cerramiento + veredicto multicanal. */}
-      <Tag x={0} y={rowY + 9} mode={mode} anchor="start" size={4.6} critical={critico}>
-        {`${cer.nombre} — ${VEREDICTO_MARCA[cer.estado]}`}
+      <Tag
+        x={0}
+        y={rowY + 9}
+        mode={mode}
+        anchor="start"
+        size={4.6}
+        critical={critico}
+        tone={seleccionado ? "flow" : undefined}
+        bold={seleccionado}
+      >
+        {`${nombre} — ${VEREDICTO_MARCA[cer.estado]}`}
       </Tag>
 
-      <PanelSeccion cer={cer} seccion={seccion} mode={mode} compact={compact} />
+      <PanelSeccion cer={cer} seccion={seccion} mode={mode} compact={compact} kit={kit} />
       {/* PanelBarraU no recibe `compact`: todas sus etiquetas (título, «U …»,
           línea/etiqueta del límite y veredicto) están en la lista de las que
           deben permanecer SIEMPRE, así que no cambia entre modos. */}
       <PanelBarraU cer={cer} box={ubar} mode={mode} />
       <PanelGlaser glaser={cer.glaser} box={glaser} mode={mode} compact={compact} />
+    </>
+  );
+
+  // Con interacción, la fila entera es clicable (las capas hacen
+  // stopPropagation para seleccionarse ellas). La zona de golpeo va DETRÁS del
+  // contenido para no tapar los clics de capa.
+  return kit.interactivo ? (
+    <g
+      data-el={cer.id}
+      style={{ cursor: "pointer" }}
+      onClick={() => kit.onSelect?.(cer.id)}
+    >
+      <rect
+        x={0}
+        y={rowY}
+        width={Math.max(seccion.x0 + 1, ubar.x + ubar.w)}
+        height={glaser.y + glaser.h - rowY}
+        fill="transparent"
+      />
+      {contenido}
     </g>
+  ) : (
+    <g>{contenido}</g>
   );
 }
 
@@ -542,7 +660,59 @@ function describir(result: HE1Result): string {
   );
 }
 
-export function He1SVG({ result, mode, width, height }: He1SVGProps) {
+export function He1SVG({
+  result,
+  mode,
+  width,
+  height,
+  selectedId = null,
+  hoverId = null,
+  onSelect,
+  etiquetas,
+  soloCerramientoId = null,
+}: He1SVGProps) {
+  // Kit de interacción: inerte en PDF (la ficha no cambia) — contrato feature-7.
+  const kit: Kit =
+    mode === "pdf"
+      ? KIT_INERTE
+      : { interactivo: onSelect !== undefined, sel: selectedId, hov: hoverId, onSelect };
+
+  // MODO UNO (solo pantalla, feature-8 §B): un cerramiento con sus tres paneles
+  // apilados en vertical para el aside de ~380 px. Si el id no existe (selección
+  // obsoleta en un render intermedio) se cae al multi.
+  const filaUno =
+    mode !== "pdf" && soloCerramientoId !== null
+      ? calcularLayoutUno(result, soloCerramientoId)
+      : null;
+
+  if (filaUno !== null) {
+    const [uX, uY, uW, uH] = fitViewBox(
+      [
+        { x: 0, y: 0 },
+        { x: UNO_W, y: UNO_CONTENT_H },
+      ],
+      VB_PAD,
+    );
+    return (
+      <DiagramSvg
+        viewBox={[uX, uY, uW, uH]}
+        width={width}
+        height={height}
+        mode={mode}
+        title={`Cerramiento ${filaUno.cer.nombre} (DB-HE1): sección, transmitancia y Glaser`}
+        desc={describir(result)}
+      >
+        <FilaCerramiento
+          fila={filaUno}
+          mode={mode}
+          compact={esCompacto(mode, width)}
+          kit={kit}
+          etiquetas={etiquetas}
+        />
+      </DiagramSvg>
+    );
+  }
+
   const layout = calcularLayout(result);
 
   // Esquema COMPACTO en pantallas estrechas (móvil): oculta las microetiquetas
@@ -578,7 +748,14 @@ export function He1SVG({ result, mode, width, height }: He1SVGProps) {
     >
       {/* Una fila por cerramiento, apiladas verticalmente. */}
       {layout.filas.map((fila) => (
-        <FilaCerramiento key={fila.cer.id} fila={fila} mode={mode} compact={compact} />
+        <FilaCerramiento
+          key={fila.cer.id}
+          fila={fila}
+          mode={mode}
+          compact={compact}
+          kit={kit}
+          etiquetas={etiquetas}
+        />
       ))}
 
       {/* Banda de totales (el dato numérico también va en texto, no solo SVG). */}

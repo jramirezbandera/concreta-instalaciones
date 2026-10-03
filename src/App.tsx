@@ -6,6 +6,11 @@ import { RouteHelmet } from "./components/layout/RouteHelmet";
 import { RouteProgressBar } from "./components/layout/RouteProgressBar";
 import { ChunkErrorElement } from "./components/layout/ChunkErrorElement";
 import { ThemeProvider } from "./lib/theme/ThemeProvider";
+import { InicioPage } from "./pages/InicioPage";
+import { DashboardPage } from "./pages/DashboardPage";
+import { FormDatosGeneralesPage } from "./pages/FormDatosGeneralesPage";
+import { ProyectoLayout } from "./pages/ProyectoLayout";
+import { RedirectLegacy } from "./pages/RedirectLegacy";
 
 // react-router v7 `lazy`: chunk loading integrates with the data router's
 // pending-state machine. RootLayout renders <RouteHelmet/> above <Outlet/> so
@@ -29,16 +34,23 @@ const lazyComponent =
 
 // HashRouter (no BrowserRouter): GitHub Pages es hosting estático sin fallback
 // de servidor; con rutas tras el # toda URL carga index.html (sin 404 al
-// recargar /hs/ventilacion). El base de Vite solo afecta a los assets, no a
-// estas rutas. El query string (?numDormitorios=…&estancias=…) viaja intacto
-// tras el #, sin re-encodear, preservando el "Compartir".
+// recargar /p/<id>/hs/ventilacion). El base de Vite solo afecta a los assets,
+// no a estas rutas. El query string (?numDormitorios=…&estancias=…) viaja
+// intacto tras el #, sin re-encodear, preservando el "Compartir".
+//
+// Árbol feature-6 T4.1: "/" = lista de expedientes, "/nuevo" = alta, el
+// expediente vive bajo "/p/:id" (ProyectoLayout = Provider + AppShell) y las
+// URLs pre-expediente ("/hs/*", "/he/*") redirigen al proyecto activo
+// conservando el query string. "/_smoke" queda como sandbox SIN provider
+// (el sandbox con proyecto sintético llega en F5).
 const router = createHashRouter([
   {
     element: <RootLayout />,
     HydrateFallback: RouteFallback,
     errorElement: <ChunkErrorElement />,
     children: [
-      { path: "/", element: <Navigate to="/_smoke" replace /> },
+      { path: "/", element: <InicioPage /> },
+      { path: "nuevo", element: <FormDatosGeneralesPage modo="crear" /> },
       {
         element: <AppShell />,
         children: [
@@ -46,6 +58,14 @@ const router = createHashRouter([
             path: "_smoke",
             lazy: lazyComponent(() => import("./modules/_smoke/ui"), "SmokeModule"),
           },
+        ],
+      },
+      {
+        path: "p/:id",
+        element: <ProyectoLayout />,
+        children: [
+          { index: true, element: <DashboardPage /> },
+          { path: "datos", element: <FormDatosGeneralesPage modo="editar" /> },
           {
             path: "hs/ventilacion",
             lazy: lazyComponent(() => import("./modules/hs3/ui"), "Hs3Module"),
@@ -68,7 +88,9 @@ const router = createHashRouter([
           },
         ],
       },
-      { path: "*", element: <Navigate to="/_smoke" replace /> },
+      { path: "hs/*", element: <RedirectLegacy /> },
+      { path: "he/*", element: <RedirectLegacy /> },
+      { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
 ]);

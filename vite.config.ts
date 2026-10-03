@@ -55,6 +55,13 @@ export default defineConfig(({ mode }) => {
       environment: "jsdom",
       setupFiles: ["./src/test/setup.ts"],
       globals: true,
+      // 15 s (vitest trae 5 s). Los tests de integración de módulo montan el
+      // router real y sus pantallas van por `lazy()`: la primera aserción de
+      // cada archivo espera a que el chunk se importe y compile en jsdom, lo
+      // que con la suite entera en paralelo supera de largo los 5 s. Con el
+      // valor por defecto el propio test moría ANTES que su `waitFor` (8 s),
+      // así que el fallo se veía como "timed out", no como un error real.
+      testTimeout: 15000,
     },
   };
 });

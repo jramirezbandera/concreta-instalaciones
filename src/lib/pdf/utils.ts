@@ -400,7 +400,7 @@ export function inputsFingerprint(value: unknown): string {
   return (h >>> 0).toString(16).padStart(8, "0");
 }
 
-function canonicalStringify(value: unknown): string {
+export function canonicalStringify(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return "[" + value.map(canonicalStringify).join(",") + "]";
   const obj = value as Record<string, unknown>;
@@ -424,6 +424,30 @@ function canonicalStringify(value: unknown): string {
 
 const SVG_RASTER_SCALE = 3; // sobre-muestreo para nitidez
 const PX_PER_MM = 96 / 25.4; // 96 dpi
+
+/**
+ * Tiempo máximo de espera de la decodificación de UN diagrama [ms]. Sin él, un
+ * `Image` que no dispara ni `load` ni `error` (jsdom, y en navegador un SVG que
+ * el decodificador rechaza en silencio) deja la promesa colgada PARA SIEMPRE y
+ * con ella el PDF entero: el usuario se queda mirando "Generando…". Agotado el
+ * plazo se devuelve `false` y el llamador pinta su placeholder — degradar es
+ * infinitamente mejor que colgarse, y con el anejo (feature-8) son varios
+ * diagramas en un mismo documento.
+ */
+const RASTER_TIMEOUT_MS = 5000;
+
+/** `promesa` acotada en el tiempo: `false` si no resuelve dentro del plazo. */
+async function conPlazo(promesa: Promise<unknown>, ms: number): Promise<boolean> {
+  let temporizador: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const vencido = new Promise<"timeout">((res) => {
+      temporizador = setTimeout(() => res("timeout"), ms);
+    });
+    return (await Promise.race([promesa.then(() => "ok" as const), vencido])) === "ok";
+  } finally {
+    if (temporizador !== undefined) clearTimeout(temporizador);
+  }
+}
 
 interface EmbedBox {
   x: number;
@@ -456,24 +480,32 @@ export async function embedSvgAsImage(
     const svgText = new XMLSerializer().serializeToString(clone);
     const svgUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgText);
 
-    const img = new Image();
-    img.width = pxW;
-    img.height = pxH;
-    img.src = svgUrl;
-    if (typeof img.decode === "function") {
-      await img.decode();
-    } else {
-      await new Promise<void>((res, rej) => {
-        img.onload = () => res();
-        img.onerror = () => rej(new Error("svg image load failed"));
-      });
-    }
-
+    // El canvas se reserva ANTES de decodificar: sin contexto 2D (jsdom, o un
+    // navegador con canvas deshabilitado) el raster es imposible, y esperar la
+    // imagen solo retrasaría lo inevitable. Fallar aquí es instantáneo.
     const canvas = document.createElement("canvas");
     canvas.width = pxW;
     canvas.height = pxH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return false;
+
+    const img = new Image();
+    img.width = pxW;
+    img.height = pxH;
+    img.src = svgUrl;
+    // La espera SIEMPRE va acotada (ver RASTER_TIMEOUT_MS): ni `decode()` ni el
+    // par load/error garantizan resolución en todos los entornos.
+    const cargada = await conPlazo(
+      typeof img.decode === "function"
+        ? img.decode()
+        : new Promise<void>((res, rej) => {
+            img.onload = () => res();
+            img.onerror = () => rej(new Error("svg image load failed"));
+          }),
+      RASTER_TIMEOUT_MS,
+    );
+    if (!cargada) return false;
+
     ctx.drawImage(img, 0, 0, pxW, pxH);
     const png = canvas.toDataURL("image/png");
 

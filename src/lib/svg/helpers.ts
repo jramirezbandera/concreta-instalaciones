@@ -2,7 +2,9 @@
 // cumplir react-refresh/only-export-components).
 
 export type SvgMode = "screen" | "pdf";
-export type Kind = "normal" | "flow" | "critical";
+// "dim" (feature-7): trazo secundario/contextual (forjados, ventilación, marcos)
+// — ampliación RETRO-COMPATIBLE del union (solo se usa como tipo de entrada).
+export type Kind = "normal" | "flow" | "critical" | "dim";
 
 export interface Palette {
   section: string;
@@ -41,6 +43,7 @@ export function palette(mode: SvgMode): Palette {
 export function strokeOf(kind: Kind, pal: Palette): string {
   if (kind === "critical") return pal.critical;
   if (kind === "flow") return pal.flow;
+  if (kind === "dim") return pal.dim;
   return pal.section;
 }
 

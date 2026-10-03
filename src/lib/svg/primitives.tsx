@@ -69,10 +69,15 @@ export interface SegProps {
   mode: SvgMode;
   /** Grosor base en unidades de viewBox (mm). */
   base?: number;
+  /**
+   * Patrón discontinuo explícito (p.ej. "5 4" para forjados). RETRO-COMPATIBLE:
+   * si no se indica, manda `criticalStroke` (crítico = "4 2"; resto continuo).
+   */
+  dash?: string;
 }
 
 /** Segmento de línea (tramo, conducto, eje). */
-export function Seg({ x1, y1, x2, y2, kind = "normal", mode, base = 1.2 }: SegProps) {
+export function Seg({ x1, y1, x2, y2, kind = "normal", mode, base = 1.2, dash }: SegProps) {
   const pal = palette(mode);
   const cs = criticalStroke(kind, base);
   return (
@@ -83,7 +88,7 @@ export function Seg({ x1, y1, x2, y2, kind = "normal", mode, base = 1.2 }: SegPr
       y2={y2}
       stroke={strokeOf(kind, pal)}
       strokeWidth={cs.strokeWidth}
-      strokeDasharray={cs.strokeDasharray}
+      strokeDasharray={dash ?? cs.strokeDasharray}
       strokeLinecap="round"
     />
   );
@@ -112,23 +117,94 @@ export interface TagProps {
   size?: number;
   /** Etiqueta de elemento crítico (color crítico + negrita). */
   critical?: boolean;
+  /**
+   * Tono del texto (feature-7, RETRO-COMPATIBLE): "dim" para etiquetas
+   * secundarias, "flow" para el acento (selección), "section" para trazos
+   * principales. `critical` tiene prioridad sobre `tone`.
+   */
+  tone?: "label" | "dim" | "dimText" | "flow" | "section";
+  /** Tipografía monoespaciada (cifras técnicas del esquema de columna). */
+  mono?: boolean;
+  /** Negrita sin tono crítico (nombres/valores destacados). */
+  bold?: boolean;
 }
 
 /** Etiqueta de texto directa sobre el elemento (refuerzo redundante al color). */
-export function Tag({ x, y, children, mode, anchor = "middle", size = 4, critical = false }: TagProps) {
+export function Tag({
+  x,
+  y,
+  children,
+  mode,
+  anchor = "middle",
+  size = 4,
+  critical = false,
+  tone = "label",
+  mono = false,
+  bold = false,
+}: TagProps) {
   const pal = palette(mode);
+  const fill = critical
+    ? pal.critical
+    : tone === "dim"
+      ? pal.dim
+      : tone === "dimText"
+        ? pal.dimText
+        : tone === "flow"
+          ? pal.flow
+          : tone === "section"
+            ? pal.section
+            : pal.label;
   return (
     <text
       x={x}
       y={y}
       fontSize={size}
       textAnchor={anchor}
-      fill={critical ? pal.critical : pal.label}
-      fontWeight={critical ? 700 : 400}
-      fontFamily="system-ui, sans-serif"
+      fill={fill}
+      fontWeight={critical ? 700 : bold ? 600 : 400}
+      fontFamily={mono ? "ui-monospace, SFMono-Regular, Menlo, monospace" : "system-ui, sans-serif"}
     >
       {children}
     </text>
+  );
+}
+
+export interface BoxProps {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  kind?: Kind;
+  mode: SvgMode;
+  base?: number;
+}
+
+/**
+ * Recuadro sin relleno (feature-7): arqueta / conexión a red general en el
+ * esquema de columna. Primitiva plana compatible con svg2pdf.
+ */
+export function Box({ x, y, w, h, kind = "dim", mode, base = 1.4 }: BoxProps) {
+  const pal = palette(mode);
+  return <rect x={x} y={y} width={w} height={h} fill="none" stroke={strokeOf(kind, pal)} strokeWidth={base} />;
+}
+
+export interface RingProps {
+  x: number;
+  y: number;
+  r?: number;
+  kind?: Kind;
+  mode: SvgMode;
+  opacity?: number;
+}
+
+/**
+ * Anillo de selección/hover (feature-7): círculo sin relleno sobre el elemento
+ * seleccionado del esquema. Primitiva plana compatible con svg2pdf.
+ */
+export function Ring({ x, y, r = 7, kind = "flow", mode, opacity = 0.45 }: RingProps) {
+  const pal = palette(mode);
+  return (
+    <circle cx={x} cy={y} r={r} fill="none" stroke={strokeOf(kind, pal)} strokeWidth={1.5} opacity={opacity} />
   );
 }
 

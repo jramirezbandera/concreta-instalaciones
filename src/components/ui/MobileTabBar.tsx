@@ -1,21 +1,30 @@
 export type MobileTab = "inputs" | "diagramas" | "results";
 
-interface MobileTabBarProps {
-  tab: MobileTab;
-  setTab: (t: MobileTab) => void;
+interface MobileTabBarProps<T extends string = MobileTab> {
+  tab: T;
+  setTab: (t: T) => void;
+  /** Pestañas custom (feature-7: p.ej. Tabla/Esquema); por defecto Datos/Diagrama/Resultado. */
+  tabs?: { id: T; label: string }[];
 }
 
-const TABS: { id: MobileTab; label: string }[] = [
+const DEFAULT_TABS: { id: MobileTab; label: string }[] = [
   { id: "inputs", label: "Datos" },
   { id: "diagramas", label: "Diagrama" },
   { id: "results", label: "Resultado" },
 ];
 
 /** Conmutador de pestañas (solo móvil; en `lg` el layout es de 2 columnas). */
-export function MobileTabBar({ tab, setTab }: MobileTabBarProps) {
+export function MobileTabBar<T extends string = MobileTab>({
+  tab,
+  setTab,
+  tabs,
+}: MobileTabBarProps<T>) {
+  // Sin `tabs` se mantienen las tres pestañas históricas; el cast es seguro
+  // porque en ese caso T se infiere como MobileTab en los call sites.
+  const lista = tabs ?? (DEFAULT_TABS as { id: T; label: string }[]);
   return (
     <div className="border-border-main bg-bg-surface flex shrink-0 border-b lg:hidden">
-      {TABS.map((t) => (
+      {lista.map((t) => (
         <button
           key={t.id}
           type="button"

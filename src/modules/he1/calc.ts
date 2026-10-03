@@ -68,6 +68,14 @@
 //    `HE1_PDF_SVG_ID = "he1-svg-pdf"` y la firma de `he1NativeSize`, y los nombres
 //    de los tipos exportados de este archivo NO cambian tras esta fase. Las 3
 //    tareas paralelas de la Fase 3 (svg, ficha, tests) dependen de este contrato.
+//
+//    AMPLIACIÓN feature-8 (retro-compatible, NO rompe lo congelado): el contrato
+//    del SVG gana PROPS OPCIONALES de sincronía con el outliner —
+//    `selectedId`/`hoverId`/`onSelect`/`etiquetas` (patrón feature-7) y
+//    `soloCerramientoId` (en pantalla, pintar SOLO ese cerramiento; el modo
+//    'pdf' sigue pintando TODOS) — y `svg-meta.ts` añade
+//    `he1NativeSizeUno(result, cerramientoId)` para dimensionar el viewBox de un
+//    único cerramiento. Los tipos y la lógica de este archivo NO cambian.
 // =============================================================================
 
 import type { Veredicto } from "../../lib/pdf/renderFicha";

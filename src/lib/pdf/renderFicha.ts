@@ -102,8 +102,36 @@ function sectionTitle(doc: jsPDF, label: string, y: number): number {
   return y + 4;
 }
 
-export async function renderFicha(data: FichaData): Promise<PdfResult> {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+/**
+ * ¿Está VACÍA la página actual del doc? Heurística sobre el content-stream de
+ * jsPDF: una página recién creada lleva exactamente 2 comandos de preámbulo de
+ * estado ("<w> w" grosor de línea + "<g> G" color de trazo) que jsPDF empuja al
+ * crearla; cualquier dibujo/texto añade comandos. Conservadora por diseño: ante
+ * la duda (≥3 comandos, aunque fueran solo cambios de estado) se considera CON
+ * contenido y `renderFichaEnDoc` abrirá página nueva — nunca pisa contenido.
+ */
+function paginaActualVacia(doc: jsPDF): boolean {
+  const n = doc.getCurrentPageInfo().pageNumber;
+  // `internal.pages` está tipado como number[] en jspdf.d.ts pero en runtime es
+  // un array de content-streams (string[]) por página — cast estrecho local.
+  const pages = (doc as unknown as { internal: { pages: unknown[] } }).internal.pages;
+  const cmds = pages[n];
+  return Array.isArray(cmds) && cmds.length <= 2;
+}
+
+/**
+ * Pinta la ficha completa (cabecera → normativa → datos → SVG → verificación →
+ * veredicto → observaciones) EN EL DOC RECIBIDO, empezando en una página nueva
+ * (`addPage`) salvo que la página actual esté vacía (caso del wrapper
+ * `renderFicha`, que acaba de crear el doc: se aprovecha la página 1).
+ *
+ * NO sella pies de página: el sellado (`drawFootersAllPages`) es GLOBAL — lo
+ * hace quien compone el documento final (el wrapper para la ficha suelta,
+ * `renderAnejo` para el anejo del proyecto), porque la numeración "pág. i/N"
+ * solo se conoce con el documento completo.
+ */
+export async function renderFichaEnDoc(doc: jsPDF, data: FichaData): Promise<void> {
+  if (!paginaActualVacia(doc)) doc.addPage();
   const hash = inputsFingerprint(data.inputs);
 
   // ── 1. Cabecera (identificación + sello) ─────────────────────────────────
@@ -240,14 +268,25 @@ export async function renderFicha(data: FichaData): Promise<PdfResult> {
       y += 1.5;
     }
   }
+}
 
-  // ── 8. Pie legal en TODAS las páginas (motor + edición DB) ───────────────
+/**
+ * Ficha SUELTA (export por justificación): crea el doc, pinta la ficha con
+ * `renderFichaEnDoc` y sella el pie legal en todas las páginas. Comportamiento
+ * idéntico al histórico — mismo PDF byte a byte para los módulos.
+ */
+export async function renderFicha(data: FichaData): Promise<PdfResult> {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  await renderFichaEnDoc(doc, data);
+
+  // Pie legal en TODAS las páginas (motor + edición DB).
   drawFootersAllPages(
     doc,
     { engineVersion: data.engineVersion, proyecto: data.proyecto ?? data.edicionDB },
     M,
   );
 
+  const hash = inputsFingerprint(data.inputs);
   const filename = `concreta-${data.slug}-${hash}.pdf`;
   const blob = doc.output("blob");
   const blobUrl = URL.createObjectURL(blob);

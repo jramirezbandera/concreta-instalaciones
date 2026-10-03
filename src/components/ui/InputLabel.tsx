@@ -70,10 +70,29 @@ interface NumberInputProps {
   min?: number;
   max?: number;
   step?: number;
+  /**
+   * Deja el campo VACÍO al borrarlo, emitiendo `NaN` en vez de 0.
+   *
+   * Por defecto un campo vaciado emite `Number("") === 0`, que se repinta como
+   * "0": el campo parece no borrarse nunca y el usuario sigue pulsando borrar
+   * contra un 0 que reaparece. Con esta opción el vacío se propaga como `NaN`,
+   * el input se queda en blanco y la validación del formulario lo caza como
+   * dato que falta (que es lo que es). Opt-in: quien la active debe tolerar
+   * `NaN` en su estado — nunca debe llegar a persistirse.
+   */
+  permitirVacio?: boolean;
 }
 
 /** Campo numérico compacto (13px, derecha, tabular). */
-export function NumberInput({ id, value, onChange, min, max, step = 1 }: NumberInputProps) {
+export function NumberInput({
+  id,
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  permitirVacio = false,
+}: NumberInputProps) {
   return (
     <input
       id={id}
@@ -82,7 +101,11 @@ export function NumberInput({ id, value, onChange, min, max, step = 1 }: NumberI
       min={min}
       max={max}
       step={step}
-      onChange={(e) => onChange(Number(e.target.value))}
+      onChange={(e) =>
+        onChange(
+          permitirVacio && e.target.value.trim() === "" ? Number.NaN : Number(e.target.value),
+        )
+      }
       className="border-border-main bg-bg-primary text-text-primary focus:border-accent focus:ring-accent/30 w-full rounded border px-2 py-1 text-right text-[13px] tabular-nums transition-colors focus:ring-1 focus:outline-none"
     />
   );

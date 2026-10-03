@@ -44,6 +44,8 @@ export type TipoEstancia =
 export interface Estancia {
   /** Identificador estable (lo consume el SVG / la ficha para el checker). */
   id: string;
+  /** Nombre legible opcional (feature-8, solo UI/esquema: el motor NO lo lee). */
+  nombre?: string;
   tipo: TipoEstancia;
   /**
    * Caudal de ventilación GENERAL que propone el proyectista [l/s]. En locales
@@ -96,6 +98,8 @@ export interface PlantaColectivo {
 export interface Colectivo {
   /** Identificador estable (lo consumen el SVG y la ficha). */
   id: string;
+  /** Nombre legible opcional (feature-8, solo UI/esquema: el motor NO lo lee). */
+  nombre?: string;
   /** Plantas que vierten en este colectivo (el motor las ordena por `nivel`). */
   plantas: PlantaColectivo[];
 }

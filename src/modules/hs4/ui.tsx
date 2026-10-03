@@ -1,46 +1,69 @@
 // DB-HS4 — Pantalla del módulo de suministro de agua (fontanería). Cablea el
-// motor (./calc), el render SVG (./svg) y la ficha PDF (./ficha) sobre el layout
-// compartido (Topbar + panel de inputs + panel de resultados), replicando el
-// patrón del módulo HS5 (editor de ÁRBOL DE RED explícito) pero sobre el modelo
-// HIDRÁULICO de HS4: caudal de cálculo (×K), Ø comercial, velocidad en rango,
-// pérdida de carga y presión residual; recorrido crítico resaltado.
+// motor (./calc), el esquema de columna (./svg) y la ficha PDF (./ficha) sobre
+// el esqueleto de feature-6 (<ModuleShell>) con la ZONA DE TRABAJO de feature-7:
+// réplica del módulo patrón HS5 (outliner + esquema + presets) sobre el modelo
+// HIDRÁULICO de HS4 — caudal de cálculo (×K), Ø comercial, velocidad en rango,
+// pérdida de carga y presión residual, con el RECORRIDO CRÍTICO marcado en la
+// tabla (texto "◆ crítico" junto al estado) y en rojo en el esquema.
 //
-// React 19 + React Compiler: componente PURO. El cálculo es síncrono en render
-// (useMemo sobre el estado diferido); no hay efectos de cálculo ni botón
-// "calcular" (feedback inmediato). Los ids de tramos/aparatos se generan de
-// forma DETERMINISTA en los handlers de evento (nunca en render, nunca con
-// Math.random/Date). Las mutaciones de las listas son siempre INMUTABLES.
+// El formulario corto de "Suministro" (presión de acometida — herencia
+// CONDICIONAL —, criterio K y pérdidas localizadas) se mantiene SOBRE la tabla:
+// no son colección, no van al outliner. La semántica del árbol es la de HS5
+// (anidar = colgar del hermano anterior; desanidar = subir al abuelo; sin
+// ciclos por construcción). Columna "Mat. / P mín": en tramos el material de la
+// tubería; en aparatos el modo de presión mínima (auto / grifo / fluxor).
+//
+// React 19 + React Compiler: componente PURO; cálculo síncrono en render sobre
+// el estado diferido; ids deterministas en handlers (sin Math.random/Date);
+// mutaciones inmutables.
 
 import { useDeferredValue, useMemo, useState, type ReactNode } from "react";
-import { Trash2, Plus, Info, AlertTriangle } from "lucide-react";
-import { useModuleState } from "../../hooks/useModuleState";
+import { ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { useJustificacionState } from "../../hooks/useJustificacionState";
 import { useContainerWidth } from "../../hooks/useContainerWidth";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
-import { useDrawer } from "../../components/layout/AppShell";
-import { Topbar } from "../../components/layout/Topbar";
+import {
+  ModuleShell,
+  type ResumenVeredicto,
+} from "../../components/justificacion/ModuleShell";
 import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
-import { MobileTabBar, type MobileTab } from "../../components/ui/MobileTabBar";
+import { MobileTabBar } from "../../components/ui/MobileTabBar";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
-import { Field, NumberInput, SelectInput, InputLabel } from "../../components/ui/InputLabel";
+import {
+  Field,
+  NumberInput,
+  SelectInput,
+} from "../../components/ui/InputLabel";
 import { showToast } from "../../components/ui/Toast";
+import { Outliner } from "../../components/outliner/Outliner";
+import type {
+  OutlinerCelda,
+  OutlinerColumna,
+  OutlinerFila,
+} from "../../components/outliner/tipos";
+import {
+  PRESETS_APARATOS,
+  type PresetAparatos,
+} from "../../data/presetsAparatos";
 import { renderFicha } from "../../lib/pdf/renderFicha";
-import { STATUS_LABEL } from "../../lib/pdf/utils";
-import { STATE_TEXT, STATE_TINT } from "../../lib/ui/veredicto";
 import { fmt } from "../../lib/units/format";
+import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
+import { useProyecto } from "../../lib/proyecto/ProyectoContext";
+import { generarHs4 } from "../../lib/proyecto/viviendaTipo";
 import {
   calcHS4,
   hs4Defaults,
   type AparatoInputHS4,
   type CriterioK,
   type HS4Inputs,
-  type HS4Result,
   type TipoTramoHS4,
   type TramoInputHS4,
 } from "./calc";
-import { rangoVelocidad, type MaterialTuberia, type TipoAparatoHS4 } from "./tablas";
+import type { MaterialTuberia, TipoAparatoHS4 } from "./tablas";
 import { HS4SVG } from "./svg";
-import { HS4_PDF_SVG_ID } from "./svg-meta";
+import { HS4_PDF_SVG_ID, hs4NativeSize } from "./svg-meta";
 import { toFichaData } from "./ficha";
+import { resumenHs4 } from "./resumen";
 
 // -----------------------------------------------------------------------------
 // Opciones de los selects (declaradas a módulo: estables entre renders).
@@ -70,11 +93,7 @@ const TIPO_APARATO_OPTIONS: { value: TipoAparatoHS4; label: string }[] = [
   { value: "vertedero", label: "Vertedero" },
 ];
 
-const TIPO_APARATO_LABEL: Record<TipoAparatoHS4, string> = Object.fromEntries(
-  TIPO_APARATO_OPTIONS.map((o) => [o.value, o.label]),
-) as Record<TipoAparatoHS4, string>;
-
-const TIPO_TRAMO_OPTIONS: { value: TipoTramoHS4; label: string }[] = [
+const TIPO_TRAMO_OPTIONS: { value: string; label: string }[] = [
   { value: "derivacion_aparato", label: "Derivación de aparato" },
   { value: "derivacion_particular", label: "Derivación particular" },
   { value: "columna_montante", label: "Columna / montante" },
@@ -82,17 +101,20 @@ const TIPO_TRAMO_OPTIONS: { value: TipoTramoHS4; label: string }[] = [
   { value: "acometida", label: "Acometida" },
 ];
 
-const TIPO_TRAMO_LABEL: Record<TipoTramoHS4, string> = {
-  derivacion_aparato: "Derivación de aparato",
-  derivacion_particular: "Derivación particular",
-  columna_montante: "Columna / montante",
-  tubo_alimentacion: "Tubo de alimentación",
-  acometida: "Acometida",
-};
+const MATERIAL_OPTIONS: { value: string; label: string }[] = [
+  { value: "metalica", label: "Metálica (0,5–2 m/s)" },
+  {
+    value: "termoplastico_multicapa",
+    label: "Termopl./multicapa (0,5–3,5 m/s)",
+  },
+];
 
-const MATERIAL_OPTIONS: { value: MaterialTuberia; label: string }[] = [
-  { value: "metalica", label: "Metálica (v 0,5–2,0 m/s)" },
-  { value: "termoplastico_multicapa", label: "Termoplástico / multicapa (v 0,5–3,5 m/s)" },
+// Modo de presión mínima del aparato (columna "Mat. / P mín" en filas aparato):
+// "auto" = derivada del tipo (undefined en el motor); el resto fuerza el flag.
+const PRESION_MIN_OPTIONS: { value: string; label: string }[] = [
+  { value: "auto", label: "Auto (según tipo)" },
+  { value: "grifo", label: "Grifo común (100 kPa)" },
+  { value: "fluxor", label: "Fluxor/calent. (150 kPa)" },
 ];
 
 const CRITERIO_K_OPTIONS: { value: CriterioK; label: string }[] = [
@@ -107,11 +129,29 @@ const ESTADO_LABEL: Record<string, string> = {
   neutral: "Informativo",
 };
 
+// Columnas del outliner HS4: inputs (nombre, tipo, material, L, Δh) y resultados
+// hidráulicos (Q de cálculo, Ø, v, P residual, estado) en la MISMA fila.
+const COLUMNAS_HS4: OutlinerColumna[] = [
+  { key: "elemento", header: "Elemento", align: "left" },
+  { key: "tipo", header: "Tipo", align: "left", width: "168px" },
+  { key: "mat", header: "Mat. / P mín", align: "left", width: "150px" },
+  { key: "lon", header: "L", align: "right", width: "70px" },
+  { key: "dh", header: "Δh", align: "right", width: "70px" },
+  { key: "q", header: "Q cálc.", align: "right", width: "84px" },
+  { key: "dia", header: "Ø", align: "right", width: "64px" },
+  { key: "vel", header: "v", align: "right", width: "72px" },
+  { key: "pres", header: "P res.", align: "right", width: "76px" },
+  { key: "estado", header: "Estado", align: "left", width: "150px" },
+];
+
+type TabHs4 = "tabla" | "esquema";
+const TABS_HS4: { id: TabHs4; label: string }[] = [
+  { id: "tabla", label: "Tabla" },
+  { id: "esquema", label: "Esquema" },
+];
+
 // -----------------------------------------------------------------------------
-// Ids deterministas (contador derivado del estado actual). NO usa Math.random ni
-// Date (React-Compiler-safe; solo se invoca en handlers). Extrae el sufijo
-// numérico mayor de los ids "t-N"/"a-N" y devuelve el siguiente; ignora los ids
-// semilla con otra forma. Garantiza unicidad e idempotencia por estado.
+// Ids deterministas (contador derivado del estado actual; solo en handlers).
 // -----------------------------------------------------------------------------
 function nextId(items: { id: string }[], prefix: string): string {
   const re = new RegExp(`^${prefix}(\\d+)$`);
@@ -126,28 +166,67 @@ function nextId(items: { id: string }[], prefix: string): string {
   return `${prefix}${max + 1}`;
 }
 
+/** Alias mapeado de HS4Inputs (mismo truco que HS5: interface → Record). */
+type Hs4State = { [K in keyof HS4Inputs]: HS4Inputs[K] };
+
 export function Hs4Module() {
-  const { state, setField, reset } = useModuleState<HS4Inputs>("hs4", hs4Defaults);
-  const { openDrawer } = useDrawer();
-  const [tab, setTab] = useState<MobileTab>("inputs");
+  const { state, setField, reset, herencia } = useJustificacionState<Hs4State>(
+    "hs4",
+    hs4Defaults,
+  );
+  const { proyecto, derivados } = useProyecto();
+  const [tab, setTab] = useState<TabHs4>("tabla");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [esquemaPlegado, setEsquemaPlegado] = useState(false);
 
   const deferredState = useDeferredValue(state);
   const result = useMemo(() => calcHS4(deferredState), [deferredState]);
 
-  // ── Validación de entrada ──────────────────────────────────────────────────
-  // presión de acometida finita y positiva; al menos un tramo y un aparato; todos
-  // los aparatos cuelgan de un tramo existente; árbol válido (el motor lo marca).
-  const tramoIds = new Set(state.tramos.map((t) => t.id));
+  // ── Validación de entrada (paridad con la versión anterior) ────────────────
+  const tramoPorId = new Map(state.tramos.map((t) => [t.id, t] as const));
   const valid =
     Number.isFinite(state.presionAcometida_kPa) &&
     state.presionAcometida_kPa > 0 &&
     state.tramos.length >= 1 &&
     state.aparatos.length >= 1 &&
-    state.aparatos.every((a) => tramoIds.has(a.tramoId)) &&
+    state.aparatos.every((a) => tramoPorId.has(a.tramoId)) &&
     result.arbolValido;
 
-  const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } =
-    usePdfPreview(() => renderFicha(toFichaData(deferredState, result)), valid);
+  const selVigente =
+    selectedId !== null &&
+    (tramoPorId.has(selectedId) ||
+      state.aparatos.some((a) => a.id === selectedId))
+      ? selectedId
+      : null;
+
+  // Ficha con cabecera de expediente (patrón de feature-6, sin cambios).
+  const {
+    pdfExporting,
+    pdfPreview,
+    handleExportPdf,
+    handleDownloadPdf,
+    closePdfPreview,
+  } = usePdfPreview(() => {
+    const base = toFichaData(deferredState, result);
+    return renderFicha({
+      ...base,
+      proyecto: proyecto.nombre,
+      fechaProyecto: formatearFecha(proyecto.modificado),
+      observaciones: [
+        ...(base.observaciones ?? []),
+        ...notasExcepcionesLocales({
+          key: "hs4",
+          dg: proyecto.datosGenerales,
+          d: derivados,
+          state: deferredState,
+          overrides: herencia.campos
+            .filter((c) => c.override)
+            .map((c) => c.campo),
+        }),
+      ],
+    });
+  }, valid);
 
   const handleShare = async () => {
     try {
@@ -158,56 +237,16 @@ export function Hs4Module() {
     }
   };
 
-  // ── Pérdidas localizadas (fracción opcional 0..1 expuesta como % entero) ─────
-  // `undefined` ⇒ el motor usa el valor medio del rango de buena práctica (25 %).
-  const fraccionPct = Math.round((state.fraccionPerdidasLocalizadas ?? 0.25) * 100);
+  // Fracción de pérdidas localizadas expuesta como % entero (undefined ⇒ 25 %).
+  const fraccionPct = Math.round(
+    (state.fraccionPerdidasLocalizadas ?? 0.25) * 100,
+  );
 
-  // ── Mutaciones inmutables de la lista de tramos ────────────────────────────
-  const addTramo = () => {
-    const nuevo: TramoInputHS4 = {
-      id: nextId(state.tramos, "t"),
-      tipo: "derivacion_aparato",
-      parentId: state.tramos.length > 0 ? state.tramos[state.tramos.length - 1].id : null,
-      material: "termoplastico_multicapa",
-      longitud_m: 1.5,
-      altura_m: 0,
-    };
-    setField("tramos", [...state.tramos, nuevo]);
-  };
-
-  const removeTramo = (id: string) => {
-    // Al eliminar un tramo, los hijos que colgaban de él pasan a raíz (parentId
-    // null); los aparatos que descargaban en él quedan sin tramo (el motor lo
-    // marca). Se mantiene el resto del árbol coherente sin mutaciones in situ.
-    setField(
-      "tramos",
-      state.tramos
-        .filter((t) => t.id !== id)
-        .map((t) => (t.parentId === id ? { ...t, parentId: null } : t)),
-    );
-  };
-
+  // ── Mutaciones inmutables ──────────────────────────────────────────────────
   const patchTramo = (id: string, patch: Partial<TramoInputHS4>) => {
     setField(
       "tramos",
       state.tramos.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-    );
-  };
-
-  // ── Mutaciones inmutables de la lista de aparatos ──────────────────────────
-  const addAparato = () => {
-    const nuevo: AparatoInputHS4 = {
-      id: nextId(state.aparatos, "a"),
-      tipo: "lavabo",
-      tramoId: state.tramos.length > 0 ? state.tramos[0].id : "",
-    };
-    setField("aparatos", [...state.aparatos, nuevo]);
-  };
-
-  const removeAparato = (id: string) => {
-    setField(
-      "aparatos",
-      state.aparatos.filter((a) => a.id !== id),
     );
   };
 
@@ -218,15 +257,386 @@ export function Hs4Module() {
     );
   };
 
+  /** Enter / "+ Añadir tramo" — misma semántica que HS5 (ver comentario allí). */
+  const handleAdd = (afterId: string | null) => {
+    const refAparato = afterId
+      ? state.aparatos.find((a) => a.id === afterId)
+      : undefined;
+    if (refAparato) {
+      const nuevo: AparatoInputHS4 = {
+        id: nextId(state.aparatos, "a"),
+        tipo: "lavabo",
+        tramoId: refAparato.tramoId,
+      };
+      const i = state.aparatos.findIndex((a) => a.id === refAparato.id);
+      setField("aparatos", [
+        ...state.aparatos.slice(0, i + 1),
+        nuevo,
+        ...state.aparatos.slice(i + 1),
+      ]);
+      setSelectedId(nuevo.id);
+      return;
+    }
+
+    const refTramo = afterId ? tramoPorId.get(afterId) : undefined;
+    const parentId = refTramo
+      ? (refTramo.parentId ?? refTramo.id)
+      : (state.tramos.find((t) => t.tipo === "columna_montante")?.id ??
+        state.tramos.find((t) => t.parentId === null)?.id ??
+        null);
+    // El hermano nuevo clona tipo y material de la referencia (en una red de
+    // fontanería lo habitual es añadir otro tramo del mismo escalón).
+    const nuevo: TramoInputHS4 = {
+      id: nextId(state.tramos, "t"),
+      tipo: refTramo?.tipo ?? "derivacion_particular",
+      parentId,
+      material: refTramo?.material ?? "termoplastico_multicapa",
+      longitud_m: 1.5,
+      altura_m: 0,
+    };
+    const i = refTramo
+      ? state.tramos.findIndex((t) => t.id === refTramo.id)
+      : -1;
+    setField(
+      "tramos",
+      i >= 0
+        ? [...state.tramos.slice(0, i + 1), nuevo, ...state.tramos.slice(i + 1)]
+        : [...state.tramos, nuevo],
+    );
+    setSelectedId(nuevo.id);
+  };
+
+  /** Tab: colgar del hermano ANTERIOR (mismo padre). */
+  const handleNest = (id: string) => {
+    const t = tramoPorId.get(id);
+    if (!t) return;
+    const idx = state.tramos.findIndex((x) => x.id === id);
+    const anterior = [...state.tramos]
+      .filter((x) => x.parentId === t.parentId && x.id !== id)
+      .reverse()
+      .find((x) => state.tramos.findIndex((y) => y.id === x.id) < idx);
+    if (anterior) patchTramo(id, { parentId: anterior.id });
+  };
+
+  /** Shift-Tab: subir al abuelo. */
+  const handleUnnest = (id: string) => {
+    const t = tramoPorId.get(id);
+    if (!t || t.parentId === null) return;
+    const padre = tramoPorId.get(t.parentId);
+    patchTramo(id, { parentId: padre?.parentId ?? null });
+  };
+
+  /** Borrado: hijos y aparatos pasan al padre del tramo borrado (como HS5). */
+  const handleRemove = (id: string) => {
+    const t = tramoPorId.get(id);
+    if (t) {
+      if (state.tramos.length <= 1) return;
+      const nuevoPadre = t.parentId;
+      setField(
+        "tramos",
+        state.tramos
+          .filter((x) => x.id !== id)
+          .map((x) => (x.parentId === id ? { ...x, parentId: nuevoPadre } : x)),
+      );
+      if (nuevoPadre !== null && state.aparatos.some((a) => a.tramoId === id)) {
+        setField(
+          "aparatos",
+          state.aparatos.map((a) =>
+            a.tramoId === id ? { ...a, tramoId: nuevoPadre } : a,
+          ),
+        );
+      }
+    } else {
+      if (state.aparatos.length <= 1) return;
+      setField(
+        "aparatos",
+        state.aparatos.filter((a) => a.id !== id),
+      );
+    }
+    if (selectedId === id) setSelectedId(null);
+  };
+
+  /**
+   * Preset (§6.1): en HS4 el cuarto se expande a una derivación particular +
+   * una derivación de aparato por cada aparato (la red real de AF), con los
+   * aparatos de la Tabla 2.1 colgando. Ids deterministas; todo editable.
+   */
+  const aplicarPreset = (p: PresetAparatos) => {
+    const parentId =
+      state.tramos.find((t) => t.tipo === "columna_montante")?.id ??
+      state.tramos.find((t) => t.parentId === null)?.id ??
+      null;
+    const nuevosTramos: TramoInputHS4[] = [];
+    const idDeriv = nextId(state.tramos, "t");
+    nuevosTramos.push({
+      id: idDeriv,
+      nombre: `Deriv. ${p.label.toLowerCase()}`,
+      tipo: "derivacion_particular",
+      parentId,
+      material: "termoplastico_multicapa",
+      longitud_m: 3,
+      altura_m: 0,
+    });
+    const nuevosAparatos: AparatoInputHS4[] = [];
+    for (const { tipo } of p.hs4) {
+      const idTramo = nextId([...state.tramos, ...nuevosTramos], "t");
+      nuevosTramos.push({
+        id: idTramo,
+        tipo: "derivacion_aparato",
+        parentId: idDeriv,
+        material: "termoplastico_multicapa",
+        longitud_m: 1.5,
+        altura_m: 0,
+      });
+      nuevosAparatos.push({
+        id: nextId([...state.aparatos, ...nuevosAparatos], "a"),
+        tipo,
+        tramoId: idTramo,
+      });
+    }
+    setField("tramos", [...state.tramos, ...nuevosTramos]);
+    setField("aparatos", [...state.aparatos, ...nuevosAparatos]);
+    setSelectedId(idDeriv);
+  };
+
+  // ── Generar desde viviendas tipo (feature-8 §C) — mismo patrón que HS5 ─────
+  const puedeGenerarVT = (proyecto.viviendasTipo?.length ?? 0) > 0;
+  const [confirmarGenerarVT, setConfirmarGenerarVT] = useState(false);
+  const handleGenerarVT = () => {
+    if (!confirmarGenerarVT) {
+      setConfirmarGenerarVT(true);
+      return;
+    }
+    const gen = generarHs4(proyecto.viviendasTipo ?? [], proyecto.repartoPlantas);
+    setField("tramos", gen.tramos);
+    setField("aparatos", gen.aparatos);
+    setConfirmarGenerarVT(false);
+    setSelectedId(null);
+    showToast("Red generada desde las viviendas tipo del proyecto", { autoDismiss: 3000 });
+  };
+
+  // ── Proyección estado+resultado → filas del outliner (patrón HS5) ──────────
+  const resultadoTramo = new Map(
+    result.porTramo.map((r) => [r.id, r] as const),
+  );
+  const resultadoAparato = new Map(
+    result.porAparato.map((r) => [r.id, r] as const),
+  );
+
+  const filaTramo = (t: TramoInputHS4, depth: number): OutlinerFila => {
+    const r = resultadoTramo.get(t.id);
+    // Marcadores multicanal junto al estado: recorrido crítico + avisos de
+    // buena práctica (velocidad fuera de rango / Ø fuera de serie comercial).
+    const marcas = r
+      ? [
+          r.esCritico ? "◆ crítico" : null,
+          r.velocidadFueraDeRango ? "v fuera de rango" : null,
+          r.diametroFueraDeSerie ? "Ø fuera de serie" : null,
+        ].filter((m): m is string => m !== null)
+      : [];
+    const celdas: OutlinerCelda[] = [
+      {
+        tipo: "nombre",
+        valor: t.nombre ?? t.id,
+        onChange: (v) => patchTramo(t.id, { nombre: v }),
+      },
+      {
+        tipo: "select",
+        valor: t.tipo,
+        opciones: TIPO_TRAMO_OPTIONS,
+        onChange: (v) => patchTramo(t.id, { tipo: v as TipoTramoHS4 }),
+      },
+      {
+        tipo: "select",
+        valor: t.material ?? "metalica",
+        opciones: MATERIAL_OPTIONS,
+        onChange: (v) => patchTramo(t.id, { material: v as MaterialTuberia }),
+      },
+      {
+        tipo: "numero",
+        valor: t.longitud_m ?? 1,
+        onChange: (v) => patchTramo(t.id, { longitud_m: v }),
+        min: 0,
+        step: 0.5,
+        unidad: "m",
+      },
+      {
+        tipo: "numero",
+        valor: t.altura_m ?? 0,
+        onChange: (v) => patchTramo(t.id, { altura_m: v }),
+        step: 0.5,
+        unidad: "m",
+      },
+      {
+        tipo: "texto",
+        valor: r ? fmt(r.caudalCalculo_dm3_s, undefined, 2) : "—",
+        mono: true,
+      },
+      {
+        tipo: "texto",
+        valor:
+          r?.diametro_mm != null ? `Ø${fmt(r.diametro_mm, undefined, 0)}` : "—",
+        mono: true,
+      },
+      {
+        tipo: "texto",
+        valor:
+          r?.velocidad_m_s != null ? fmt(r.velocidad_m_s, undefined, 2) : "—",
+        mono: true,
+      },
+      {
+        tipo: "texto",
+        valor: r ? fmt(r.presionResidual_kPa, undefined, 0) : "—",
+        mono: true,
+      },
+      r
+        ? {
+            tipo: "estado",
+            veredicto: r.estado,
+            extra: marcas.join(" · ") || undefined,
+          }
+        : { tipo: "texto", valor: "—", dim: true },
+    ];
+    return {
+      id: t.id,
+      depth,
+      kind: "tramo",
+      anidable: true,
+      borrable: state.tramos.length > 1,
+      celdas,
+    };
+  };
+
+  const filaAparato = (a: AparatoInputHS4, depth: number): OutlinerFila => {
+    const r = resultadoAparato.get(a.id);
+    const modoPresion =
+      a.esFluxorOCalentador === undefined
+        ? "auto"
+        : a.esFluxorOCalentador
+          ? "fluxor"
+          : "grifo";
+    const celdas: OutlinerCelda[] = [
+      {
+        tipo: "nombre",
+        valor: a.nombre ?? a.id,
+        onChange: (v) => patchAparato(a.id, { nombre: v }),
+      },
+      {
+        tipo: "select",
+        valor: a.tipo,
+        opciones: TIPO_APARATO_OPTIONS,
+        onChange: (v) => patchAparato(a.id, { tipo: v as TipoAparatoHS4 }),
+      },
+      {
+        tipo: "select",
+        valor: modoPresion,
+        opciones: PRESION_MIN_OPTIONS,
+        onChange: (v) =>
+          patchAparato(a.id, {
+            esFluxorOCalentador: v === "auto" ? undefined : v === "fluxor",
+          }),
+      },
+      { tipo: "texto", valor: "", dim: true },
+      { tipo: "texto", valor: "", dim: true },
+      {
+        tipo: "texto",
+        valor: r ? fmt(r.caudalInstantaneo_dm3_s, undefined, 2) : "—",
+        mono: true,
+      },
+      {
+        tipo: "texto",
+        valor:
+          r?.diametroMinDerivacion_mm != null
+            ? `Ø${fmt(r.diametroMinDerivacion_mm, undefined, 0)}`
+            : "—",
+        mono: true,
+      },
+      { tipo: "texto", valor: "", dim: true },
+      {
+        tipo: "texto",
+        valor: r ? fmt(r.presionMinExigida_kPa, undefined, 0) : "—",
+        mono: true,
+        dim: true,
+      },
+      r
+        ? { tipo: "estado", veredicto: r.estado }
+        : { tipo: "texto", valor: "—", dim: true },
+    ];
+    return {
+      id: a.id,
+      depth,
+      kind: "aparato",
+      anidable: false,
+      borrable: state.aparatos.length > 1,
+      celdas,
+    };
+  };
+
+  const filas: OutlinerFila[] = [];
+  {
+    const visto = new Set<string>();
+    const empujar = (t: TramoInputHS4, depth: number) => {
+      if (visto.has(t.id)) return;
+      visto.add(t.id);
+      filas.push(filaTramo(t, depth));
+      for (const a of state.aparatos.filter((a) => a.tramoId === t.id)) {
+        filas.push(filaAparato(a, depth + 1));
+      }
+      for (const h of state.tramos.filter((x) => x.parentId === t.id)) {
+        empujar(h, depth + 1);
+      }
+    };
+    const raices = state.tramos.filter(
+      (t) => t.parentId === null || !tramoPorId.has(t.parentId),
+    );
+    for (const r of raices) empujar(r, 0);
+    for (const t of state.tramos) if (!visto.has(t.id)) empujar(t, 0);
+    for (const a of state.aparatos.filter((a) => !tramoPorId.has(a.tramoId))) {
+      filas.push(filaAparato(a, 0));
+    }
+  }
+
+  // Etiquetas legibles (id→nombre) para el esquema y el pie de selección.
+  const etiquetas: Record<string, string> = {};
+  for (const t of state.tramos) if (t.nombre) etiquetas[t.id] = t.nombre;
+  for (const a of state.aparatos) if (a.nombre) etiquetas[a.id] = a.nombre;
+
+  // Pie de selección del panel de esquema.
+  let textoSeleccion: string | null = null;
+  if (selVigente) {
+    const nombre = etiquetas[selVigente] ?? selVigente;
+    const rt = resultadoTramo.get(selVigente);
+    const ra = resultadoAparato.get(selVigente);
+    if (rt) {
+      textoSeleccion = `${nombre} — ${rt.diametro_mm != null ? `Ø${fmt(rt.diametro_mm, undefined, 0)}` : "Ø —"} · ${fmt(rt.caudalCalculo_dm3_s, "dm³/s", 2)} · ${fmt(rt.presionResidual_kPa, "kPa", 0)} · ${ESTADO_LABEL[rt.estado]}`;
+    } else if (ra) {
+      textoSeleccion = `${nombre} — ${fmt(ra.caudalInstantaneo_dm3_s, "dm³/s", 2)} · P mín ${fmt(ra.presionMinExigida_kPa, "kPa", 0)} · ${ESTADO_LABEL[ra.estado]}`;
+    }
+  }
+
+  // Tamaño del esquema (proporción del viewBox nativo, como HS5).
   const [canvasRef, canvasWidth] = useContainerWidth();
+  const { nativeW, nativeH } = hs4NativeSize(result);
   const svgW =
     canvasWidth !== undefined && canvasWidth > 0
-      ? Math.min(640, Math.max(280, canvasWidth - 32))
-      : 480;
-  const svgH = Math.round(svgW * 0.6);
+      ? Math.max(240, Math.min(560, canvasWidth - 24))
+      : 348;
+  const svgH = Math.round(
+    nativeW > 0 ? (svgW * nativeH) / nativeW : svgW * 1.2,
+  );
 
-  // Presión mínima exigida en el punto crítico (para el banner: cumple/no contra
-  // ESE umbral). El motor ya la calcula por aparato; aquí la leemos del crítico.
+  const resumen: ResumenVeredicto | null = useMemo(
+    () => (valid ? resumenHs4(result) : null),
+    [valid, result],
+  );
+
+  // Herencia CONDICIONAL de la presión de acometida (ver comentario de cabecera):
+  // con el dato informado en el expediente, manda el chip de la BarraContexto y
+  // el Field local se oculta.
+  const presionHeredada = herencia.campos.some(
+    (c) => c.campo === "presionAcometida_kPa",
+  );
+
   const apCritico =
     result.puntoCriticoId != null
       ? result.porAparato.find((a) => a.id === result.puntoCriticoId)
@@ -234,189 +644,300 @@ export function Hs4Module() {
   const presionMinCritico_kPa = apCritico?.presionMinExigida_kPa ?? null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <Topbar
-        moduleLabel="HS4 Fontanería"
-        moduleGroup="Salubridad (DB-HS) · suministro de agua"
-        onExportPdf={handleExportPdf}
-        pdfExporting={pdfExporting}
-        onShare={handleShare}
-        onReset={reset}
-        onMenuOpen={openDrawer}
-      />
-      <MobileTabBar tab={tab} setTab={setTab} />
+    <ModuleShell
+      justificacionKey="hs4"
+      resultado={resumen}
+      herencia={herencia}
+      acciones={{
+        onExportPdf: handleExportPdf,
+        pdfExporting,
+        onShare: handleShare,
+        onReset: reset,
+      }}
+    >
+      <MobileTabBar<TabHs4> tab={tab} setTab={setTab} tabs={TABS_HS4} />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Left: inputs */}
+        {/* Tabla (outliner) + suministro + detalle. En móvil, pestaña "tabla". */}
         <div
           className={[
-            "bg-bg-surface flex min-h-0 flex-col overflow-hidden",
-            "lg:border-border-main lg:w-80 lg:shrink-0 lg:border-r",
-            tab === "inputs" ? "max-lg:flex-1" : "max-lg:hidden",
-            "lg:flex",
+            "scroll-hide min-w-0 flex-col overflow-y-auto px-4 py-4 lg:px-6",
+            "lg:flex lg:flex-1",
+            tab === "tabla" ? "flex flex-1" : "hidden",
           ].join(" ")}
         >
-          <div className="scroll-hide flex-1 overflow-y-auto px-4 py-3">
-            <CollapsibleSection label="Suministro" refNorma="DB-HS4 ap. 2.1.3 / 4.2">
-              <Field
-                id="presion-acometida"
-                label="Presión acometida"
-                sub="P"
-                unit="kPa"
-                help="Presión disponible en la acometida (entrada de la red). Es el punto de partida de la presión residual: a lo largo del recorrido se le restan las pérdidas de carga y la cota. Si en el punto más desfavorable cae por debajo de la mínima exigida, hace falta grupo de presión (ap. 4.5)."
-                refText="DB-HS4 ap. 2.1.3"
-              >
-                <NumberInput
-                  id="presion-acometida"
-                  value={state.presionAcometida_kPa}
-                  onChange={(v) => setField("presionAcometida_kPa", v)}
-                  min={0}
-                  step={10}
-                />
-              </Field>
-              <Field
-                id="criterio-k"
-                label="Simultaneidad"
-                sub="K"
-                help="Coeficiente de simultaneidad K aplicado al caudal acumulado de cada tramo. UNE 149201 (K = 1/√(n−1)) es un CRITERIO EXTERNO, no exigencia del DB-HS4 (el DB sólo remite a «un criterio adecuado»). «Sin simultaneidad» suma directa de caudales (K = 1)."
-                refText="UNE 149201 (criterio externo)"
-              >
-                <SelectInput<CriterioK>
+          {/* Formulario corto de suministro (no es colección: fuera del outliner). */}
+          <div className="max-w-2xl">
+            <CollapsibleSection
+              label="Suministro"
+              refNorma="DB-HS4 ap. 2.1.3 / 4.2"
+            >
+              <div className="grid gap-x-6 sm:grid-cols-2">
+                {!presionHeredada && (
+                  <Field
+                    id="presion-acometida"
+                    label="Presión acometida"
+                    sub="P"
+                    unit="kPa"
+                    help="Presión disponible en la acometida (entrada de la red). Es el punto de partida de la presión residual: a lo largo del recorrido se le restan las pérdidas de carga y la cota. Si en el punto más desfavorable cae por debajo de la mínima exigida, hace falta grupo de presión (ap. 4.5)."
+                    refText="DB-HS4 ap. 2.1.3"
+                  >
+                    <NumberInput
+                      id="presion-acometida"
+                      value={state.presionAcometida_kPa}
+                      onChange={(v) => setField("presionAcometida_kPa", v)}
+                      min={0}
+                      step={10}
+                    />
+                  </Field>
+                )}
+                <Field
                   id="criterio-k"
-                  value={state.criterioK}
-                  options={CRITERIO_K_OPTIONS}
-                  onChange={(v) => setField("criterioK", v)}
-                />
-              </Field>
-              <Field
-                id="perdidas-localizadas"
-                label="Pérdidas local."
-                sub="%"
-                unit="%"
-                help="Fracción de pérdidas localizadas (codos, tes, válvulas…) estimada sobre las longitudinales. Es buena práctica de cálculo (20–30 %), NO cifra del DB-HS4. Por defecto 25 %."
-                refText="Buena práctica (no DB)"
-              >
-                <NumberInput
+                  label="Simultaneidad"
+                  sub="K"
+                  help="Coeficiente de simultaneidad K aplicado al caudal acumulado de cada tramo. UNE 149201 (K = 1/√(n−1)) es un CRITERIO EXTERNO, no exigencia del DB-HS4 (el DB sólo remite a «un criterio adecuado»). «Sin simultaneidad» suma directa de caudales (K = 1)."
+                  refText="UNE 149201 (criterio externo)"
+                >
+                  <SelectInput<CriterioK>
+                    id="criterio-k"
+                    value={state.criterioK}
+                    options={CRITERIO_K_OPTIONS}
+                    onChange={(v) => setField("criterioK", v)}
+                  />
+                </Field>
+                <Field
                   id="perdidas-localizadas"
-                  value={fraccionPct}
-                  onChange={(v) => setField("fraccionPerdidasLocalizadas", v / 100)}
-                  min={20}
-                  max={30}
-                  step={1}
+                  label="Pérdidas local."
+                  sub="%"
+                  unit="%"
+                  help="Fracción de pérdidas localizadas (codos, tes, válvulas…) estimada sobre las longitudinales. Es buena práctica de cálculo (20–30 %), NO cifra del DB-HS4. Por defecto 25 %."
+                  refText="Buena práctica (no DB)"
+                >
+                  <NumberInput
+                    id="perdidas-localizadas"
+                    value={fraccionPct}
+                    onChange={(v) =>
+                      setField("fraccionPerdidasLocalizadas", v / 100)
+                    }
+                    min={20}
+                    max={30}
+                    step={1}
+                  />
+                </Field>
+              </div>
+            </CollapsibleSection>
+          </div>
+
+          {!result.arbolValido && (
+            <div className="text-state-fail mb-3 text-[12px] font-semibold">
+              La red de tramos no es un árbol válido (hay un ciclo, un huérfano
+              o varias raíces): revisa la jerarquía con Tab/Shift-Tab.
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <Outliner
+              columnas={COLUMNAS_HS4}
+              filas={filas}
+              selectedId={selVigente}
+              onSelect={setSelectedId}
+              onHover={setHoverId}
+              onAdd={handleAdd}
+              onNest={handleNest}
+              onUnnest={handleUnnest}
+              onRemove={handleRemove}
+              etiquetaAdd="+ Añadir tramo"
+              toolbar={
+                <div className="flex items-center gap-1.5">
+                  {puedeGenerarVT && (
+                    <button
+                      type="button"
+                      onClick={handleGenerarVT}
+                      onBlur={() => setConfirmarGenerarVT(false)}
+                      title="Reemplaza la red actual por la propuesta derivada de las viviendas tipo del proyecto"
+                      className={[
+                        "rounded border px-2 py-0.5 text-[11px] transition-colors",
+                        confirmarGenerarVT
+                          ? "border-state-warn text-state-warn font-medium"
+                          : "border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary",
+                      ].join(" ")}
+                    >
+                      {confirmarGenerarVT
+                        ? "¿Reemplazar la red actual?"
+                        : "Generar desde viviendas tipo"}
+                    </button>
+                  )}
+                  {PRESETS_APARATOS.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => aplicarPreset(p)}
+                      title={`Añadir una derivación de ${p.label.toLowerCase()} con sus aparatos`}
+                      className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded border px-2 py-0.5 text-[11px] transition-colors"
+                    >
+                      + {p.label}
+                    </button>
+                  ))}
+                </div>
+              }
+            />
+          </div>
+
+          <div className="mt-4 max-w-2xl">
+            <CollapsibleSection
+              label="Resumen"
+              refNorma="DB-HS4 ap. 2.1.3 / 4.5"
+            >
+              <dl className="text-[13px]">
+                <SummaryRow
+                  k="Caudal de cálculo total"
+                  v={fmt(result.caudalTotal_dm3_s, "dm³/s", 2)}
+                  sub="que llega a la acometida"
                 />
-              </Field>
+                <SummaryRow
+                  k="Presión en el punto crítico"
+                  v={fmt(result.presionCritica_kPa, "kPa", 0)}
+                  sub={
+                    presionMinCritico_kPa != null
+                      ? `mínima exigida ${fmt(presionMinCritico_kPa, "kPa", 0)}${
+                          apCritico ? ` · ${apCritico.id}` : ""
+                        }`
+                      : "sin punto de consumo crítico"
+                  }
+                />
+                <SummaryRow
+                  k="Grupo de presión (ap. 4.5)"
+                  v={
+                    result.grupoPresionNecesario ? "Necesario" : "No necesario"
+                  }
+                  sub={
+                    result.grupoPresionNecesario
+                      ? "la presión cae por debajo de la mínima en el punto más desfavorable"
+                      : "la presión de acometida es suficiente"
+                  }
+                />
+                <SummaryRow
+                  k="Criterio de simultaneidad"
+                  v={
+                    result.criterioK === "une149201"
+                      ? "K = 1/√(n−1)"
+                      : "K = 1 (sin simultaneidad)"
+                  }
+                  sub={
+                    result.kEsCriterioExterno
+                      ? `${result.normaCriterioK ?? "UNE 149201"} — criterio externo (no exigencia CTE)`
+                      : "suma directa de caudales"
+                  }
+                />
+              </dl>
             </CollapsibleSection>
 
-            <CollapsibleSection label="Tramos de la red" refNorma="DB-HS4 Tablas 4.2–4.3">
-              <div className="flex flex-col gap-2.5">
-                {state.tramos.map((t) => (
-                  <TramoRow
-                    key={t.id}
-                    tramo={t}
-                    tramos={state.tramos}
-                    onPatch={(patch) => patchTramo(t.id, patch)}
-                    onRemove={() => removeTramo(t.id)}
-                    canRemove={state.tramos.length > 1}
-                  />
-                ))}
+            {/* Zona única de ALCANCE Y SUPUESTOS (ARCH-1 / ARCH-2): las
+                limitaciones agrupadas, visibles y no solo color. */}
+            <div className="mt-4">
+              <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
+                Alcance y supuestos
               </div>
-              <button
-                type="button"
-                onClick={addTramo}
-                className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-[13px] transition-colors"
-              >
-                <Plus size={14} />
-                Añadir tramo
-              </button>
-            </CollapsibleSection>
+              <DisclosureNote>
+                <span className="font-semibold">Alcance:</span> esta versión
+                dimensiona solo la red de agua fría (AF). La red de ACS (agua
+                caliente sanitaria) no se dimensiona en esta versión.
+              </DisclosureNote>
+              <DisclosureNote>
+                <span className="font-semibold">Presión estimada:</span> los
+                valores de presión (residual, en el punto crítico y la necesidad
+                de grupo de presión) provienen de un modelo de predimensionado y
+                son orientativos; no sustituyen un cálculo hidráulico de
+                detalle.
+              </DisclosureNote>
+              <p className="text-text-disabled text-[11px] leading-snug">
+                El coeficiente de simultaneidad K (UNE 149201) y la estimación
+                de pérdidas localizadas (20–30 %) son criterios externos al
+                DB-HS4, no exigencias del CTE. El modelo de pérdida de carga es
+                de predimensionado.
+              </p>
+            </div>
 
-            <CollapsibleSection label="Aparatos sanitarios" refNorma="DB-HS4 Tabla 2.1">
-              <div className="flex flex-col gap-2.5">
-                {state.aparatos.map((a) => (
-                  <AparatoRow
-                    key={a.id}
-                    aparato={a}
-                    tramos={state.tramos}
-                    onPatch={(patch) => patchAparato(a.id, patch)}
-                    onRemove={() => removeAparato(a.id)}
-                    canRemove={state.aparatos.length > 1}
-                  />
+            {result.warnings.length > 0 && (
+              <ul className="text-state-warn mt-3 list-disc space-y-1 pl-5 text-[12px]">
+                {result.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
                 ))}
-              </div>
-              <button
-                type="button"
-                onClick={addAparato}
-                className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-[13px] transition-colors"
-              >
-                <Plus size={14} />
-                Añadir aparato
-              </button>
-            </CollapsibleSection>
+              </ul>
+            )}
           </div>
         </div>
 
-        {/* Right: SVG + results. En lg se apila junto (banner → lienzo → tablas);
-            en móvil se reparte por pestaña: "diagramas" = solo el lienzo,
-            "results" = veredicto + tablas. Cada bloque se gatea por separado
-            manteniendo intacto el orden y el layout en lg (lg:flex / lg:block). */}
-        <div
+        {/* Esquema de columna: soporte compacto, plegable en lg; pestaña en móvil. */}
+        <aside
+          aria-label="Esquema de columna"
           className={[
-            "scroll-hide flex min-w-0 flex-col overflow-y-auto",
-            "lg:flex-1",
-            tab === "results" || tab === "diagramas" ? "flex-1" : "hidden",
-            "lg:flex",
+            "border-border-main bg-bg-surface min-h-0 flex-col overflow-hidden",
+            "lg:flex lg:shrink-0 lg:border-l",
+            esquemaPlegado ? "lg:w-10" : "lg:w-[380px]",
+            tab === "esquema" ? "flex flex-1" : "hidden",
           ].join(" ")}
         >
-          {/* Verdict banner (parte del resultado: tab "results" en móvil). */}
-          <div
-            className={[
-              `border-b px-6 py-2.5 ${STATE_TINT[result.veredictoGlobal]}`,
-              tab === "results" ? "block" : "hidden",
-              "lg:block",
-            ].join(" ")}
-          >
-            <span className="text-text-secondary text-[13px]">
-              Red de suministro (agua fría) —{" "}
-              <span className={`font-semibold ${STATE_TEXT[result.veredictoGlobal]}`}>
-                {STATUS_LABEL[result.veredictoGlobal]}
-              </span>{" "}
-              <span className="text-text-disabled">
-                ({fmt(result.caudalTotal_dm3_s, "dm³/s", 2)} de cálculo · P crítica{" "}
-                {fmt(result.presionCritica_kPa, "kPa", 0)}
-                {presionMinCritico_kPa != null ? ` / ${fmt(presionMinCritico_kPa, "kPa", 0)} mín.` : ""}
-                {result.grupoPresionNecesario ? " · grupo de presión necesario" : ""})
-              </span>
-            </span>
-          </div>
-
-          {/* Lienzo del diagrama (tab "diagramas" en móvil; siempre en lg). */}
-          <div
-            ref={canvasRef}
-            className={[
-              "border-border-main canvas-dot-grid items-center justify-center border-b px-4 py-6",
-              tab === "diagramas" ? "flex" : "hidden",
-              "lg:flex",
-            ].join(" ")}
-          >
-            <HS4SVG result={result} mode="screen" width={svgW} height={svgH} />
-          </div>
-
-          {/* Tablas/resultados (tab "results" en móvil; siempre en lg). */}
-          <div
-            className={[
-              "px-6 py-4",
-              tab === "results" ? "block" : "hidden",
-              "lg:block",
-            ].join(" ")}
-          >
-            <ResultsTable result={result} />
-          </div>
-        </div>
+          {esquemaPlegado ? (
+            <button
+              type="button"
+              onClick={() => setEsquemaPlegado(false)}
+              aria-label="Mostrar esquema de columna"
+              title="Mostrar esquema"
+              className="text-text-disabled hover:text-text-primary hidden h-full w-full items-start justify-center pt-3 transition-colors lg:flex"
+            >
+              <ChevronLeft size={15} />
+            </button>
+          ) : (
+            <>
+              <div className="border-border-sub flex items-center justify-between border-b px-3.5 py-2.5">
+                <span className="text-text-disabled text-[10px] font-semibold tracking-[0.07em] uppercase">
+                  Esquema de columna
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEsquemaPlegado(true)}
+                  aria-label="Plegar esquema de columna"
+                  title="Plegar esquema"
+                  className="text-text-disabled hover:text-text-primary hidden transition-colors lg:block"
+                >
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+              <div
+                ref={canvasRef}
+                className="scroll-hide flex flex-1 items-start justify-center overflow-y-auto px-3 py-4"
+              >
+                <HS4SVG
+                  result={result}
+                  mode="screen"
+                  width={svgW}
+                  height={svgH}
+                  selectedId={selVigente}
+                  hoverId={hoverId}
+                  onSelect={setSelectedId}
+                  etiquetas={etiquetas}
+                />
+              </div>
+              {textoSeleccion && (
+                <div className="border-border-sub bg-tint-accent flex items-center gap-2 border-t px-3.5 py-2">
+                  <span className="bg-accent h-[3px] w-3.5 shrink-0 rounded-full" />
+                  <span className="text-text-primary text-[11.5px]">
+                    Seleccionado: {textoSeleccion}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </aside>
       </div>
 
       {/* Clon oculto del SVG para el raster del PDF (mismo id que busca renderFicha). */}
       <div className="h-0 w-0 overflow-hidden" aria-hidden="true">
-        <div id={HS4_PDF_SVG_ID} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+        <div
+          id={HS4_PDF_SVG_ID}
+          style={{ position: "absolute", left: "-9999px", top: 0 }}
+        >
           <HS4SVG result={result} mode="pdf" width={420} height={315} />
         </div>
       </div>
@@ -430,422 +951,23 @@ export function Hs4Module() {
           onClose={closePdfPreview}
         />
       )}
-    </div>
+    </ModuleShell>
   );
 }
 
-// -----------------------------------------------------------------------------
-// Fila editable de un TRAMO de la red (lista dinámica). Selector de tipo, de
-// padre ("cuelga de" — entre los OTROS tramos + opción raíz, nunca a sí mismo
-// para evitar el ciclo trivial; el motor valida el resto), material (fija el
-// rango de velocidad), longitud y cota (altura respecto al padre).
-// -----------------------------------------------------------------------------
-function TramoRow({
-  tramo,
-  tramos,
-  onPatch,
-  onRemove,
-  canRemove,
-}: {
-  tramo: TramoInputHS4;
-  tramos: TramoInputHS4[];
-  onPatch: (patch: Partial<TramoInputHS4>) => void;
-  onRemove: () => void;
-  canRemove: boolean;
-}) {
-  // Padres ofertados = todos los tramos menos el propio (impide el ciclo
-  // trivial). El selector usa "" como sentinela de "— (raíz)" (parentId null).
-  const parentOptions: { value: string; label: string }[] = [
-    { value: "", label: "— (raíz / acometida)" },
-    ...tramos
-      .filter((t) => t.id !== tramo.id)
-      .map((t) => ({ value: t.id, label: `${TIPO_TRAMO_LABEL[t.tipo]} · ${t.id}` })),
-  ];
-
-  return (
-    <div className="border-border-sub bg-bg-primary rounded-md border p-2.5">
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <SelectInput<TipoTramoHS4>
-            id={`tipo-tramo-${tramo.id}`}
-            value={tramo.tipo}
-            options={TIPO_TRAMO_OPTIONS}
-            onChange={(v) => onPatch({ tipo: v })}
-          />
-        </div>
-        <span className="text-text-disabled shrink-0 font-mono text-[11px]">{tramo.id}</span>
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={!canRemove}
-          aria-label="Quitar tramo"
-          title={canRemove ? "Quitar tramo" : "Debe haber al menos un tramo"}
-          className="text-text-disabled hover:text-state-fail shrink-0 rounded p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Trash2 size={15} />
-        </button>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <InputLabel htmlFor={`parent-${tramo.id}`} label="Cuelga de" />
-        <div className="w-40 shrink-0">
-          <SelectInput<string>
-            id={`parent-${tramo.id}`}
-            value={tramo.parentId ?? ""}
-            options={parentOptions}
-            onChange={(v) => onPatch({ parentId: v === "" ? null : v })}
-          />
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <InputLabel htmlFor={`material-${tramo.id}`} label="Material" />
-        <div className="w-40 shrink-0">
-          <SelectInput<MaterialTuberia>
-            id={`material-${tramo.id}`}
-            value={tramo.material ?? "metalica"}
-            options={MATERIAL_OPTIONS}
-            onChange={(v) => onPatch({ material: v })}
-          />
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <InputLabel htmlFor={`longitud-${tramo.id}`} label="Longitud" sub="L" />
-        <div className="flex w-32 shrink-0 items-center gap-1.5">
-          <div className="flex-1">
-            <NumberInput
-              id={`longitud-${tramo.id}`}
-              value={tramo.longitud_m ?? 1}
-              onChange={(v) => onPatch({ longitud_m: v })}
-              min={0}
-              step={0.5}
-            />
-          </div>
-          <span className="text-text-disabled w-8 shrink-0 text-[11px]">m</span>
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <InputLabel
-          htmlFor={`altura-${tramo.id}`}
-          label="Cota"
-          sub="Δh"
-          help="Altura del tramo respecto a su padre. Positiva si SUBE (resta presión hidrostática, ≈ 9,81 kPa por metro)."
-        />
-        <div className="flex w-32 shrink-0 items-center gap-1.5">
-          <div className="flex-1">
-            <NumberInput
-              id={`altura-${tramo.id}`}
-              value={tramo.altura_m ?? 0}
-              onChange={(v) => onPatch({ altura_m: v })}
-              step={0.5}
-            />
-          </div>
-          <span className="text-text-disabled w-8 shrink-0 text-[11px]">m</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Fila editable de un APARATO sanitario (lista dinámica). Tipo de aparato (los
-// TipoAparatoHS4 reales del motor), el tramo al que descarga (entre los tramos
-// existentes) y un flag para forzar la presión de fluxor/calentador (150 kPa).
-// -----------------------------------------------------------------------------
-function AparatoRow({
-  aparato,
-  tramos,
-  onPatch,
-  onRemove,
-  canRemove,
-}: {
-  aparato: AparatoInputHS4;
-  tramos: TramoInputHS4[];
-  onPatch: (patch: Partial<AparatoInputHS4>) => void;
-  onRemove: () => void;
-  canRemove: boolean;
-}) {
-  const tramoOptions: { value: string; label: string }[] = tramos.map((t) => ({
-    value: t.id,
-    label: `${TIPO_TRAMO_LABEL[t.tipo]} · ${t.id}`,
-  }));
-
-  return (
-    <div className="border-border-sub bg-bg-primary rounded-md border p-2.5">
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <SelectInput<TipoAparatoHS4>
-            id={`tipo-aparato-${aparato.id}`}
-            value={aparato.tipo}
-            options={TIPO_APARATO_OPTIONS}
-            onChange={(v) => onPatch({ tipo: v })}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={!canRemove}
-          aria-label="Quitar aparato"
-          title={canRemove ? "Quitar aparato" : "Debe haber al menos un aparato"}
-          className="text-text-disabled hover:text-state-fail shrink-0 rounded p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Trash2 size={15} />
-        </button>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <InputLabel htmlFor={`tramo-aparato-${aparato.id}`} label="Descarga a" />
-        <div className="w-40 shrink-0">
-          {tramoOptions.length > 0 ? (
-            <SelectInput<string>
-              id={`tramo-aparato-${aparato.id}`}
-              value={aparato.tramoId}
-              options={tramoOptions}
-              onChange={(v) => onPatch({ tramoId: v })}
-            />
-          ) : (
-            <span className="text-state-warn text-[11px]">Sin tramos disponibles</span>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <InputLabel
-          htmlFor={`fluxor-${aparato.id}`}
-          label="Fluxor / calentador"
-          help="Fuerza la presión mínima de fluxor/calentador (150 kPa) en el punto de consumo, en vez de la de grifo común (100 kPa). Por defecto se deriva del tipo de aparato."
-        />
-        <input
-          id={`fluxor-${aparato.id}`}
-          type="checkbox"
-          checked={aparato.esFluxorOCalentador ?? false}
-          onChange={(e) => onPatch({ esFluxorOCalentador: e.target.checked })}
-          className="accent-accent h-4 w-4 shrink-0 cursor-pointer"
-        />
-      </div>
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Tabla de resultados ACCESIBLE (WCAG: el dato numérico SIEMPRE en texto/tabla,
-// no solo en el SVG). Por tramo: tipo · Ø resultante · caudal de cálculo · K ·
-// velocidad (con su rango) · pérdida · presión residual · estado. El recorrido
-// crítico se resalta (no solo color: marca «◆ crítico» en texto). Después, el
-// resumen (caudal total, presión crítica vs mínima, grupo de presión, criterio
-// K) y los avisos del motor.
-// -----------------------------------------------------------------------------
-function ResultsTable({ result }: { result: HS4Result }) {
-  const apCritico =
-    result.puntoCriticoId != null
-      ? result.porAparato.find((a) => a.id === result.puntoCriticoId)
-      : undefined;
-  const presionMinCritico_kPa = apCritico?.presionMinExigida_kPa ?? null;
-
-  return (
-    <div className="max-w-3xl">
-      {!result.arbolValido && (
-        <div className="text-state-fail mb-3 text-[12px] font-semibold">
-          La red de tramos no es un árbol válido (hay un ciclo o un padre
-          inexistente): corrige las conexiones «cuelga de».
-        </div>
-      )}
-
-      <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-        Dimensionado por tramo
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="text-text-disabled border-border-sub border-b text-left text-[11px] uppercase">
-              <th scope="col" className="py-1.5 font-medium">Tramo</th>
-              <th scope="col" className="py-1.5 text-right font-medium">Ø</th>
-              <th scope="col" className="py-1.5 text-right font-medium">Q cálc.</th>
-              <th scope="col" className="py-1.5 text-right font-medium">K</th>
-              <th scope="col" className="py-1.5 text-right font-medium">v</th>
-              <th scope="col" className="py-1.5 text-right font-medium">Pérdida</th>
-              <th scope="col" className="py-1.5 text-right font-medium">P resid.</th>
-              <th scope="col" className="py-1.5 text-right font-medium">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.porTramo.map((t) => {
-              const rango = rangoVelocidad(t.material);
-              return (
-                <tr key={t.id} className="border-border-sub border-b">
-                  <td className="text-text-secondary py-1.5">
-                    {TIPO_TRAMO_LABEL[t.tipo]}{" "}
-                    <span className="text-text-disabled font-mono text-[11px]">({t.id})</span>
-                    {t.esCritico && (
-                      <span className="text-state-fail ml-1 text-[11px] font-semibold">
-                        ◆ crítico
-                      </span>
-                    )}
-                  </td>
-                  <td className="text-text-primary py-1.5 text-right tabular-nums">
-                    {t.diametro_mm == null ? "—" : `Ø${fmt(t.diametro_mm, "mm", 0)}`}
-                    {t.diametroFueraDeSerie && (
-                      <FlagBadge
-                        label="fuera de serie"
-                        title="Ø requerido fuera de la serie comercial (> 110 mm): el tramo no tiene un Ø válido de la serie. Aviso, no incumplimiento del CTE."
-                      />
-                    )}
-                  </td>
-                  <td className="text-text-secondary py-1.5 text-right tabular-nums">
-                    {fmt(t.caudalCalculo_dm3_s, "dm³/s", 3)}
-                  </td>
-                  <td className="text-text-secondary py-1.5 text-right tabular-nums">
-                    {fmt(t.k, "", 2)}
-                  </td>
-                  <td className="text-text-secondary py-1.5 text-right tabular-nums">
-                    {t.velocidad_m_s == null ? "—" : fmt(t.velocidad_m_s, "m/s", 2)}
-                    <span className="text-text-disabled ml-1 text-[10px]">
-                      [{fmt(rango.min_m_s, "", 1)}–{fmt(rango.max_m_s, "", 1)}]
-                    </span>
-                    {t.velocidadFueraDeRango && (
-                      <FlagBadge
-                        label="fuera de rango"
-                        title="Velocidad fuera del rango recomendado del material (ap. 4.2 d). Buena práctica de proyecto; aviso, no incumplimiento prestacional del CTE."
-                      />
-                    )}
-                  </td>
-                  <td className="text-text-secondary py-1.5 text-right tabular-nums">
-                    {fmt(t.perdida_kPa, "kPa", 1)}
-                  </td>
-                  <td className="text-text-primary py-1.5 text-right tabular-nums">
-                    {fmt(t.presionResidual_kPa, "kPa", 0)}
-                  </td>
-                  <td className={`py-1.5 text-right font-semibold ${STATE_TEXT[t.estado]}`}>
-                    {ESTADO_LABEL[t.estado]}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="text-text-disabled mt-5 mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-        Verificación por aparato
-      </div>
-      <table className="w-full max-w-2xl text-[13px]">
-        <thead>
-          <tr className="text-text-disabled border-border-sub border-b text-left text-[11px] uppercase">
-            <th scope="col" className="py-1.5 font-medium">Aparato</th>
-            <th scope="col" className="py-1.5 text-right font-medium">Q inst.</th>
-            <th scope="col" className="py-1.5 text-right font-medium">P mín.</th>
-            <th scope="col" className="py-1.5 text-right font-medium">Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {result.porAparato.map((a) => (
-            <tr key={a.id} className="border-border-sub border-b">
-              <td className="text-text-secondary py-1.5">
-                {TIPO_APARATO_LABEL[a.tipo]}{" "}
-                <span className="text-text-disabled text-[11px]">
-                  (→ {a.tramoId}
-                  {a.esFluxorOCalentador ? " · fluxor" : ""})
-                </span>
-              </td>
-              <td className="text-text-primary py-1.5 text-right tabular-nums">
-                {fmt(a.caudalInstantaneo_dm3_s, "dm³/s", 3)}
-              </td>
-              <td className="text-text-secondary py-1.5 text-right tabular-nums">
-                {fmt(a.presionMinExigida_kPa, "kPa", 0)}
-              </td>
-              <td className={`py-1.5 text-right font-semibold ${STATE_TEXT[a.estado]}`}>
-                {ESTADO_LABEL[a.estado]}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className="text-text-disabled mt-5 mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-        Resumen
-      </div>
-      <dl className="max-w-2xl text-[13px]">
-        <SummaryRow
-          k="Caudal de cálculo total"
-          v={fmt(result.caudalTotal_dm3_s, "dm³/s", 2)}
-          sub="que llega a la acometida"
-        />
-        <SummaryRow
-          k="Presión en el punto crítico"
-          v={fmt(result.presionCritica_kPa, "kPa", 0)}
-          sub={
-            presionMinCritico_kPa != null
-              ? `mínima exigida ${fmt(presionMinCritico_kPa, "kPa", 0)}${
-                  apCritico ? ` · ${apCritico.id}` : ""
-                }`
-              : "sin punto de consumo crítico"
-          }
-        />
-        <SummaryRow
-          k="Grupo de presión (ap. 4.5)"
-          v={result.grupoPresionNecesario ? "Necesario" : "No necesario"}
-          sub={
-            result.grupoPresionNecesario
-              ? "la presión cae por debajo de la mínima en el punto más desfavorable"
-              : "la presión de acometida es suficiente"
-          }
-        />
-        <SummaryRow
-          k="Criterio de simultaneidad"
-          v={
-            result.criterioK === "une149201"
-              ? "K = 1/√(n−1)"
-              : "K = 1 (sin simultaneidad)"
-          }
-          sub={
-            result.kEsCriterioExterno
-              ? `${result.normaCriterioK ?? "UNE 149201"} — criterio externo (no exigencia CTE)`
-              : "suma directa de caudales"
-          }
-        />
-      </dl>
-
-      {/* Zona única de ALCANCE Y SUPUESTOS (ARCH-1 / ARCH-2): todas las
-          limitaciones agrupadas tras el resumen para verlas de un vistazo —
-          alcance (solo AF), presión orientativa y criterios externos (K /
-          pérdidas). Cada nota mantiene su `role="note"` (no solo color). */}
-      <div className="mt-5">
-        <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-          Alcance y supuestos
-        </div>
-
-        {/* ARCH-2: alcance de esta versión. Solo se dimensiona agua fría (AF); la
-            red de ACS NO se dimensiona aquí. Visible (no enterrado), no solo color. */}
-        <DisclosureNote>
-          <span className="font-semibold">Alcance:</span> esta versión dimensiona solo la red de
-          agua fría (AF). La red de ACS (agua caliente sanitaria) no se dimensiona en esta versión.
-        </DisclosureNote>
-
-        {/* ARCH-1: la presión (residual, crítica, grupo de presión) es ORIENTATIVA. */}
-        <DisclosureNote>
-          <span className="font-semibold">Presión estimada:</span> los valores de presión (residual,
-          en el punto crítico y la necesidad de grupo de presión) provienen de un modelo de
-          predimensionado y son orientativos; no sustituyen un cálculo hidráulico de detalle.
-        </DisclosureNote>
-
-        <p className="text-text-disabled text-[11px] leading-snug">
-          El coeficiente de simultaneidad K (UNE 149201) y la estimación de pérdidas
-          localizadas (20–30 %) son criterios externos al DB-HS4, no exigencias del
-          CTE. El modelo de pérdida de carga es de predimensionado.
-        </p>
-      </div>
-
-      {result.warnings.length > 0 && (
-        <ul className="text-state-warn mt-3 list-disc space-y-1 pl-5 text-[12px]">
-          {result.warnings.map((w, i) => (
-            <li key={i}>{w}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+/**
+ * "22 ago 2026" — fecha corta es-ES a partir de un ISO (mismo formato que el
+ * listado de expedientes de InicioPage). Solo para la cabecera de la ficha; el
+ * ISO llega ya construido desde la persistencia (aquí no hay Date.now).
+ */
+function formatearFecha(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-ES", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(d);
 }
 
 function SummaryRow({ k, v, sub }: { k: string; v: string; sub?: string }) {
@@ -871,27 +993,12 @@ function DisclosureNote({ children }: { children: ReactNode }) {
       role="note"
       className="bg-tint-neutral border-border-main text-text-secondary mb-3 flex items-start gap-2 rounded-md border px-3 py-2 text-[12px] leading-snug"
     >
-      <Info size={15} className="text-text-disabled mt-0.5 shrink-0" aria-hidden="true" />
+      <Info
+        size={15}
+        className="text-text-disabled mt-0.5 shrink-0"
+        aria-hidden="true"
+      />
       <p className="min-w-0">{children}</p>
     </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Distintivo MULTICANAL de aviso por tramo (velocidad fuera de rango / Ø fuera de
-// serie, flags Wave 1). No depende solo del color (WCAG 1.4.1): icono + etiqueta
-// textual visible + `title`/`aria-label` con la explicación completa. El tono
-// `state-warn` solo REFUERZA.
-// -----------------------------------------------------------------------------
-function FlagBadge({ label, title }: { label: string; title: string }) {
-  return (
-    <span
-      title={title}
-      aria-label={title}
-      className="bg-tint-warn text-state-warn ml-1.5 inline-flex items-center gap-0.5 rounded px-1 py-0.5 align-middle text-[10px] font-semibold whitespace-nowrap"
-    >
-      <AlertTriangle size={10} className="shrink-0" aria-hidden="true" />
-      {label}
-    </span>
   );
 }

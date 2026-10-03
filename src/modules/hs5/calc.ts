@@ -60,6 +60,8 @@ export type DisposicionColector = "colgado" | "enterrado";
 export interface AparatoInput {
   /** Identificador estable (lo consume el SVG / la ficha). */
   id: string;
+  /** Nombre legible dado por el usuario (feature-7). El motor NO lo lee. */
+  nombre?: string;
   /** Tipo de aparato de la Tabla 4.1 (incluye "cuartos" agrupados). */
   tipo: TipoAparato;
   /** Id del tramo (normalmente un `ramal`) al que descarga el aparato. */
@@ -75,6 +77,8 @@ export interface AparatoInput {
 export interface TramoInput {
   /** Identificador estable (lo consume el SVG para dibujar el árbol). */
   id: string;
+  /** Nombre legible dado por el usuario (feature-7). El motor NO lo lee. */
+  nombre?: string;
   tipo: TipoTramo;
   /** Id del tramo padre (aguas abajo) o `null` si es la raíz (acometida). */
   parentId: string | null;

@@ -24,6 +24,12 @@ if (typeof globalThis.IntersectionObserver === "undefined") {
   } as unknown as typeof IntersectionObserver;
 }
 
+// jsdom doesn't implement scrollIntoView — the municipality combobox calls it
+// to keep the keyboard-highlighted option in view.
+if (typeof Element.prototype.scrollIntoView !== "function") {
+  Element.prototype.scrollIntoView = function scrollIntoView() {};
+}
+
 // jsdom URL.createObjectURL is unimplemented; PDF export needs it.
 if (typeof URL.createObjectURL !== "function") {
   URL.createObjectURL = () => "blob:mock";

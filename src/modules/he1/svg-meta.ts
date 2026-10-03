@@ -16,6 +16,12 @@
 // El bbox de cada panel se calcula aquí; `he1NativeSize` reproduce EXACTAMENTE
 // el viewBox que `He1SVG` pinta vía `fitViewBox`, de modo que `scale = CW/nativeW`
 // del raster PDF no deforme nada.
+//
+// feature-8 (ampliación RETRO-COMPATIBLE): además del layout multi (arriba),
+// existe el MODO "UNO" — un único cerramiento con los tres paneles apilados en
+// VERTICAL para el aside de 380 px (`calcularLayoutUno` / `he1NativeSizeUno` /
+// `UNO_W`/`UNO_GAP`/`UNO_CONTENT_H`). Solo pantalla: el PDF sigue usando el
+// layout multi congelado.
 
 import type { SvgMode } from "../../lib/svg/helpers";
 import type { HE1Result, ResultadoCerramientoHE1 } from "./calc";
@@ -23,6 +29,14 @@ import type { HE1Result, ResultadoCerramientoHE1 } from "./calc";
 // Id del clon oculto que la ficha PDF clona y pasa a svg2pdf. Se exporta aquí
 // (única fuente de verdad) para que toFichaData/renderFicha lo importen sin
 // duplicar el literal. CONGELADO (Fase 3): debe ser EXACTAMENTE "he1-svg-pdf".
+//
+// CONTRATO AMPLIADO (feature-8, RETRO-COMPATIBLE): el id y la firma de
+// `he1NativeSize` siguen CONGELADOS (la ficha PDF no cambia: el clon en
+// mode="pdf" pinta TODOS los cerramientos como siempre). Se AÑADEN, solo para
+// pantalla, el layout "uno" (un único cerramiento con sus tres paneles apilados
+// en vertical para el aside de 380 px del patrón feature-7) vía
+// `calcularLayoutUno` y `he1NativeSizeUno`, que la UI usa para dimensionar el
+// alto del esquema cuando pasa `soloCerramientoId` a `He1SVG`.
 export const HE1_PDF_SVG_ID = "he1-svg-pdf";
 
 // -----------------------------------------------------------------------------
@@ -206,12 +220,80 @@ export function calcularLayout(result: HE1Result): He1Layout {
 // Tamaño NATIVO del viewBox (ÚNICA fuente de verdad, consumida por la ficha PDF
 // para `scale = CW / nativeW` del raster). Reproduce EXACTAMENTE lo que `He1SVG`
 // calcula vía `fitViewBox(esquinas, VB_PAD)` + BANDA_TOTALES, derivado del layout
-// del resultado. La rejilla arranca en (0,0). CONGELADO (Fase 3): firma estable.
+// del resultado. La rejilla arranca en (0,0). CONGELADO (Fase 3): firma estable
+// (feature-8 la mantiene intacta; el modo "uno" tiene su propio helper abajo).
 // -----------------------------------------------------------------------------
 export function he1NativeSize(result: HE1Result): { nativeW: number; nativeH: number } {
   const { contentW, contentH } = calcularLayout(result);
   return {
     nativeW: contentW + 2 * VB_PAD,
     nativeH: contentH + 2 * VB_PAD + BANDA_TOTALES,
+  };
+}
+
+// =============================================================================
+// MODO "UNO" (feature-8, SOLO PANTALLA): un único cerramiento con sus TRES
+// paneles APILADOS EN VERTICAL (sección arriba → barra U → Glaser abajo),
+// pensado para el aside de ~350 px de ancho del patrón feature-7. El modo "pdf"
+// NUNCA usa este layout (la ficha sigue pintando todos los cerramientos con
+// `calcularLayout`/`he1NativeSize`). Ampliación RETRO-COMPATIBLE del contrato.
+// =============================================================================
+
+// Ancho de la columna única del modo uno. Menor que SEC_W para que, al escalar
+// el viewBox a ~350 px CSS, los cuerpos de texto queden legibles (escala ~1,6×).
+export const UNO_W = 190;
+// Separación vertical entre los tres paneles apilados.
+export const UNO_GAP = 14;
+// Alto total del contenido del modo uno (título + sección + barra U + Glaser).
+// CONSTANTE: los paneles tienen alto fijo, así que no depende del cerramiento.
+export const UNO_CONTENT_H =
+  ROW_TITLE_H + SEC_TOTAL_H + UNO_GAP + UBAR_H + UNO_GAP + GLASER_H;
+
+/**
+ * Geometría del modo uno: la fila (CerramientoGeom) del cerramiento pedido con
+ * los tres paneles apilados en vertical, arrancando en (0,0). Devuelve `null`
+ * si el cerramiento no existe en el resultado (la UI puede pasar una selección
+ * obsoleta durante un render intermedio). Función PURA y determinista.
+ */
+export function calcularLayoutUno(
+  result: HE1Result,
+  cerramientoId: string,
+): CerramientoGeom | null {
+  const cer = result.porCerramiento.find((c) => c.id === cerramientoId);
+  if (cer === undefined) return null;
+
+  const rowY = 0;
+  const bodyY = rowY + ROW_TITLE_H;
+
+  // Panel SECCIÓN (arriba), a todo el ancho de la columna única.
+  const seccion: SeccionGeom = {
+    x0: 0,
+    y0: bodyY,
+    bodyY: bodyY + SEC_AXIS_H,
+    bodyH: SEC_BODY_H,
+    capas: distribuirCapas(cer, 0, UNO_W),
+  };
+
+  // Barra U (centro) y Glaser (abajo), apilados bajo la sección.
+  const yUbar = bodyY + SEC_TOTAL_H + UNO_GAP;
+  const ubar = { x: 0, y: yUbar, w: UNO_W, h: UBAR_H };
+  const glaser = { x: 0, y: yUbar + UBAR_H + UNO_GAP, w: UNO_W, h: GLASER_H };
+
+  return { cer, rowY, bodyY, seccion, ubar, glaser };
+}
+
+/**
+ * Tamaño nativo del viewBox del modo uno (lo consume la UI para dimensionar el
+ * alto del esquema del aside, igual que hace con `he1NativeSize` en multi).
+ * El contenido es de alto FIJO (paneles de alto constante): los argumentos se
+ * conservan por paridad de firma con `he1NativeSize` y estabilidad futura.
+ */
+export function he1NativeSizeUno(
+  _result: HE1Result,
+  _cerramientoId: string,
+): { nativeW: number; nativeH: number } {
+  return {
+    nativeW: UNO_W + 2 * VB_PAD,
+    nativeH: UNO_CONTENT_H + 2 * VB_PAD,
   };
 }

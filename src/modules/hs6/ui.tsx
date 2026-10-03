@@ -1,12 +1,20 @@
 // DB-HS6 — Pantalla del módulo de PROTECCIÓN FRENTE AL RADÓN. Cablea el motor
-// (./calc), el render SVG (./svg) y la ficha PDF (./ficha) sobre el layout
-// compartido (Topbar + panel de inputs + panel de resultados), replicando el
-// patrón POR-ELEMENTO de HE1 (emplazamiento + lista de medidas independientes) con
-// el editor de LISTA DINÁMICA de HS4 (añadir/quitar soluciones con menú de tipo e
-// ids deterministas). El motor clasifica por zona, comprueba la adecuación de la
-// COMBINACIÓN de soluciones propuesta y el checklist cualitativo/geométrico de cada
-// medida; el elemento crítico (la medida que falta o el requisito incumplido) se
-// resalta en el SVG y en la tabla.
+// (./calc), el render SVG (./svg) y la ficha PDF (./ficha) sobre el esqueleto
+// nuevo de feature-6: <ModuleShell> aporta Topbar + barra de contexto heredado +
+// banda de veredicto (el resumen sale de ./resumen); aquí queda la zona de
+// trabajo con el editor de LISTA DINÁMICA de soluciones (añadir/quitar con menú
+// de tipo e ids deterministas). El motor clasifica por zona, comprueba la
+// adecuación de la COMBINACIÓN de soluciones propuesta y el checklist
+// cualitativo/geométrico de cada medida; el elemento crítico (la medida que
+// falta o el requisito incumplido) se resalta en el SVG y en la tabla.
+//
+// MIGRACIÓN (T5.2, patrón de HS5/T5.1): el estado viene de useJustificacionState
+// (defaults ← guardados en el proyecto ← heredados del expediente ← URL) — los
+// campos heredados (municipio / zona) ya NO tienen campo local en el panel de
+// inputs: se ven y se excepcionan vía los chips de la BarraContexto del shell.
+// Siguen viviendo en el estado (los alimenta la herencia) y el motor los recibe
+// igual. `localHabitableEnContactoConTerreno` NO está en el mapa de herencia →
+// conserva su campo local en "Emplazamiento".
 //
 // React 19 + React Compiler: componente PURO. El cálculo es síncrono en render
 // (useMemo sobre el estado diferido); no hay efectos de cálculo ni botón
@@ -16,11 +24,10 @@
 
 import { useDeferredValue, useMemo, useState, type JSX, type ReactNode } from "react";
 import { Trash2, Plus, Info } from "lucide-react";
-import { useModuleState } from "../../hooks/useModuleState";
+import { useJustificacionState } from "../../hooks/useJustificacionState";
 import { useContainerWidth } from "../../hooks/useContainerWidth";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
-import { useDrawer } from "../../components/layout/AppShell";
-import { Topbar } from "../../components/layout/Topbar";
+import { ModuleShell, type ResumenVeredicto } from "../../components/justificacion/ModuleShell";
 import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
 import { MobileTabBar, type MobileTab } from "../../components/ui/MobileTabBar";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
@@ -28,8 +35,10 @@ import { Field, NumberInput, SelectInput, InputLabel } from "../../components/ui
 import { showToast } from "../../components/ui/Toast";
 import { renderFicha } from "../../lib/pdf/renderFicha";
 import { STATUS_LABEL } from "../../lib/pdf/utils";
-import { STATE_TEXT, STATE_TINT } from "../../lib/ui/veredicto";
+import { STATE_TEXT } from "../../lib/ui/veredicto";
 import { fmt } from "../../lib/units/format";
+import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
+import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import {
   calcHS6,
   hs6Defaults,
@@ -45,23 +54,15 @@ import type {
   TipoSolucionHS6,
   TipoVentilacionContencion,
   ViaJustificacionBarrera,
-  ZonaRadon,
 } from "./tablas";
 import { HS6SVG } from "./svg";
 import { HS6_PDF_SVG_ID, hs6NativeSize } from "./svg-meta";
 import { toFichaData } from "./ficha";
+import { resumenHs6 } from "./resumen";
 
 // -----------------------------------------------------------------------------
 // Opciones de los selects (declaradas a módulo: estables entre renders).
 // -----------------------------------------------------------------------------
-
-// Zona de radón del edificio (Apéndice B): la consulta el proyectista por su
-// municipio. Indexa el nivel de protección exigido (art. 3.1).
-const ZONA_OPTIONS: { value: ZonaRadon; label: string }[] = [
-  { value: "I", label: "Zona I (potencial medio)" },
-  { value: "II", label: "Zona II (potencial alto)" },
-  { value: "sin_exigencia", label: "Sin exigencia (no clasificada)" },
-];
 
 // Ámbito (art. 1): expuesto como select Sí/No para que cierre la columna como el
 // resto de controles del panel (paridad visual con HE1/HS4).
@@ -155,9 +156,20 @@ function nuevaSolucion(tipo: TipoSolucionHS6, id: string): SolucionHS6Input {
   }
 }
 
+/**
+ * Alias mapeado de HS6Inputs para el generic de useJustificacionState: los
+ * `interface` NO llevan index signature implícita y no satisfacen la
+ * restricción `Record<string, unknown>` del hook; el alias mapeado (idéntico
+ * estructuralmente y mutuamente asignable) sí. Mismo truco que en HS5 (T5.1).
+ */
+type Hs6State = { [K in keyof HS6Inputs]: HS6Inputs[K] };
+
 export function Hs6Module(): JSX.Element {
-  const { state, setField, reset } = useModuleState<HS6Inputs>("hs6", hs6Defaults);
-  const { openDrawer } = useDrawer();
+  const { state, setField, reset, herencia } = useJustificacionState<Hs6State>(
+    "hs6",
+    hs6Defaults,
+  );
+  const { proyecto, derivados } = useProyecto();
   const [tab, setTab] = useState<MobileTab>("inputs");
 
   const deferredState = useDeferredValue(state);
@@ -185,8 +197,32 @@ export function Hs6Module(): JSX.Element {
   });
   const valid = numerosFinitos;
 
+  // Ficha con cabecera de expediente: la transformación pura de ./ficha se
+  // completa aquí con la identificación del proyecto activo y las notas de
+  // excepción local (campos heredados que difieren del expediente).
+  // DECISIÓN fechaProyecto: se usa `proyecto.modificado` (último instante en que
+  // el usuario editó el expediente) formateado legible es-ES — es la fecha que
+  // ya enseña el listado de InicioPage y la más veraz para el sello de la ficha
+  // (no existe una "fecha de proyecto" declarativa en DatosGenerales).
   const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } =
-    usePdfPreview(() => renderFicha(toFichaData(deferredState, result)), valid);
+    usePdfPreview(() => {
+      const base = toFichaData(deferredState, result);
+      return renderFicha({
+        ...base,
+        proyecto: proyecto.nombre,
+        fechaProyecto: formatearFecha(proyecto.modificado),
+        observaciones: [
+          ...(base.observaciones ?? []),
+          ...notasExcepcionesLocales({
+            key: "hs6",
+            dg: proyecto.datosGenerales,
+            d: derivados,
+            state: deferredState,
+            overrides: herencia.campos.filter((c) => c.override).map((c) => c.campo),
+          }),
+        ],
+      });
+    }, valid);
 
   const handleShare = async () => {
     try {
@@ -228,17 +264,26 @@ export function Hs6Module(): JSX.Element {
       : 480;
   const svgH = Math.round((svgW * nativeH) / nativeW);
 
+  // Resumen para la banda del shell (mismo contenido que la antigua banda
+  // inline, ver ./resumen). `null` con datos inválidos → banda neutra "Datos
+  // insuficientes" del shell.
+  const resumen: ResumenVeredicto | null = useMemo(
+    () => (valid ? resumenHs6(result) : null),
+    [valid, result],
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <Topbar
-        moduleLabel="HS6 Protección frente al radón"
-        moduleGroup="Salubridad (DB-HS) · protección frente al radón"
-        onExportPdf={handleExportPdf}
-        pdfExporting={pdfExporting}
-        onShare={handleShare}
-        onReset={reset}
-        onMenuOpen={openDrawer}
-      />
+    <ModuleShell
+      justificacionKey="hs6"
+      resultado={resumen}
+      herencia={herencia}
+      acciones={{
+        onExportPdf: handleExportPdf,
+        pdfExporting,
+        onShare: handleShare,
+        onReset: reset,
+      }}
+    >
       <MobileTabBar tab={tab} setTab={setTab} />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -252,36 +297,11 @@ export function Hs6Module(): JSX.Element {
           ].join(" ")}
         >
           <div className="scroll-hide flex-1 overflow-y-auto px-4 py-3">
+            {/* Los antiguos campos "Zona de radón" y "Municipio" desaparecen del
+                panel: son heredados del expediente y se ven / excepcionan vía los
+                chips de la BarraContexto del shell. El ámbito (art. 1) NO está en
+                el mapa de herencia → conserva su campo local aquí. */}
             <CollapsibleSection label="Emplazamiento" refNorma="DB-HS6 art. 1 / Apéndice B">
-              <Field
-                id="zona-radon"
-                label="Zona de radón"
-                help="Zona de radón del edificio según su municipio (Apéndice B del DB-HS6). La consulta el proyectista; es un INPUT, no se calcula. Indexa el nivel de protección exigido (art. 3.1): Zona I → una medida; Zona II → barrera obligatoria + una adicional; «sin exigencia» → HS6 no exige medidas."
-                refText="DB-HS6 Apéndice B"
-              >
-                <SelectInput<ZonaRadon>
-                  id="zona-radon"
-                  value={state.zona}
-                  options={ZONA_OPTIONS}
-                  onChange={(v) => setField("zona", v)}
-                />
-              </Field>
-              <Field
-                id="municipio"
-                label="Municipio"
-                help="Municipio del edificio. PURAMENTE INFORMATIVO (para la ficha): no condiciona el cálculo; la clasificación efectiva es la zona, que el usuario consulta en el Apéndice B."
-                refText="Informativo (no condiciona el cálculo)"
-              >
-                <input
-                  id="municipio"
-                  type="text"
-                  value={state.municipio ?? ""}
-                  onChange={(e) => setField("municipio", e.target.value)}
-                  aria-label="Municipio (informativo)"
-                  placeholder="Municipio"
-                  className="border-border-main bg-bg-primary text-text-primary focus:border-accent focus:ring-accent/30 w-full rounded border px-2 py-1 text-[13px] transition-colors focus:ring-1 focus:outline-none"
-                />
-              </Field>
               <Field
                 id="ambito"
                 label="Local en contacto"
@@ -324,10 +344,11 @@ export function Hs6Module(): JSX.Element {
           </div>
         </div>
 
-        {/* Right: SVG + results. En lg se apila junto (banner → lienzo → tablas);
-            en móvil se reparte por pestaña: "diagramas" = solo el lienzo,
-            "results" = veredicto + tablas. Cada bloque se gatea por separado
-            manteniendo intacto el orden y el layout en lg (lg:flex / lg:block). */}
+        {/* Right: SVG + results. En lg se apila junto (lienzo → tablas); en
+            móvil se reparte por pestaña: "diagramas" = solo el lienzo,
+            "results" = tablas (el veredicto vive ya en la banda del shell).
+            Cada bloque se gatea por separado manteniendo intacto el orden y el
+            layout en lg (lg:flex / lg:block). */}
         <div
           className={[
             "scroll-hide flex min-w-0 flex-col overflow-y-auto",
@@ -336,36 +357,11 @@ export function Hs6Module(): JSX.Element {
             "lg:flex",
           ].join(" ")}
         >
-          {/* Verdict banner (parte del resultado: tab "results" en móvil). */}
-          <div
-            className={[
-              `border-b px-6 py-2.5 ${STATE_TINT[result.veredictoGlobal]}`,
-              tab === "results" ? "block" : "hidden",
-              "lg:block",
-            ].join(" ")}
-          >
-            <span className="text-text-secondary text-[13px]">
-              Protección frente al radón (zona {result.zona}) —{" "}
-              <span className={`font-semibold ${STATE_TEXT[result.veredictoGlobal]}`}>
-                {STATUS_LABEL[result.veredictoGlobal]}
-              </span>{" "}
-              <span className="text-text-disabled">
-                (
-                {result.aplica
-                  ? `${result.nMedidasValidas} de ${result.nMedidasMin} medida(s) válida(s)${
-                      result.barreraObligatoria ? " · barrera obligatoria" : ""
-                    }`
-                  : "sin exigencia HS6"}
-                )
-              </span>
-            </span>
-          </div>
-
           {/* Lienzo del diagrama (tab "diagramas" en móvil; siempre en lg). */}
           <div
             ref={canvasRef}
             className={[
-              "border-border-main canvas-dot-grid items-center justify-center border-b px-4 py-6",
+              "border-border-main items-center justify-center border-b px-4 py-6",
               tab === "diagramas" ? "flex" : "hidden",
               "lg:flex",
             ].join(" ")}
@@ -404,8 +400,23 @@ export function Hs6Module(): JSX.Element {
           onClose={closePdfPreview}
         />
       )}
-    </div>
+    </ModuleShell>
   );
+}
+
+/**
+ * "22 ago 2026" — fecha corta es-ES a partir de un ISO (mismo formato que el
+ * listado de expedientes de InicioPage). Solo para la cabecera de la ficha; el
+ * ISO llega ya construido desde la persistencia (aquí no hay Date.now).
+ */
+function formatearFecha(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-ES", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(d);
 }
 
 // -----------------------------------------------------------------------------

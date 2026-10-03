@@ -24,3 +24,7 @@ dev-dist
 *.sln
 *.sw?
 .gstack/
+
+# Capturas de QA (el cuaderno qa/HALLAZGOS.md sí se versiona)
+qa/capturas/*
+!qa/capturas/LEEME.txt

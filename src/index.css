@@ -49,12 +49,6 @@ html.theme-switching *::after {
   transition: none !important;
 }
 
-/* dot-grid canvas — "mesa de trabajo del ingeniero" */
-.canvas-dot-grid {
-  background-image: radial-gradient(circle, var(--color-dot-grid) 1px, transparent 1px);
-  background-size: 22px 22px;
-}
-
 /* ── Collapsible section reveal ── */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -124,7 +118,6 @@ html.theme-switching *::after {
   --color-chart-dim: #64748b;
   --color-chart-dim-text: #475569;
   --color-chart-label: #0f172a;
-  --color-dot-grid: #e2e8f0;
   --color-scrollbar: #94a3b8;
   --color-scrollbar-hover: #64748b;
 
@@ -173,7 +166,6 @@ html[data-theme="dark"] {
   --color-chart-dim: #94a3b8;
   --color-chart-dim-text: #94a3b8;
   --color-chart-label: #e2e8f0;
-  --color-dot-grid: #253147;
   --color-scrollbar: #22304d;
   --color-scrollbar-hover: #2c3d63;
 }

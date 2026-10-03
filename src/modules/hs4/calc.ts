@@ -149,6 +149,8 @@ export type CriterioK = "une149201" | "sin_simultaneidad";
 export interface AparatoInputHS4 {
   /** Identificador estable (lo consume el SVG / la ficha). */
   id: string;
+  /** Nombre legible dado por el usuario (feature-7). El motor NO lo lee. */
+  nombre?: string;
   /** Tipo de aparato de la Tabla 2.1 (fuente de verdad de aparatos). */
   tipo: TipoAparatoHS4;
   /** Id del tramo (normalmente una `derivacion_aparato`) al que se conecta. */
@@ -165,6 +167,8 @@ export interface AparatoInputHS4 {
 export interface TramoInputHS4 {
   /** Identificador estable (lo consume el SVG para dibujar el árbol). */
   id: string;
+  /** Nombre legible dado por el usuario (feature-7). El motor NO lo lee. */
+  nombre?: string;
   tipo: TipoTramoHS4;
   /** Id del tramo padre (aguas abajo, hacia la acometida) o `null` si es la raíz. */
   parentId: string | null;

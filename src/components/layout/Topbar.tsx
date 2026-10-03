@@ -21,7 +21,7 @@ export function Topbar({
   onMenuOpen,
 }: TopbarProps) {
   return (
-    <header className="border-border-main bg-bg-surface flex shrink-0 items-center gap-2 border-b px-4 py-2">
+    <header className="border-border-sub bg-bg-surface flex shrink-0 items-center gap-2 border-b px-4 py-1.5">
       <button
         onClick={onMenuOpen}
         className="text-text-secondary hover:text-text-primary -ml-1 p-1 lg:hidden"

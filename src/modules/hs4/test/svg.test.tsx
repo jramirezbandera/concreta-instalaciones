@@ -1,19 +1,21 @@
-import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, fireEvent } from "@testing-library/react";
 import { calcHS4, hs4Defaults } from "../calc";
 import { HS4SVG } from "../svg";
 import { HS4_PDF_SVG_ID, hs4NativeSize } from "../svg-meta";
 
 // =============================================================================
-// HS4 — render SVG del árbol de red (smoke ACCESIBLE, TEST-1 T5b). Cierra la
-// cobertura del eng review: render con @testing-library/react verificando
+// HS4 — render SVG del ESQUEMA DE COLUMNA (feature-7; sustituye al árbol
+// jerárquico). Verifica:
 //   (1) accesibilidad WCAG (role="img" + <title>/<desc> no vacíos),
-//   (2) recorrido crítico marcado (texto «crítico», codificación multicanal),
+//   (2) recorrido crítico marcado (texto «crítico» + «◆», codificación
+//       multicanal — nunca solo color),
 //   (3) render en modo 'pdf' sin lanzar y compatible con HS4_PDF_SVG_ID,
-//   (4) tamaño nativo (función pura `hs4NativeSize`) estrictamente positivo.
+//   (4) tamaño nativo (función pura `hs4NativeSize`) estrictamente positivo,
+//   (5) sincronización con la tabla: clic → onSelect(id); `etiquetas` renombra.
 //
-// El componente NO usa getBBox/getBoundingClientRect del DOM (calcula el viewBox
-// de los DATOS vía fitViewBox): los tests no necesitan polyfill de jsdom.
+// El componente NO usa getBBox/getBoundingClientRect del DOM (la geometría se
+// deriva de los DATOS en svg-meta): los tests no necesitan polyfill de jsdom.
 // =============================================================================
 
 const result = calcHS4(hs4Defaults);
@@ -48,16 +50,72 @@ describe("HS4SVG — smoke accesible (screen)", () => {
 
     // Hay al menos un tramo crítico en los defaults (siempre hay punto crítico).
     expect(result.porTramo.some((t) => t.esCritico)).toBe(true);
-    // El recorrido crítico se refuerza con la etiqueta textual «crítico».
+    // El recorrido crítico se refuerza con la etiqueta textual «crítico» en los
+    // elementos con etiqueta (base, montante, niveles, derivaciones); los
+    // descendientes colapsados van en rojo + marca «◆» en el punto crítico.
     expect(textos.some((t) => t.includes("crítico"))).toBe(true);
-    // El punto más desfavorable lleva la marca reforzada «◆ crítico».
-    expect(textos.some((t) => t.includes("◆ crítico"))).toBe(true);
+    // El punto de consumo más desfavorable lleva la marca reforzada «◆».
+    expect(textos.some((t) => t.includes("◆"))).toBe(true);
+  });
 
-    // El nº de etiquetas «crítico» coincide con el nº de tramos críticos del
-    // motor (cada tramo del recorrido crítico pinta una etiqueta).
-    const nEtiquetasCritico = textos.filter((t) => t.includes("crítico")).length;
-    const nTramosCriticos = result.porTramo.filter((t) => t.esCritico).length;
-    expect(nEtiquetasCritico).toBe(nTramosCriticos);
+  it("dibuja el esquema de columna: base (acometida), montante y forjados", () => {
+    const { container } = render(
+      <HS4SVG result={result} mode="screen" width={480} height={300} />,
+    );
+    const textos = [...container.querySelectorAll("text")].map((t) => t.textContent ?? "");
+    // Base con recuadro de la red general y etiquetas de acometida/montante.
+    expect(textos.some((t) => t.includes("red general"))).toBe(true);
+    expect(textos.some((t) => t.includes("acometida"))).toBe(true);
+    expect(textos.some((t) => t.includes("montante"))).toBe(true);
+    expect(container.querySelector("rect")).not.toBeNull();
+    // Forjados discontinuos (dash "5 4") entre niveles.
+    const dashes = [...container.querySelectorAll("line")].map((l) =>
+      l.getAttribute("stroke-dasharray"),
+    );
+    expect(dashes.some((d) => d === "5 4")).toBe(true);
+    // Caption con los totales (Q total · P crítica · X/N cumplen).
+    expect(textos.some((t) => t.includes("Q total") && t.includes("tramos cumplen"))).toBe(true);
+  });
+
+  it("clic en un elemento → onSelect(id); `etiquetas` renombra sin cambiar ids", () => {
+    const onSelect = vi.fn();
+    const { container } = render(
+      <HS4SVG
+        result={result}
+        mode="screen"
+        width={480}
+        height={300}
+        onSelect={onSelect}
+        etiquetas={{ "deriv-particular": "Vivienda tipo" }}
+      />,
+    );
+    // El nombre legible sustituye al id en la etiqueta del nivel.
+    const textos = [...container.querySelectorAll("text")].map((t) => t.textContent ?? "");
+    expect(textos.some((t) => t.includes("Vivienda tipo"))).toBe(true);
+
+    // Clic sobre el montante → selecciona su fila en la tabla.
+    const montante = container.querySelector('[data-el="montante"]');
+    expect(montante).not.toBeNull();
+    fireEvent.click(montante!);
+    expect(onSelect).toHaveBeenCalledWith("montante");
+  });
+
+  it("selección: acento + anillo (círculo sin relleno) sobre el seleccionado", () => {
+    const { container } = render(
+      <HS4SVG
+        result={result}
+        mode="screen"
+        width={480}
+        height={300}
+        selectedId="deriv-particular"
+        onSelect={() => {}}
+      />,
+    );
+    // El anillo de selección es un círculo fill="none" (primitiva Ring).
+    const anillos = [...container.querySelectorAll("circle")].filter(
+      (c) => c.getAttribute("fill") === "none",
+    );
+    expect(anillos.length).toBeGreaterThan(0);
   });
 
   it("la descripción accesible refleja el veredicto y el recorrido crítico", () => {
