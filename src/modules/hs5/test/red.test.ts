@@ -124,7 +124,7 @@ describe("generarRedHs5 · los otros casos", () => {
     const e = edificioDeCaso("unifamiliar");
     const red = generarRedHs5(e, DECISIONES_POR_DEFECTO);
     expect(decisionesHabituales(e).colectores).toBe("enterrado");
-    expect(red.supuestos.unifamiliarPorPlantas).toBe(true);
+    expect(red.supuestos.unifamiliarReparto).toBe(true);
     const u = red.verticales[0];
     expect(u.bajantes.map((b) => [b.clase, b.id, b.ramales.map((x) => x.nivel)])).toEqual([
       ["fecales", "bajante-u-fecales", [0, 1]],

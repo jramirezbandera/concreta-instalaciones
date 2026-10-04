@@ -18,14 +18,18 @@
 //     consumo, 1 m sobre el suelo de su planta;
 //   - longitudes horizontales tipo (`LONGITUDES_M`), editables con «Ajustar a
 //     mano»;
-//   - en la unifamiliar de varias plantas, los baños en la más alta y la cocina
-//     y el aseo en la más baja (el mismo supuesto que HS5, avisado).
+//   - en la unifamiliar, los cuartos húmedos en las plantas que dice El edificio
+//     o, si no lo dice, los baños en la más alta y la cocina y el aseo en la más
+//     baja (`repartoUnifamiliar`, el mismo que HS5; el supuesto se avisa);
+//   - los grifos de baldeo de los garajes cuelgan de la vivienda en la
+//     unifamiliar y, si no, del contador de servicios comunes.
 // Las composiciones de aparatos salen de `PRESETS_APARATOS` (Tabla 2.1, sin
 // agrupados); los caudales, Ø y presiones los pone el motor.
 // =============================================================================
 
 import { PRESETS_APARATOS } from "../../data/presetsAparatos";
 import { etiquetaNivel, plantasDe, resumenEdificio } from "../../lib/edificio/derivar";
+import { repartirCuartos, repartoUnifamiliar, textoReparto } from "../../lib/edificio/reparto";
 import type { Edificio, NucleoAseos, ViviendaTipo } from "../../lib/edificio/tipos";
 import type { AparatoInputHS4, TramoInputHS4 } from "./calc";
 import type { MaterialTuberia, TipoAparatoHS4 } from "./tablas";
@@ -125,27 +129,30 @@ export const LONGITUDES_M = {
 // Forma de la red
 // -----------------------------------------------------------------------------
 
-export type ClaseCuartoHs4 = "bano" | "aseo" | "cocina" | "aseos";
+export type ClaseCuartoHs4 = "bano" | "aseo" | "cocina" | "aseos" | "garaje";
 
 export interface CuartoHs4 {
   clase: ClaseCuartoHs4;
-  /** «Baño», «Baño 2», «Aseo», «Cocina», «Aseos». */
+  /** «Baño», «Baño 2», «Aseo», «Cocina», «Aseos», «Garaje». */
   etiqueta: string;
   slug: string;
   aparatos: TipoAparatoHS4[];
 }
 
-/** Una unidad de consumo: una vivienda o una planta de oficinas, con su contador. */
+/**
+ * Una unidad de consumo con su contador: una vivienda, una planta de oficinas o
+ * los servicios comunes (los grifos del garaje de un edificio de varias unidades).
+ */
 export interface UnidadHs4 {
-  /** «a-p3», «a-p3-2», «u», «of-p1». */
+  /** «a-p3», «a-p3-2», «u», «of-p1», «comunes». */
   id: string;
-  /** Id del tipo en El edificio («A», «N»…); en oficinas, el del primer núcleo. */
+  /** Id del tipo en El edificio («A», «N»…); en oficinas, el del primer núcleo; «comunes». */
   tipoId: string;
-  /** «A3», «B1», «Vivienda», «Oficinas P1». */
+  /** «A3», «B1», «Vivienda», «Oficinas P1», «Servicios comunes». */
   nombre: string;
   /** Nombre del tipo («A»), para agrupar. */
   nombreTipo: string;
-  clase: "vivienda" | "oficinas";
+  clase: "vivienda" | "oficinas" | "comunes";
   /** Planta del contador / de la derivación particular. */
   nivel: number;
   /** Cuartos húmedos por planta (la unifamiliar los reparte). */
@@ -191,11 +198,15 @@ export interface RedHs4 {
   /** Niveles con unidades, de abajo arriba. */
   niveles: number[];
   /** Supuestos de reparto que conviene revisar. */
-  supuestos: { unifamiliarPorPlantas: boolean };
+  supuestos: { unifamiliarReparto: boolean };
+  /** «P1: 2 baños · PB: 1 aseo y cocina» (unifamiliar), para el aviso. */
+  repartoTexto: string;
   /** Hay oficinas sin núcleos de aseos: no aportan red. */
   oficinasSinNucleos: boolean;
-  /** Hay garaje (sin puntos de consumo: no se calcula). */
+  /** Hay garaje. */
   garaje: boolean;
+  /** Grifos de baldeo de los garajes (0: el garaje no tiene consumo). */
+  grifosGaraje: number;
 }
 
 // -----------------------------------------------------------------------------
@@ -245,6 +256,16 @@ function cuartosVivienda(vt: ViviendaTipo): CuartoHs4[] {
   return out;
 }
 
+/** Los grifos de baldeo de los garajes de una planta. */
+function cuartoGaraje(grifos: number): CuartoHs4 {
+  return {
+    clase: "garaje",
+    etiqueta: "Garaje",
+    slug: "garaje",
+    aparatos: Array.from({ length: grifos }, () => "grifo_garaje" as const),
+  };
+}
+
 /** Los aseos de los núcleos de una planta de oficinas, juntos. */
 function cuartoOficinas(nucleos: { n: NucleoAseos; cantidad: number }[]): CuartoHs4 {
   const aparatos: TipoAparatoHS4[] = [];
@@ -278,36 +299,53 @@ interface Prov {
   cuartos: { nivel: number; cuartos: CuartoHs4[] }[];
 }
 
-function unidadesDe(e: Edificio): { provs: Prov[]; unifamiliarPorPlantas: boolean; oficinasSinNucleos: boolean } {
+interface Unidades {
+  provs: Prov[];
+  unifamiliarReparto: boolean;
+  repartoTexto: string;
+  oficinasSinNucleos: boolean;
+  grifosGaraje: number;
+}
+
+function unidadesDe(e: Edificio): Unidades {
   const plantas = plantasDe(e); // de arriba abajo
   const resumen = resumenEdificio(e);
   const provs: Prov[] = [];
-  let unifamiliarPorPlantas = false;
+  let unifamiliarReparto = false;
+  let repartoTexto = "";
+
+  // Grifos de baldeo por planta, de abajo arriba.
+  const garajes = [...plantas]
+    .reverse()
+    .map((p) => ({
+      nivel: p.nivel,
+      grifos: p.zonas
+        .filter((z) => z.uso === "garaje" || z.uso === "garaje_privado")
+        .reduce((s, z) => s + sanea(z.grifos ?? 0), 0),
+    }))
+    .filter((g) => g.grifos > 0);
+  const grifosGaraje = garajes.reduce((s, g) => s + g.grifos, 0);
 
   if (resumen.esUnifamiliar) {
-    const vt = e.unidades.find((u): u is ViviendaTipo => u.clase === "vivienda");
-    const niveles = [
-      ...new Set(plantas.filter((p) => p.zonas.some((z) => z.uso === "vivienda_unifamiliar")).map((p) => p.nivel)),
-    ].sort((a, b) => a - b);
-    if (vt && niveles.length > 0) {
-      const cuartos = cuartosVivienda(vt);
-      const baja = niveles[0];
-      const alta = niveles[niveles.length - 1];
-      const porNivel =
-        niveles.length === 1
-          ? [{ nivel: baja, cuartos }]
-          : [
-              { nivel: baja, cuartos: cuartos.filter((c) => c.clase !== "bano") },
-              { nivel: alta, cuartos: cuartos.filter((c) => c.clase === "bano") },
-            ].filter((x) => x.cuartos.length > 0);
-      unifamiliarPorPlantas = niveles.length > 1;
+    const reparto = repartoUnifamiliar(e);
+    if (reparto) {
+      const porNivel = repartirCuartos(cuartosVivienda(reparto.tipo), reparto.plantas);
+      // El garaje es un cuarto más de la vivienda, detrás de su contador.
+      for (const g of garajes) {
+        const enNivel = porNivel.find((x) => x.nivel === g.nivel);
+        if (enNivel) enNivel.cuartos.push(cuartoGaraje(g.grifos));
+        else porNivel.push({ nivel: g.nivel, cuartos: [cuartoGaraje(g.grifos)] });
+      }
+      porNivel.sort((a, b) => a.nivel - b.nivel);
+      unifamiliarReparto = reparto.supuesto;
+      repartoTexto = textoReparto(reparto);
       provs.push({
         id: "u",
-        tipoId: vt.id,
+        tipoId: reparto.tipo.id,
         nombre: "Vivienda",
-        nombreTipo: vt.nombre,
+        nombreTipo: reparto.tipo.nombre,
         clase: "vivienda",
-        nivel: baja,
+        nivel: reparto.plantas[0].nivel,
         cuartos: porNivel,
       });
     }
@@ -367,7 +405,20 @@ function unidadesDe(e: Edificio): { provs: Prov[]; unifamiliarPorPlantas: boolea
       cuartos: [{ nivel: p.nivel, cuartos: [cuarto] }],
     });
   }
-  return { provs, unifamiliarPorPlantas, oficinasSinNucleos };
+  // Fuera de la unifamiliar, los grifos del garaje van al contador de servicios
+  // comunes; la unidad está en el garaje más alto (el más cercano a la batería).
+  if (!resumen.esUnifamiliar && garajes.length > 0) {
+    provs.push({
+      id: "comunes",
+      tipoId: "comunes",
+      nombre: "Servicios comunes",
+      nombreTipo: "Comunes",
+      clase: "comunes",
+      nivel: garajes[garajes.length - 1].nivel,
+      cuartos: garajes.map((g) => ({ nivel: g.nivel, cuartos: [cuartoGaraje(g.grifos)] })),
+    });
+  }
+  return { provs, unifamiliarReparto, repartoTexto, oficinasSinNucleos, grifosGaraje };
 }
 
 export function generarRedHs4(e: Edificio, d: DecisionesHs4): RedHs4 {
@@ -376,7 +427,7 @@ export function generarRedHs4(e: Edificio, d: DecisionesHs4): RedHs4 {
   const plantas = plantasDe(e);
   const cotaDe = new Map(plantas.map((p) => [p.nivel, p.cota_m] as const));
   const material = materialDe(decisiones.tuberia);
-  const { provs, unifamiliarPorPlantas, oficinasSinNucleos } = unidadesDe(e);
+  const { provs, unifamiliarReparto, repartoTexto, oficinasSinNucleos, grifosGaraje } = unidadesDe(e);
   const unifamiliar = resumen.esUnifamiliar;
   const porPlanta = decisiones.contadores === "por_planta" && !unifamiliar && provs.length > 1;
 
@@ -393,7 +444,8 @@ export function generarRedHs4(e: Edificio, d: DecisionesHs4): RedHs4 {
     });
   }
   const usos = new Set(plantas.flatMap((p) => p.zonas.map((z) => z.uso)));
-  const comunes = !unifamiliar && (usos.has("zona_comun") || usos.has("vestibulo"));
+  const comunes =
+    !unifamiliar && (usos.has("zona_comun") || usos.has("vestibulo") || provs.some((u) => u.clase === "comunes"));
   const nViv = provs.filter((u) => u.clase === "vivienda").length;
   const nOf = provs.filter((u) => u.clase === "oficinas").length;
   const nLoc = locales.reduce((s, l) => s + l.numero, 0);
@@ -417,9 +469,11 @@ export function generarRedHs4(e: Edificio, d: DecisionesHs4): RedHs4 {
     unifamiliar,
     material,
     niveles: [],
-    supuestos: { unifamiliarPorPlantas },
+    supuestos: { unifamiliarReparto },
+    repartoTexto,
     oficinasSinNucleos,
     garaje: resumen.tieneGaraje,
+    grifosGaraje,
   };
   if (provs.length === 0) return vacia;
 
@@ -446,7 +500,10 @@ export function generarRedHs4(e: Edificio, d: DecisionesHs4): RedHs4 {
   const cota = (nivel: number) => cotaDe.get(nivel) ?? 0;
 
   // ── Montante general por planta (contadores por planta) ───────────────────
-  const niveles = [...new Set(provs.map((u) => u.nivel))].sort((a, b) => a - b);
+  // Los servicios comunes no van por el montante general: tienen el suyo.
+  const niveles = [...new Set(provs.filter((u) => u.clase !== "comunes").map((u) => u.nivel))].sort(
+    (a, b) => a - b,
+  );
   const generalDe = new Map<number, string>();
   if (porPlanta) {
     let parent = "alimentacion";
@@ -479,7 +536,7 @@ export function generarRedHs4(e: Edificio, d: DecisionesHs4): RedHs4 {
     let parentDeriv: string;
     if (unifamiliar) {
       parentDeriv = "alimentacion";
-    } else if (porPlanta) {
+    } else if (porPlanta && u.clase !== "comunes") {
       parentDeriv = generalDe.get(u.nivel)!;
     } else {
       // Batería en PB: un montante por unidad, desde la batería hasta su planta.

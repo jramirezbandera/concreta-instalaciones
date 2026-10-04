@@ -1,11 +1,14 @@
 import { useState, type JSX, type ReactNode } from "react";
 import {
   cotasGrupo,
+  etiquetaNivel,
   formatoCota,
   grupoTocaTerreno,
   nombreGrupo,
 } from "../../lib/edificio/derivar";
+import { repartoUnifamiliar, textoCuartos } from "../../lib/edificio/reparto";
 import {
+  admiteGrifos,
   anadirTipo,
   anadirZona,
   buscarZona,
@@ -17,7 +20,9 @@ import {
   separarGrupo,
   setAltura,
   setContador,
+  setCuartosZona,
   setCubierta,
+  setGrifos,
   setRepeticiones,
   setSuperficie,
   setUnidades,
@@ -317,6 +322,19 @@ function EditorZona(props: Props & { zonaId: string }): JSX.Element | null {
         </Fila>
       )}
 
+      {admiteGrifos(zona.uso) && (
+        <Fila htmlFor="ed-grifos" etiqueta={n > 1 ? "Grifos de baldeo, en cada planta" : "Grifos de baldeo"}>
+          <PasoAPaso
+            id="ed-grifos"
+            nombre="Grifos de baldeo"
+            value={zona.grifos ?? 0}
+            min={0}
+            max={20}
+            onChange={(v) => onCambiar(setGrifos(e, zona.id, v))}
+          />
+        </Fila>
+      )}
+
       <Fila
         htmlFor="ed-sup"
         etiqueta={n > 1 ? "Superficie útil de la zona, en cada planta" : "Superficie útil de la zona"}
@@ -328,6 +346,10 @@ function EditorZona(props: Props & { zonaId: string }): JSX.Element | null {
           onChange={(v) => onCambiar(setSuperficie(e, zona.id, v))}
         />
       </Fila>
+
+      {zona.uso === "vivienda_unifamiliar" && (
+        <CuartosDeZona edificio={e} zonaId={zona.id} repeticiones={n} onCambiar={onCambiar} />
+      )}
 
       <Sub>Lo que se deduce</Sub>
       {deduccionesZona(e, zona.id).map((d) => (
@@ -355,6 +377,75 @@ function EditorZona(props: Props & { zonaId: string }): JSX.Element | null {
   );
 }
 
+/** Límites de la vivienda tipo (los de `editarTipo`). */
+const MAX_BANOS = 5;
+const MAX_ASEOS = 4;
+
+/**
+ * Los cuartos húmedos de una zona de la unifamiliar (feature-18). Solo con la
+ * vivienda en varias plantas: en una, todo está en ella. Cada cambio fija el
+ * reparto de toda la vivienda (`setCuartosZona`) y la vivienda tipo suma lo que
+ * hay en sus plantas.
+ */
+function CuartosDeZona(props: {
+  edificio: Edificio;
+  zonaId: string;
+  repeticiones: number;
+  onCambiar: (e: Edificio) => void;
+}): JSX.Element | null {
+  const { edificio: e, zonaId, repeticiones: n, onCambiar } = props;
+  const reparto = repartoUnifamiliar(e);
+  const c = reparto?.porZona.get(zonaId);
+  if (!reparto || !c || reparto.plantas.length < 2) return null;
+  const banos = reparto.plantas.reduce((s, p) => s + p.banos, 0);
+  const aseos = reparto.plantas.reduce((s, p) => s + p.aseos, 0);
+  // La vivienda no se queda sin baño, ni pasa de los límites del tipo.
+  const minBanos = banos - c.banos * n > 0 ? 0 : 1;
+  const maxBanos = c.banos + Math.floor((MAX_BANOS - banos) / n);
+  const maxAseos = c.aseos + Math.floor((MAX_ASEOS - aseos) / n);
+  const cambiar = (patch: Parameters<typeof setCuartosZona>[2]) => onCambiar(setCuartosZona(e, zonaId, patch));
+  const sufijo = n > 1 ? ", en cada planta" : "";
+  return (
+    <>
+      <Sub>Cuartos húmedos{n > 1 ? " en cada planta" : " en esta planta"}</Sub>
+      <Fila etiqueta={`Baños${sufijo}`} htmlFor="ed-cz-banos">
+        <PasoAPaso
+          id="ed-cz-banos"
+          nombre={`Baños${sufijo}`}
+          value={c.banos}
+          min={minBanos}
+          max={maxBanos}
+          onChange={(v) => cambiar({ banos: v })}
+        />
+      </Fila>
+      <Fila etiqueta={`Aseos${sufijo}`} htmlFor="ed-cz-aseos">
+        <PasoAPaso
+          id="ed-cz-aseos"
+          nombre={`Aseos${sufijo}`}
+          value={c.aseos}
+          min={0}
+          max={maxAseos}
+          onChange={(v) => cambiar({ aseos: v })}
+        />
+      </Fila>
+      <Fila etiqueta="Cocina">
+        {c.cocina ? (
+          <span className="text-text-primary text-[12px]">está aquí</span>
+        ) : (
+          <BotonSec onClick={() => cambiar({ cocina: true })}>Traer aquí</BotonSec>
+        )}
+      </Fila>
+      <p className="text-text-disabled px-3.5 pb-1 text-[11px] leading-snug">
+        {reparto.supuesto
+          ? reparto.explicito
+            ? "Hay cuartos de la vivienda tipo sin situar: se han puesto en la planta de la regla. Cambia una cifra para fijarlos."
+            : "Supuesto: los baños en la planta más alta; la cocina y los aseos en la más baja. Cambia una cifra para fijarlo."
+          : "Mover un cuarto es quitarlo aquí y ponerlo en otra planta. La vivienda tipo suma lo que hay en todas."}
+      </p>
+    </>
+  );
+}
+
 function tituloTipo(t: UnidadTipo): string {
   return t.clase === "vivienda" ? `Tipo ${t.nombre} · T${t.dormitorios}` : `Núcleo ${t.nombre} · aseos de planta`;
 }
@@ -364,6 +455,8 @@ function EditorUnidad(props: Props & { tipoId: string }): JSX.Element | null {
   const t = e.unidades.find((u) => u.id === tipoId);
   if (!t) return null;
   const donde = dondeEstaTipo(e, t);
+  const reparto = repartoUnifamiliar(e);
+  const plantasReparto = reparto && reparto.tipo.id === t.id && reparto.plantas.length > 1 ? reparto.plantas : [];
   const paso = (etiqueta: string, campo: string, valor: number, min: number, max: number) => (
     <Fila key={campo} etiqueta={etiqueta} htmlFor={`ed-t-${campo}`}>
       <PasoAPaso
@@ -424,6 +517,19 @@ function EditorUnidad(props: Props & { tipoId: string }): JSX.Element | null {
 
       <Sub>Dónde está</Sub>
       <ParKV k={donde.donde} v={donde.cuantas} />
+      {[...plantasReparto].reverse().map((p) => (
+        <ParKV
+          key={p.nivel}
+          k={`Cuartos en ${etiquetaNivel(p.nivel)}`}
+          v={textoCuartos(p)}
+          title={reparto?.supuesto ? "Reparto supuesto: sitúalos en cada planta de la vivienda" : undefined}
+        />
+      ))}
+      {plantasReparto.length > 0 && reparto?.supuesto && (
+        <p className="text-text-disabled px-3.5 pb-1 text-[11px] leading-snug">
+          Reparto supuesto. Pulsa cada planta de la vivienda en la sección para decir sus cuartos.
+        </p>
+      )}
 
       {t.origen && <Procedencia origen={t.origen} />}
 

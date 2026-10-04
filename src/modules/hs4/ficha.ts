@@ -157,7 +157,14 @@ export function toFichaData(j: JustificacionHs4, o: OpcionesFichaHs4): FichaData
     for (const u of j.red.unidades) if (!tipos.has(u.tipoId + u.clase)) tipos.set(u.tipoId + u.clase, u);
     for (const u of tipos.values()) {
       datosPartida.push({
-        concepto: u.clase === "oficinas" ? "Planta de oficinas" : j.red.unifamiliar ? "Vivienda" : `Vivienda tipo ${u.nombreTipo}`,
+        concepto:
+          u.clase === "oficinas"
+            ? "Planta de oficinas"
+            : u.clase === "comunes"
+              ? "Servicios comunes (garaje)"
+              : j.red.unifamiliar
+                ? "Vivienda"
+                : `Vivienda tipo ${u.nombreTipo}`,
         valor: `${u.numAparatos} aparatos`,
         origen: `${ORIGEN_EDIFICIO} · Tabla 2.1`,
       });

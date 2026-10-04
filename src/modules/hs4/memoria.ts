@@ -95,7 +95,9 @@ function parrafoCaudal(j: JustificacionHs4): Trozo[] {
     const sujeto =
       u.clase === "oficinas"
         ? "cada planta de oficinas"
-        : j.red.unifamiliar
+        : u.clase === "comunes"
+          ? "los servicios comunes"
+          : j.red.unifamiliar
           ? "la vivienda"
           : `cada vivienda ${u.nombreTipo}`;
     p.push(
@@ -174,7 +176,12 @@ function parrafoOtros(j: JustificacionHs4): Trozo[] {
       ` Para ${locales.length === 1 && locales[0].detalle.local.numero === 1 ? "el local" : "los locales"}, sin uso definido, se deja contador${g.contadores === "bateria" ? " en la batería" : ""}, llave de corte y tubería en espera ${mm(locales[0].detalle.diametro_mm)}.`,
     );
   }
-  if (j.red.garaje) p.push(" El garaje no tiene puntos de consumo.");
+  const grifos = j.red.grifosGaraje;
+  if (grifos > 0) {
+    p.push(
+      ` El garaje tiene ${grifos === 1 ? "un grifo" : `${grifos} grifos`} de baldeo (agua fría, 0,20 dm³/s cada uno según la tabla 2.1), ${j.red.unifamiliar ? "detrás del contador de la vivienda" : "con el contador de servicios comunes"}.`,
+    );
+  } else if (j.red.garaje) p.push(" El garaje no tiene puntos de consumo.");
   return p;
 }
 

@@ -12,8 +12,9 @@
 //   - cada vertical baja por una bajante de baños y otra de cocina («Propia»), o
 //     por una sola («Con los baños»);
 //   - un ramal por planta y bajante recoge los cuartos húmedos de esa vivienda;
-//   - en la unifamiliar de varias plantas, los baños van en la más alta y la
-//     cocina y el aseo en la más baja (supuesto, se avisa);
+//   - en la unifamiliar, los cuartos en las plantas que dice El edificio o, si
+//     no lo dice, los baños en la más alta y la cocina y el aseo en la más baja
+//     (`repartoUnifamiliar`, el mismo que HS4; el supuesto se avisa);
 //   - lo que acomete en la planta que apoya sobre el colector va directo a él.
 // Las composiciones de aparatos salen de `PRESETS_APARATOS` (baño y aseo como
 // cuartos agrupados de la Tabla 4.1); las UD y los Ø los pone el motor.
@@ -21,6 +22,12 @@
 
 import { PRESETS_APARATOS } from "../../data/presetsAparatos";
 import { etiquetaNivel, plantasDe, resumenEdificio } from "../../lib/edificio/derivar";
+import {
+  repartirCuartos,
+  repartoUnifamiliar,
+  textoReparto,
+  type RepartoUnifamiliar,
+} from "../../lib/edificio/reparto";
 import type { Edificio, NucleoAseos, TipoCubierta, ViviendaTipo } from "../../lib/edificio/tipos";
 import {
   udDeAparato,
@@ -195,7 +202,9 @@ export interface RedHs5 {
   /** Edificio de una sola vivienda (la unifamiliar). */
   unifamiliar: boolean;
   /** Supuestos de reparto que conviene revisar. */
-  supuestos: { unifamiliarPorPlantas: boolean };
+  supuestos: { unifamiliarReparto: boolean };
+  /** «P1: 2 baños · PB: 1 aseo y cocina» (unifamiliar), para el aviso. */
+  repartoTexto: string;
   /** Hay oficinas sin núcleos de aseos: no aportan red. */
   oficinasSinNucleos: boolean;
 }
@@ -345,33 +354,19 @@ function pilasRepetidas(e: Edificio, usoZona: "viviendas" | "oficinas"): Pila[] 
 }
 
 /**
- * La unifamiliar: una vivienda (la primera vivienda tipo) en las plantas de sus
- * zonas. Con varias plantas, los baños en la más alta y la cocina y los aseos en
- * la más baja (supuesto que se avisa).
+ * La unifamiliar: una vivienda (la primera vivienda tipo) con sus cuartos en las
+ * plantas que dice El edificio o, si no lo dice, los baños en la más alta y la
+ * cocina y los aseos en la más baja (`repartoUnifamiliar`, el mismo que HS4).
  */
-function pilaUnifamiliar(e: Edificio): Pila | null {
-  const vt = e.unidades.find((u): u is ViviendaTipo => u.clase === "vivienda");
-  if (!vt) return null;
-  const niveles = [
-    ...new Set(plantasDe(e).filter((p) => p.zonas.some((z) => z.uso === "vivienda_unifamiliar")).map((p) => p.nivel)),
-  ].sort((a, b) => a - b);
-  if (niveles.length === 0) return null;
-  const cuartos = cuartosVivienda(vt);
-  const alta = niveles[niveles.length - 1];
-  const baja = niveles[0];
-  const cuartosEn = (nivel: number): CuartoRed[] => {
-    if (niveles.length === 1) return cuartos;
-    if (nivel === alta) return cuartos.filter((c) => c.clase === "bano");
-    if (nivel === baja) return cuartos.filter((c) => c.clase !== "bano");
-    return [];
-  };
-  const conCuartos = niveles.filter((n) => cuartosEn(n).length > 0);
+function pilaUnifamiliar(reparto: RepartoUnifamiliar): Pila {
+  const cuartos = cuartosVivienda(reparto.tipo);
+  const porNivel = repartirCuartos(cuartos, reparto.plantas);
   return {
-    tipoId: vt.id,
-    nombre: vt.nombre,
+    tipoId: reparto.tipo.id,
+    nombre: reparto.tipo.nombre,
     clase: "vivienda",
-    instancias: [conCuartos],
-    cuartosEn,
+    instancias: [porNivel.map((g) => g.nivel)],
+    cuartosEn: (nivel) => porNivel.find((g) => g.nivel === nivel)?.cuartos ?? [],
     udUnidad: cuartos.reduce((s, c) => s + c.ud, 0),
   };
 }
@@ -399,7 +394,8 @@ export function generarRedHs5(e: Edificio, d: DecisionesHs5): RedHs5 {
           : "sotano";
 
   const pilas: Pila[] = [];
-  const unifamiliar = resumen.esUnifamiliar ? pilaUnifamiliar(e) : null;
+  const reparto = resumen.esUnifamiliar ? repartoUnifamiliar(e) : null;
+  const unifamiliar = reparto ? pilaUnifamiliar(reparto) : null;
   if (unifamiliar) pilas.push(unifamiliar);
   else pilas.push(...pilasRepetidas(e, "viviendas"));
   pilas.push(...pilasRepetidas(e, "oficinas"));
@@ -573,7 +569,8 @@ export function generarRedHs5(e: Edificio, d: DecisionesHs5): RedHs5 {
     garajes,
     cubierta: { tipo: e.cubierta.tipo, superficie_m2: Math.max(0, e.cubierta.superficie_m2 || 0) },
     unifamiliar: unifamiliar !== null,
-    supuestos: { unifamiliarPorPlantas: unifamiliar !== null && new Set(unifamiliar.instancias[0]).size > 1 },
+    supuestos: { unifamiliarReparto: reparto?.supuesto ?? false },
+    repartoTexto: reparto ? textoReparto(reparto) : "",
     oficinasSinNucleos,
   };
 }

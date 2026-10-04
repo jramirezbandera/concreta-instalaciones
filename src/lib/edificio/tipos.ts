@@ -46,6 +46,13 @@ export interface OrigenDocumento {
   filas: string[];
 }
 
+/** Cuartos húmedos de la unifamiliar en una zona. La cocina es una por vivienda. */
+export interface CuartosZona {
+  banos: number;
+  aseos: number;
+  cocina: boolean;
+}
+
 /** Unidades de un tipo dentro de una zona, por planta. */
 export interface UnidadesEnZona {
   tipoId: string;
@@ -64,6 +71,13 @@ export interface Zona {
   plazas?: number;
   /** Número de trasteros. */
   numero?: number;
+  /**
+   * Cuartos húmedos de LA vivienda en esta zona (solo «vivienda unifamiliar»), en
+   * cada planta del grupo. Sin él, manda el reparto supuesto (`reparto.ts`).
+   */
+  cuartos?: CuartosZona;
+  /** Grifos de baldeo o limpieza (garajes): puntos de consumo de HS4. */
+  grifos?: number;
   /** Nota libre que acompaña a la zona en la sección («planta alta · noche»). */
   nota?: string;
   /** Si viene del cuadro de superficies (feature-13). */

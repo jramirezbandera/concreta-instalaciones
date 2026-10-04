@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { edificioDeCaso } from "../../../lib/edificio/casos";
+import { setCuartosZona } from "../../../lib/edificio/editar";
 import type { Edificio } from "../../../lib/edificio/tipos";
 import { hs5EstadoDefaults, type Hs5Estado } from "../estado";
 import { justificarHs5, type ObraHs5 } from "../justificacion";
@@ -158,6 +159,13 @@ describe("justificarHs5 · supuestos y casos especiales", () => {
     const j = justificarHs5(estado(), edificioDeCaso("unifamiliar"), OBRA_MAQUETA);
     expect(j.avisos.map((a) => a.id)).toEqual(["unifamiliar-reparto"]);
     expect(j.elementos.map((x) => x.id)).toContain("pluviales-canalones");
+  });
+
+  it("unifamiliar con los cuartos dichos en El edificio: sin aviso, y el baño de la PB baja por su ramal", () => {
+    const e = setCuartosZona(setCuartosZona(edificioDeCaso("unifamiliar"), "z1", { banos: 1 }), "z2", { banos: 1 });
+    const j = justificarHs5(estado(), e, OBRA_MAQUETA);
+    expect(j.avisos.map((a) => a.id)).not.toContain("unifamiliar-reparto");
+    expect(j.red.verticales[0].bajantes[0].ramales.map((r) => r.nivel)).toEqual([0, 1]);
   });
 
   it("«Ajustar a mano»: manda la tabla de tramos del estado", () => {

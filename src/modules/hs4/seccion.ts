@@ -150,7 +150,9 @@ export function calcularSeccionHs4(j: JustificacionHs4, edificio: Edificio): Sec
     const porNivel = new Map<number, typeof red.unidades>();
     for (const u of red.unidades) {
       for (const g of u.cuartos) {
-        if (!red.unifamiliar && g.nivel !== u.nivel) continue;
+        // Las unidades repetidas, solo en su planta; la vivienda unifamiliar y
+        // los servicios comunes (garajes en varias plantas), en cada una.
+        if (!red.unifamiliar && u.clase !== "comunes" && g.nivel !== u.nivel) continue;
         porNivel.set(g.nivel, [...(porNivel.get(g.nivel) ?? []), u]);
       }
     }
@@ -158,19 +160,30 @@ export function calcularSeccionHs4(j: JustificacionHs4, edificio: Edificio): Sec
       const ySuelo = ySueloDe.get(nivel);
       if (ySuelo === undefined) continue;
       // En la PB, a la izquierda del patinillo va la batería: las unidades, a la derecha.
+      // Bajo rasante, a la izquierda van el nombre y la cota de la planta: también a la derecha.
       const conBateria = nivel === 0 && !(red.decisiones.contadores === "por_planta" && red.unidades.length > 1);
-      const izq = conBateria ? [] : us.filter((_, i) => i % 2 === 0);
-      const der = conBateria ? us : us.filter((_, i) => i % 2 === 1);
+      const soloDerecha = conBateria || nivel < 0;
+      const izq = soloDerecha ? [] : us.filter((_, i) => i % 2 === 0);
+      const der = soloDerecha ? us : us.filter((_, i) => i % 2 === 1);
       const huecoIzq = S.X_PATINILLO - 26 - (S.X0 + 30);
       const huecoDer = S.X1 - 12 - (S.X_PATINILLO + 26);
       // Una sola caja por lado puede ensancharse (oficinas, la unifamiliar).
       const ancho = (hueco: number, n: number) =>
         n === 1 ? Math.min(S.CAJA_W_SOLA, hueco - 6) : Math.min(S.CAJA_W, hueco / Math.max(1, n) - 6);
-      const wIzq = ancho(huecoIzq, izq.length);
-      const wDer = ancho(huecoDer, der.length);
       const y = ySuelo - 36;
       const texto = (u: (typeof us)[number]) =>
-        red.unifamiliar ? cuartosTexto(u, nivel) : u.clase === "oficinas" ? "Aseos" : u.nombre;
+        red.unifamiliar
+          ? cuartosTexto(u, nivel)
+          : u.clase === "oficinas"
+            ? "Aseos"
+            : u.clase === "comunes"
+              ? "Garaje"
+              : u.nombre;
+      // La unifamiliar tiene una caja por planta: crece hasta que quepa su rótulo.
+      const anchoTexto = (lado: typeof us, hueco: number, w: number) =>
+        red.unifamiliar && lado.length === 1 ? Math.min(hueco - 6, Math.max(w, texto(lado[0]).length * 5.6 + 14)) : w;
+      const wIzq = anchoTexto(izq, huecoIzq, ancho(huecoIzq, izq.length));
+      const wDer = anchoTexto(der, huecoDer, ancho(huecoDer, der.length));
       const critica = (u: (typeof us)[number]) =>
         u.id === idCritica && (!red.unifamiliar || critNivel(j) === nivel);
       const elementoId = elPorNivel.get(nivel)?.id ?? null;
@@ -226,6 +239,11 @@ export function calcularSeccionHs4(j: JustificacionHs4, edificio: Edificio): Sec
     for (const u of red.unidades) {
       const c = centroCaja.get(`${u.id}@${u.nivel}`);
       if (!c) continue;
+      // Los servicios comunes tienen su montante desde la PB, fuera del general.
+      if (u.clase === "comunes") {
+        montantes.push({ elementoId: elMontante(u), unidadId: u.id, x: xs + 8, y0: ySalida, y1: c.y, xCaja: c.x });
+        continue;
+      }
       montantes.push({ elementoId: "montante-general", unidadId: u.id, x: xs, y0: c.y, y1: c.y, xCaja: c.x });
     }
   } else if (!manual && !red.unifamiliar) {
@@ -313,7 +331,8 @@ export function calcularSeccionHs4(j: JustificacionHs4, edificio: Edificio): Sec
     const { w, recortada } = anchoBarra(a.presionResidual_kPa);
     barras.push({ elementoId: pc.id, y: (pisos[0]?.ySuelo ?? yRasante) - 25, w, rotulo: "Grifo más desfavorable", cumple: a.presionResidual_kPa >= a.presionMinExigida_kPa, recortada });
   }
-  const yRed = yRasante + 30;
+  // La red de la calle, bajo la última barra (un garaje en sótano tiene la suya).
+  const yRed = Math.max(yRasante + 30, ...barras.map((b) => b.y + 34));
   const barraRed = j.resultado
     ? { elementoId: "presion-red", y: yRed, ...anchoBarra(j.presionRed_kPa), rotulo: "Red de la calle", cumple: true }
     : null;
@@ -398,6 +417,7 @@ function puntoCorto(el: ElementoHs4): string {
                     ? "bidé"
                     : "grifo";
   if (!p.unidad) return ap;
+  if (t === "grifo_garaje") return "grifo del garaje";
   if (p.unidad.clase === "oficinas") return `${ap} de los aseos`;
   return p.unidad.id === "u" ? `${ap} · ${(p.cuarto ?? "").toLowerCase()}` : `${ap} de ${p.unidad.nombre}`;
 }
@@ -405,10 +425,18 @@ function puntoCorto(el: ElementoHs4): string {
 function cuartosTexto(u: JustificacionHs4["red"]["unidades"][number], nivel: number): string {
   const g = u.cuartos.find((c) => c.nivel === nivel);
   if (!g) return u.nombre;
-  const banos = g.cuartos.filter((c) => c.clase === "bano").length;
-  if (banos > 0 && banos === g.cuartos.length) return banos === 1 ? "Baño" : "Baños";
-  if (g.cuartos.some((c) => c.clase === "cocina")) return g.cuartos.some((c) => c.clase === "aseo") ? "Cocina y aseo" : "Cocina";
-  return u.nombre;
+  // El garaje se rotula solo si es lo único de la planta.
+  const cuartos = g.cuartos.filter((c) => c.clase !== "garaje");
+  if (cuartos.length === 0) return "Garaje";
+  const banos = cuartos.filter((c) => c.clase === "bano").length;
+  const aseos = cuartos.filter((c) => c.clase === "aseo").length;
+  const partes: string[] = [];
+  if (cuartos.some((c) => c.clase === "cocina")) partes.push("cocina");
+  if (banos > 0) partes.push(banos === 1 ? "baño" : "baños");
+  if (aseos > 0) partes.push(aseos === 1 ? "aseo" : "aseos");
+  if (partes.length === 0) return u.nombre;
+  const texto = partes.length === 1 ? partes[0] : `${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}`;
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
 function critNivel(j: JustificacionHs4): number | null {

@@ -10,7 +10,9 @@
 // =============================================================================
 
 import { esBajoRasante, renumerar } from "./derivar";
+import { repartoUnifamiliar } from "./reparto";
 import type {
+  CuartosZona,
   Edificio,
   GrupoPlantas,
   NucleoAseos,
@@ -42,10 +44,16 @@ function siguienteId(e: Edificio, prefijo: string): string {
   return `${prefijo}${max + 1}`;
 }
 
-/** Copia las zonas con ids nuevos (`z<N>` consecutivos). */
+/**
+ * Copia las zonas con ids nuevos (`z<N>` consecutivos). Los cuartos húmedos de
+ * la unifamiliar no se copian: la vivienda no gana un baño por tener otra planta.
+ */
 function copiarZonas(e: Edificio, zonas: Zona[]): Zona[] {
   let base = Number(siguienteId(e, "z").slice(1));
-  return zonas.map((z) => ({ ...structuredClone(z), id: `z${base++}` }));
+  return zonas.map((z) => {
+    const { cuartos: _c, ...resto } = structuredClone(z);
+    return { ...resto, id: `z${base++}` };
+  });
 }
 
 // -----------------------------------------------------------------------------
@@ -250,15 +258,83 @@ export function setUso(e: Edificio, zonaId: string, uso: UsoZona): Edificio {
     unidades = previas.length > 0 ? previas : [{ tipoId: tipo.id, cantidad: 1 }];
   }
   return conZona(base, zonaId, (z) => {
-    const { unidades: _u, plazas: _p, numero: _n, ...resto } = z;
+    const { unidades: _u, plazas: _p, numero: _n, cuartos, grifos, ...resto } = z;
     return {
       ...resto,
       uso,
       ...(unidades ? { unidades } : {}),
       ...(def.contador?.campo === "plazas" ? { plazas: z.plazas ?? 10 } : {}),
       ...(def.contador?.campo === "numero" ? { numero: z.numero ?? 4 } : {}),
+      ...(cuartos && uso === "vivienda_unifamiliar" ? { cuartos } : {}),
+      ...(grifos !== undefined && admiteGrifos(uso) ? { grifos } : {}),
     };
   });
+}
+
+/** Los garajes pueden llevar grifos de baldeo. */
+export function admiteGrifos(uso: UsoZona): boolean {
+  return uso === "garaje" || uso === "garaje_privado";
+}
+
+export function setGrifos(e: Edificio, zonaId: string, n: number): Edificio {
+  const hallada = buscarZona(e, zonaId);
+  if (!hallada || !admiteGrifos(hallada.zona.uso)) return e;
+  return conZona(e, zonaId, (z) => ({ ...z, grifos: entero(n, 0, 20) }));
+}
+
+/** Límites de los cuartos de la vivienda tipo (los mismos que `editarTipo`). */
+const MAX_BANOS = 5;
+const MAX_ASEOS = 4;
+
+/**
+ * Cambia los cuartos húmedos de una zona de la unifamiliar. El reparto pasa a ser
+ * del proyectista: se escribe el que hay ahora (supuesto o no) en todas las zonas
+ * de la vivienda, se aplica el cambio y la vivienda tipo queda con la suma. Así
+ * mover un baño de planta es bajar uno aquí y subir otro allí, y nunca se pierde
+ * ni se duplica un cuarto. La cocina es una: traerla a esta zona la quita de las
+ * demás; quitarla la lleva a la zona más baja de las otras. Lo que dejaría la
+ * vivienda sin baño o por encima de los límites no se aplica.
+ */
+export function setCuartosZona(e: Edificio, zonaId: string, patch: Partial<CuartosZona>): Edificio {
+  const hallada = buscarZona(e, zonaId);
+  const reparto = repartoUnifamiliar(e);
+  if (!hallada || hallada.zona.uso !== "vivienda_unifamiliar" || !reparto) return e;
+  const actual = new Map<string, CuartosZona>([...reparto.porZona].map(([id, c]) => [id, { ...c }]));
+  const destino = actual.get(zonaId);
+  if (!destino) return e;
+  if (patch.banos !== undefined) destino.banos = entero(patch.banos, 0, MAX_BANOS);
+  if (patch.aseos !== undefined) destino.aseos = entero(patch.aseos, 0, MAX_ASEOS);
+  if (patch.cocina === true) {
+    for (const c of actual.values()) c.cocina = false;
+    destino.cocina = true;
+  } else if (patch.cocina === false && destino.cocina) {
+    // A la zona más baja de las demás (el reparto las da de abajo arriba).
+    const otra = [...actual.keys()].find((id) => id !== zonaId);
+    if (!otra) return e;
+    destino.cocina = false;
+    actual.get(otra)!.cocina = true;
+  }
+  // Totales: cada zona cuenta en todas las plantas de su grupo.
+  const r = renumerar(e);
+  let banos = 0;
+  let aseos = 0;
+  for (const g of r.grupos) {
+    for (const z of g.zonas) {
+      const c = actual.get(z.id);
+      if (!c) continue;
+      banos += c.banos * Math.max(1, g.repeticiones);
+      aseos += c.aseos * Math.max(1, g.repeticiones);
+    }
+  }
+  if (banos < 1 || banos > MAX_BANOS || aseos > MAX_ASEOS) return e;
+  const conCuartos: Edificio = {
+    ...r,
+    grupos: r.grupos.map((g) => ({
+      ...g,
+      zonas: g.zonas.map((z) => (actual.has(z.id) ? { ...z, cuartos: actual.get(z.id)! } : z)),
+    })),
+  };
+  return editarTipo(conCuartos, reparto.tipo.id, { banos, aseos });
 }
 
 export function setSuperficie(e: Edificio, zonaId: string, m2: number): Edificio {

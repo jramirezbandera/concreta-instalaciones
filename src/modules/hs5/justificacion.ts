@@ -516,8 +516,8 @@ export function justificarHs5(estado: Hs5Estado, edificio: Edificio, obra: ObraH
   }
 
   // ── Avisos de reparto y alcance ───────────────────────────────────────────
-  if (modo === "edificio" && red.supuestos.unifamiliarPorPlantas) {
-    avisos.push({ id: "unifamiliar-reparto", tipo: "supuesto", datos: {} });
+  if (modo === "edificio" && red.supuestos.unifamiliarReparto) {
+    avisos.push({ id: "unifamiliar-reparto", tipo: "supuesto", datos: { reparto: red.repartoTexto } });
   }
   if (red.oficinasSinNucleos) {
     avisos.push({ id: "oficinas-sin-nucleos", tipo: "fuera_de_alcance", datos: {} });

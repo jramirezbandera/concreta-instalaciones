@@ -102,7 +102,23 @@ export function filasQueEntraHs4(j: JustificacionHs4, estados: Record<string, Es
       elementoId: "presion-red",
     });
   }
-  if (red.garaje) {
+  if (red.grifosGaraje > 0 && j.modo !== "manual") {
+    // Los grifos van con la vivienda (unifamiliar) o con los servicios comunes.
+    const ns = new Set(
+      red.unidades.flatMap((u) => u.cuartos.filter((g) => g.cuartos.some((c) => c.clase === "garaje")).map((g) => g.nivel)),
+    );
+    const ids = presiones.filter((e) => e.detalle.clase === "planta" && e.detalle.nivel !== null && ns.has(e.detalle.nivel)).map((e) => e.id);
+    const estado = peorEstado(ids.map((id) => estados[id]));
+    const n = red.grifosGaraje;
+    filas.push({
+      id: "garaje",
+      titulo: "Garaje",
+      detalle: `${rango([...ns])} · ${n === 1 ? "1 grifo" : `${n} grifos`} de baldeo`,
+      trato: estado === "ko" ? "no cumple" : "se calcula",
+      estado: tratoDe(estado),
+      elementoId: ids[0],
+    });
+  } else if (red.garaje) {
     filas.push({ id: "garaje", titulo: "Garaje", detalle: "sin puntos de consumo", trato: "no aplica", estado: "out" });
   }
   return filas;

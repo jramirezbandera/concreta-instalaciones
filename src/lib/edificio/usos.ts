@@ -64,8 +64,8 @@ export const USOS: Record<UsoZona, DefUso> = {
     cuentaPara: ["SI", "REBT"],
     loUsan: [
       { codigo: "HS3", texto: "una vivienda, sin conducto colectivo", trato: "si" },
-      { codigo: "HS4", texto: "contador único", trato: "si" },
-      { codigo: "HS5", texto: "desagües de la vivienda", trato: "si" },
+      { codigo: "HS4", texto: "contador único; los cuartos húmedos de cada planta", trato: "si" },
+      { codigo: "HS5", texto: "desagües de los cuartos húmedos de cada planta", trato: "si" },
       { codigo: "HE1", texto: "dentro de la envolvente", trato: "si" },
       { codigo: "SUA", texto: "SUA 6 y SUA 7 no se aplican a la unifamiliar", trato: "no" },
     ],
@@ -126,6 +126,7 @@ export const USOS: Record<UsoZona, DefUso> = {
     cuentaPara: ["SI", "REBT"],
     loUsan: [
       { codigo: "HS3", texto: "ventilación por plaza", trato: "si" },
+      { codigo: "HS4", texto: "grifos de baldeo, si los lleva", trato: "si" },
       { codigo: "HS5", texto: "sumideros; bombeo si queda por debajo de la red", trato: "si" },
       { codigo: "HS6", texto: "puede ser el espacio de contención si está ventilado", trato: "otra" },
       { codigo: "HE1", texto: "frontera con lo que tiene encima", trato: "otra" },
@@ -141,6 +142,7 @@ export const USOS: Record<UsoZona, DefUso> = {
     cuentaParaNota: "ninguna: va con la vivienda",
     loUsan: [
       { codigo: "HS3", texto: "ventilación del garaje", trato: "si" },
+      { codigo: "HS4", texto: "grifos de baldeo, si los lleva", trato: "si" },
       { codigo: "HE1", texto: "frontera con la vivienda", trato: "otra" },
       { codigo: "SUA7", texto: "no aplica: es de una vivienda unifamiliar", trato: "no" },
     ],

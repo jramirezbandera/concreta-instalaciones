@@ -543,7 +543,7 @@ export function textoAviso(a: Aviso): TextoAviso {
     case "unifamiliar-reparto":
       return {
         titulo: "Se ha supuesto dónde están los cuartos húmedos.",
-        detalle: "Baños en la planta alta; cocina y aseo en la baja. Si no es así, ajusta la red a mano.",
+        detalle: `${String(a.datos.reparto ?? "")}. Si no es así, dilo en El edificio: cada planta de la vivienda lleva sus cuartos.`,
       };
     case "oficinas-sin-nucleos":
       return {

@@ -121,7 +121,7 @@ function slugDe(s: string): string {
 
 /** Id del elemento del montante de una unidad: uno por tipo («montante-a», «montante-oficinas»). */
 export function idMontanteDe(u: Pick<UnidadHs4, "clase" | "nombreTipo">): string {
-  return `montante-${slugDe(u.clase === "oficinas" ? "oficinas" : u.nombreTipo)}`;
+  return `montante-${slugDe(u.clase === "vivienda" ? u.nombreTipo : u.clase)}`;
 }
 
 /** Hash corto y estable de un texto (ids de los avisos del motor). */
@@ -351,7 +351,12 @@ export function justificarHs4(estado: Hs4Estado, edificio: Edificio, obra: ObraH
         if (!t) continue;
         elementos.push({
           id: idMontanteDe(alta),
-          nombre: alta.clase === "oficinas" ? "Montantes · oficinas" : `Montante · ${alta.nombreTipo}`,
+          nombre:
+            alta.clase === "oficinas"
+              ? "Montantes · oficinas"
+              : alta.clase === "comunes"
+                ? "Montante · servicios comunes"
+                : `Montante · ${alta.nombreTipo}`,
           tipo: "montante",
           ...criterioVel(t),
           detalle: { clase: "montante", unidad: alta, tramo: t, iguales: us.length, general: false },
@@ -362,15 +367,22 @@ export function justificarHs4(estado: Hs4Estado, edificio: Edificio, obra: ObraH
     // ── Caudal de cada tipo de unidad ───────────────────────────────────────
     const vistos = new Set<string>();
     for (const u of red.unidades) {
-      const clave = u.clase === "oficinas" ? "oficinas" : u.tipoId;
+      const clave = u.clase === "vivienda" ? u.tipoId : u.clase;
       if (vistos.has(clave)) continue;
       vistos.add(clave);
       const t = porTramo.get(u.derivacionId);
       if (!t) continue;
-      const iguales = red.unidades.filter((x) => (x.clase === "oficinas" ? "oficinas" : x.tipoId) === clave).length;
+      const iguales = red.unidades.filter((x) => (x.clase === "vivienda" ? x.tipoId : x.clase) === clave).length;
       elementos.push({
         id: `caudal-${slugDe(clave)}`,
-        nombre: u.clase === "oficinas" ? "Caudal · oficinas" : red.unifamiliar ? "Caudal de la vivienda" : `Caudal · ${u.nombreTipo}`,
+        nombre:
+          u.clase === "oficinas"
+            ? "Caudal · oficinas"
+            : u.clase === "comunes"
+              ? "Caudal · servicios comunes"
+              : red.unifamiliar
+                ? "Caudal de la vivienda"
+                : `Caudal · ${u.nombreTipo}`,
         tipo: "caudal",
         veredicto: "criterio",
         valor: { valor: t.caudalCalculo_dm3_s, unidad: "dm³/s" },
@@ -431,8 +443,8 @@ export function justificarHs4(estado: Hs4Estado, edificio: Edificio, obra: ObraH
   if (d.aguaCaliente === "central") {
     avisos.push({ id: "acs-central", tipo: "fuera_de_alcance", datos: {} });
   }
-  if (modo === "edificio" && red.supuestos.unifamiliarPorPlantas) {
-    avisos.push({ id: "unifamiliar-reparto", tipo: "supuesto", datos: {} });
+  if (modo === "edificio" && red.supuestos.unifamiliarReparto) {
+    avisos.push({ id: "unifamiliar-reparto", tipo: "supuesto", datos: { reparto: red.repartoTexto } });
   }
   if (red.oficinasSinNucleos) {
     avisos.push({ id: "oficinas-sin-nucleos", tipo: "fuera_de_alcance", datos: {} });

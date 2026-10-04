@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CASOS_EDIFICIO, edificioDeCaso } from "../../../lib/edificio/casos";
+import { setCuartosZona, setGrifos } from "../../../lib/edificio/editar";
 import { calcHS4 } from "../calc";
 import { DECISIONES_HS4_POR_DEFECTO, generarRedHs4, type DecisionesHs4 } from "../red";
 
@@ -60,7 +61,7 @@ describe("generarRedHs4 · los cuatro casos", () => {
       [0, ["aseo", "cocina"]],
       [1, ["bano", "bano"]],
     ]);
-    expect(red.supuestos.unifamiliarPorPlantas).toBe(true);
+    expect(red.supuestos.unifamiliarReparto).toBe(true);
     const subida = red.tramos.find((t) => t.id === "u-subida-p1")!;
     expect(subida.parentId).toBe("deriv-u");
     expect(subida.altura_m).toBe(2.8);
@@ -92,5 +93,55 @@ describe("generarRedHs4 · los cuatro casos", () => {
   it("es determinista", () => {
     const e = edificioDeCaso("plurifamiliar");
     expect(generarRedHs4(e, decisiones())).toEqual(generarRedHs4(e, decisiones()));
+  });
+});
+
+// -----------------------------------------------------------------------------
+// feature-18: el reparto de la unifamiliar y los grifos del garaje
+// -----------------------------------------------------------------------------
+
+describe("generarRedHs4 · reparto de la unifamiliar y grifos de baldeo", () => {
+  const valida = (red: ReturnType<typeof generarRedHs4>) =>
+    calcHS4({ tramos: red.tramos, aparatos: red.aparatos, presionAcometida_kPa: 300, criterioK: "une149201" }).arbolValido;
+
+  it("el baño que se dice en la PB va en la PB, y ya no hay supuesto", () => {
+    const e = setCuartosZona(edificioDeCaso("unifamiliar"), "z1", { banos: 1 });
+    const red = generarRedHs4(setCuartosZona(e, "z2", { banos: 1 }), decisiones());
+    expect(red.unidades[0].cuartos.map((c) => [c.nivel, c.cuartos.map((x) => x.etiqueta)])).toEqual([
+      [0, ["Baño 2", "Aseo", "Cocina"]],
+      [1, ["Baño 1"]],
+    ]);
+    expect(red.supuestos.unifamiliarReparto).toBe(false);
+    expect(valida(red)).toBe(true);
+  });
+
+  it("unifamiliar: el grifo del garaje es un cuarto más de la vivienda, tras su contador", () => {
+    const red = generarRedHs4(setGrifos(edificioDeCaso("unifamiliar"), "z3", 1), decisiones());
+    expect(red.grifosGaraje).toBe(1);
+    expect(red.unidades).toHaveLength(1);
+    const pb = red.unidades[0].cuartos.find((c) => c.nivel === 0)!;
+    expect(pb.cuartos.map((c) => c.clase)).toEqual(["aseo", "cocina", "garaje"]);
+    expect(red.aparatos.filter((a) => a.tipo === "grifo_garaje")).toHaveLength(1);
+    expect(red.contadores).toMatchObject({ viviendas: 1, comunes: false, total: 1 });
+    expect(valida(red)).toBe(true);
+  });
+
+  it("plurifamiliar: los grifos del garaje van al contador de servicios comunes", () => {
+    const e = setGrifos(edificioDeCaso("plurifamiliar_locales"), "z4", 2);
+    const red = generarRedHs4(e, decisiones());
+    const c = red.unidades.find((u) => u.clase === "comunes")!;
+    expect(c).toMatchObject({ id: "comunes", nivel: -1, numAparatos: 2 });
+    expect(red.tramos.find((t) => t.id === "montante-comunes")!.parentId).toBe("alimentacion");
+    // Las zonas comunes ya tenían contador: la batería no cambia.
+    expect(red.contadores.total).toBe(8);
+    expect(valida(red)).toBe(true);
+  });
+
+  it("con contadores por planta, los comunes tienen su montante fuera del general", () => {
+    const e = setGrifos(edificioDeCaso("plurifamiliar_locales"), "z4", 1);
+    const red = generarRedHs4(e, decisiones({ contadores: "por_planta" }));
+    expect(red.tramos.find((t) => t.id === "deriv-comunes")!.parentId).toBe("montante-comunes");
+    expect(red.tramos.some((t) => t.id === "montante-s1")).toBe(false);
+    expect(valida(red)).toBe(true);
   });
 });

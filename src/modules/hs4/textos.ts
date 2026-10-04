@@ -84,6 +84,7 @@ export function describirPunto(p: PuntoHs4, unifamiliar: boolean): string {
   const ap = conArticulo(p.aparato.tipo);
   if (!p.unidad) return `${ap} (${p.nombre})`;
   if (p.unidad.clase === "oficinas") return `${ap} de los aseos de ${etiquetaNivel(p.unidad.nivel)}`;
+  if (p.aparato.tipo === "grifo_garaje") return p.nivel !== null ? `${ap} de ${etiquetaNivel(p.nivel)}` : ap;
   if (unifamiliar) return `${ap} del ${(p.cuarto ?? "cuarto").toLowerCase()}`;
   return `${ap} de ${p.unidad.nombre}`;
 }
@@ -93,6 +94,7 @@ function tituloPunto(p: PuntoHs4, unifamiliar: boolean): string {
   const ap = mayuscula(aparato(p.aparato.tipo));
   if (!p.unidad) return `${ap} · ${p.nombre}`;
   if (p.unidad.clase === "oficinas") return `${ap} · aseos de ${etiquetaNivel(p.unidad.nivel)}`;
+  if (p.aparato.tipo === "grifo_garaje") return p.nivel !== null ? `${ap} · ${nombrePlanta(p.nivel)}` : ap;
   if (unifamiliar) return `${ap} · ${(p.cuarto ?? "").toLowerCase()}${p.nivel !== null ? `, ${nombrePlanta(p.nivel)}` : ""}`;
   return `${ap} · vivienda ${p.unidad.nombre}`;
 }
@@ -107,6 +109,8 @@ function cuartosDe(u: UnidadHs4): string {
   if (aseos > 0) partes.push(aseos === 1 ? "aseo" : `${aseos} aseos`);
   if (cs.some((c) => c.clase === "cocina")) partes.push("cocina");
   if (cs.some((c) => c.clase === "aseos")) partes.push("aseos");
+  const grifos = cs.filter((c) => c.clase === "garaje").reduce((s, c) => s + c.aparatos.length, 0);
+  if (grifos > 0) partes.push(grifos === 1 ? "grifo del garaje" : `${grifos} grifos del garaje`);
   return listaY(partes);
 }
 
@@ -316,7 +320,9 @@ export function franjaDe(el: ElementoHs4, j: JustificacionHs4, estado: EstadoPre
           ? "Montante general"
           : det.unidad?.clase === "oficinas"
             ? "Montantes de las oficinas"
-            : `Montantes de las viviendas ${det.unidad?.nombreTipo ?? ""}`.trim(),
+            : det.unidad?.clase === "comunes"
+              ? "Montante de los servicios comunes"
+              : `Montantes de las viviendas ${det.unidad?.nombreTipo ?? ""}`.trim(),
         unidad: `${tub}${det.iguales > 1 ? ` · × ${det.iguales}` : ""}`,
         manda: `La velocidad: se elige el diámetro para ir ${rango}. Con ${valorCorto(el)} va a ${n1(t.velocidad_m_s ?? 0)} m/s.`,
         nota: det.general ? "Lleva el agua de todas las unidades: los contadores están en cada planta." : undefined,
@@ -338,7 +344,9 @@ export function franjaDe(el: ElementoHs4, j: JustificacionHs4, estado: EstadoPre
         titulo:
           u.clase === "oficinas"
             ? "Caudal de una planta de oficinas"
-            : j.red.unifamiliar
+            : u.clase === "comunes"
+              ? "Caudal de los servicios comunes"
+              : j.red.unifamiliar
               ? "Caudal de la vivienda"
               : `Caudal de una vivienda ${u.nombreTipo}`,
         unidad: "dm³/s",
@@ -425,7 +433,7 @@ export function fraseHs4(j: JustificacionHs4): string {
   else if (red.unifamiliar) disposicion = "Contador general y la instalación interior de la vivienda.";
   else if (d0.contadores === "por_planta") disposicion = "Montante general con los contadores en cada planta.";
   else {
-    const por = red.unidades.every((u) => u.clase === "oficinas") ? "planta de oficinas" : "vivienda";
+    const por = red.unidades.every((u) => u.clase !== "vivienda") ? "planta de oficinas" : "vivienda";
     disposicion = `Batería de ${red.contadores.total} contadores en planta baja y un montante por ${por}.`;
   }
   if (!a) return disposicion;
@@ -483,7 +491,7 @@ export function textoAviso(a: Aviso, j: JustificacionHs4): TextoAviso {
     case "unifamiliar-reparto":
       return {
         titulo: "Se ha supuesto dónde están los cuartos húmedos.",
-        detalle: "Baños en la planta alta; cocina y aseo en la baja. Si no es así, ajusta la red a mano.",
+        detalle: `${String(a.datos.reparto ?? "")}. Si no es así, dilo en El edificio: cada planta de la vivienda lleva sus cuartos.`,
       };
     case "oficinas-sin-nucleos":
       return {
