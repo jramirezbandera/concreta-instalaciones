@@ -49,8 +49,6 @@ describe("filasObra — el Demo", () => {
 
   it("las «pronto» de una familia van juntas", () => {
     const p = demo();
-    expect(fila(p, "junta-si")).toMatchObject({ codigo: "SI1–6", titulo: "Seis apartados", estado: "pronto" });
-    expect(fila(p, "junta-si").claves).toHaveLength(6);
     // SUA6 no aplica (sin piscina): sale aparte y la junta lista las demás.
     expect(fila(p, "junta-sua")).toMatchObject({ codigo: "SUA", titulo: "SUA1 · SUA4 · SUA7 · SUA8 · SUA9" });
     expect(fila(p, "sua6")).toMatchObject({ estado: "no_aplica", piezas: [{ texto: "párrafo redactado", acento: false }] });
@@ -62,10 +60,19 @@ describe("filasObra — el Demo", () => {
     const p = demo();
     const q: Proyecto = {
       ...p,
-      justificaciones: { ...p.justificaciones, si3: { aplicabilidadForzada: { valor: "no_aplica", nota: "n/a" } } },
+      justificaciones: { ...p.justificaciones, sua4: { aplicabilidadForzada: { valor: "no_aplica", nota: "n/a" } } },
     };
-    expect(fila(q, "junta-si")).toMatchObject({ codigo: "SI", titulo: "SI1 · SI2 · SI4 · SI5 · SI6" });
-    expect(fila(q, "si3")).toMatchObject({ estado: "no_aplica", forzada: true, nota: "n/a" });
+    expect(fila(q, "junta-sua")).toMatchObject({ codigo: "SUA", titulo: "SUA1 · SUA7 · SUA8 · SUA9" });
+    expect(fila(q, "sua4")).toMatchObject({ estado: "no_aplica", forzada: true, nota: "n/a" });
+  });
+
+  it("SI1 a SI6 publicadas (feature-19): cada una con su fila, su ruta y sus piezas", () => {
+    const p = demo();
+    expect(fila(p, "si1")).toMatchObject({ codigo: "SI1", ruta: "si/propagacion-interior", estado: "revisar" });
+    expect(textos(fila(p, "si1"))).toEqual(["6 viviendas", "garaje · sector propio", "local · sector propio", "1 local de riesgo"]);
+    expect(textos(fila(p, "si5"))).toEqual(["espacio de maniobra", "fachada accesible"]);
+    expect(textos(fila(p, "si6"))).toEqual(["R 60", "R 90", "R 120"]);
+    expect(filasObra(p).flatMap((g) => g.filas).some((f) => f.id === "junta-si")).toBe(false);
   });
 
   it("las externas: con qué se justifican y su referencia", () => {
@@ -83,7 +90,7 @@ describe("filasObra — el Demo", () => {
   it("las «pronto» solo nombran partes del edificio", () => {
     const p = demo();
     expect(textos(fila(p, "hs2"))).toEqual(["6 viviendas", "local"]);
-    expect(textos(fila(p, "junta-si"))).toEqual(["viviendas", "local", "garaje"]);
+    expect(textos(fila(p, "junta-sua"))).toEqual(["escaleras", "garaje", "itinerario accesible"]);
     for (const g of filasObra(p))
       for (const f of g.filas)
         if (f.estado === "pronto") for (const t of textos(f)) expect(t, f.id).not.toMatch(/W\/m²|kW|l\/s/);
@@ -119,8 +126,8 @@ describe("piezasDeQueEntra", () => {
 describe("recuento", () => {
   it("una a una, no por filas", () => {
     const r = recuentoObra(demo());
-    expect(r).toMatchObject({ cumple: 2, revisar: 4, no_cumple: 0, no_aplica: 1, externo: 2, pronto: 16 });
-    expect(textoRecuento(r)).toBe("2 cumple · 4 por revisar · 1 no aplica · 2 externo · 16 pronto");
+    expect(r).toMatchObject({ cumple: 4, revisar: 8, no_cumple: 0, no_aplica: 1, externo: 2, pronto: 10 });
+    expect(textoRecuento(r)).toBe("4 cumple · 8 por revisar · 1 no aplica · 2 externo · 10 pronto");
   });
 
   it("rotuloGrupo", () => {

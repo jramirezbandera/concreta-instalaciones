@@ -44,6 +44,14 @@ import { justificarHe1, type JustificacionHe1 } from "../../modules/he1/justific
 import { filasQueEntraHe1 } from "../../modules/he1/entra";
 import { memoriaHe1 } from "../../modules/he1/memoria";
 import * as textosHe1 from "../../modules/he1/textos";
+import type { DefinicionSi } from "../../modules/si/definicion";
+import type { JustificacionSiBase } from "../../modules/si/tipos";
+import { si1 } from "../../modules/si1/definicion";
+import { si4 } from "../../modules/si4/definicion";
+import { si2 } from "../../modules/si2/definicion";
+import { si3 } from "../../modules/si3/definicion";
+import { si5 } from "../../modules/si5/definicion";
+import { si6 } from "../../modules/si6/definicion";
 
 /** Un título y su explicación: un aviso o algo que no cumple, ya redactado. */
 export interface TextoObra {
@@ -60,6 +68,8 @@ export interface ModuloCalculado {
   frase: string;
   /** Las partes del edificio que entran y cómo las trata (las filas de «Qué entra»). */
   queEntra: FilaQueEntra[];
+  /** Las piezas de la fila de La obra, si el módulo las da (si no, salen de «Qué entra»). */
+  piezas?: { texto: string; acento: boolean }[];
   textoAviso(a: Aviso): TextoObra;
   /**
    * Lo que no cumple de un elemento, redactado; `null` si el módulo no lo
@@ -225,5 +235,46 @@ const he1: ModuloObra = {
   },
 };
 
+/**
+ * Las secciones del DB-SI (feature-19) comparten la forma de su definición: un
+ * adaptador común para las seis.
+ */
+function moduloSi<E extends Record<string, unknown>, J extends JustificacionSiBase>(def: DefinicionSi<E, J>): ModuloObra {
+  return {
+    key: def.key,
+    defaults: def.defaults,
+    calcular(estado, p, revisados) {
+      const j = def.justificar(estado as E, p);
+      return {
+        veredicto: j.veredicto,
+        elementos: j.elementos,
+        avisos: j.avisos,
+        frase: def.frase(j),
+        queEntra: def.queEntra(j, estadosDe(j, revisados)),
+        piezas: def.piezas(j),
+        textoAviso: (a) => def.textoAviso(a),
+        textoIncumplimiento: (el) => {
+          const e = j.elementos.find((x) => x.id === el.id);
+          return e ? def.textoIncumplimiento(e) : null;
+        },
+        memoria: () => def.memoria(j),
+      };
+    },
+  };
+}
+
 /** Los módulos publicados, por clave. */
-export const MODULOS_OBRA: Partial<Record<JustificacionKey, ModuloObra>> = { hs1, hs3, hs4, hs5, hs6, he1 };
+export const MODULOS_OBRA: Partial<Record<JustificacionKey, ModuloObra>> = {
+  hs1,
+  hs3,
+  hs4,
+  hs5,
+  hs6,
+  he1,
+  si1: moduloSi(si1),
+  si4: moduloSi(si4),
+  si2: moduloSi(si2),
+  si3: moduloSi(si3),
+  si5: moduloSi(si5),
+  si6: moduloSi(si6),
+};

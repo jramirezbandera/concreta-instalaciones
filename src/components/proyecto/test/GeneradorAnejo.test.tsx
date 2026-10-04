@@ -57,6 +57,10 @@ afterEach(() => {
   cleanup();
 });
 
+
+/** Los módulos publicados, ordenados por clave (feature-19 añade SI1 a SI6). */
+const PUBLICADAS = ["he1", "hs1", "hs3", "hs4", "hs5", "hs6", "si1", "si2", "si3", "si4", "si5", "si6"];
+
 describe("GeneradorAnejo · anejo del expediente (feature-8 §D)", () => {
   it("el PDF de las fichas está disponible con el Demo", () => {
     renderTarjeta();
@@ -69,7 +73,7 @@ describe("GeneradorAnejo · anejo del expediente (feature-8 §D)", () => {
 
     await user.click(screen.getByRole("button", { name: "Fichas justificativas en PDF" }));
 
-    // La composición es asíncrona (imports dinámicos de los 6 motores + doble
+    // La composición es asíncrona (imports dinámicos de los 12 motores + doble
     // rAF antes de rasterizar): se espera a que renderAnejo reciba su entrada.
     await waitFor(() => expect(renderAnejoSpy).toHaveBeenCalledTimes(1), { timeout: 15000 });
 
@@ -77,8 +81,8 @@ describe("GeneradorAnejo · anejo del expediente (feature-8 §D)", () => {
       typeof import("../../../lib/pdf/anejo").renderAnejo
     >[0];
 
-    // Los 6 módulos publicados se calculan → 6 fichas.
-    expect(entrada.fichas.map((f) => f.key).sort()).toEqual(["he1", "hs1", "hs3", "hs4", "hs5", "hs6"]);
+    // Los 12 módulos publicados se calculan → 12 fichas.
+    expect(entrada.fichas.map((f) => f.key).sort()).toEqual(PUBLICADAS);
     // Cada ficha llega identificada con el proyecto (cabecera del documento).
     for (const { data } of entrada.fichas) {
       expect(data.proyecto).toBe(entrada.proyecto.nombre);
@@ -103,6 +107,6 @@ describe("GeneradorAnejo · anejo del expediente (feature-8 §D)", () => {
     const entrada = renderAnejoSpy.mock.calls[0][0] as Parameters<
       typeof import("../../../lib/pdf/anejo").renderAnejo
     >[0];
-    expect(entrada.fichas.map((f) => f.key).sort()).toEqual(["he1", "hs1", "hs3", "hs4", "hs5", "hs6"]);
+    expect(entrada.fichas.map((f) => f.key).sort()).toEqual(PUBLICADAS);
   }, 30000);
 });

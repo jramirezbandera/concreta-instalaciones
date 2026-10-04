@@ -136,14 +136,16 @@ describe("justificacionesPorGrupo", () => {
       expect(g.entradas.length).toBeGreaterThan(0);
       expect(g.entradas.every((j) => j.shipped)).toBe(true);
     }
-    // Los grupos sin entradas shipped (SI, SUA, HR, Electricidad, Externas)
-    // no aparecen; los que quedan mantienen el orden de declaración.
+    // Los grupos sin entradas shipped (SUA, HR, Electricidad, Externas) no
+    // aparecen; los que quedan mantienen el orden de declaración.
     expect(grupos.map((g) => g.grupo)).toEqual([
       "Salubridad (DB-HS)",
+      "Seguridad en caso de incendio (DB-SI)",
       "Ahorro de energía (DB-HE)",
       "Desarrollo",
     ]);
-    // Contenido shipped exacto del grupo Salubridad, en orden numérico declarado.
+    // Contenido shipped exacto de los grupos Salubridad y DB-SI, en orden numérico declarado.
     expect(grupos[0].entradas.map((j) => j.key)).toEqual(["hs1", "hs3", "hs4", "hs5", "hs6"]);
+    expect(grupos[1].entradas.map((j) => j.key)).toEqual(["si1", "si2", "si3", "si4", "si5", "si6"]);
   });
 });

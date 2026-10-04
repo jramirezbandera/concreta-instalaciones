@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation, CloudRain } from "lucide-react";
+import { Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation, CloudRain, BrickWallFire, Truck, Columns3, FireExtinguisher, Flame, DoorOpen } from "lucide-react";
 import type { JustificacionKey } from "../lib/proyecto/tipos";
 
 // Registry de justificaciones (feature-6 §C, UX-RECONCEPT §3 y §10). Única fuente
@@ -124,9 +124,12 @@ export const justificacionRegistry: JustificacionEntry[] = [
     label: "Propagación interior",
     grupo: "Seguridad en caso de incendio (DB-SI)",
     db: "DB-SI1",
-    edicionDB: "DB-SI (consolidado 2022)",
+    edicionDB: "DB-SI (consolidado 4-mar-2025)",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "si/propagacion-interior",
+    icon: BrickWallFire,
+    schemaVersion: "1",
   },
   {
     key: "si2",
@@ -134,9 +137,12 @@ export const justificacionRegistry: JustificacionEntry[] = [
     label: "Propagación exterior",
     grupo: "Seguridad en caso de incendio (DB-SI)",
     db: "DB-SI2",
-    edicionDB: "DB-SI (consolidado 2022)",
+    edicionDB: "DB-SI (consolidado 4-mar-2025)",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "si/propagacion-exterior",
+    icon: Flame,
+    schemaVersion: "1",
   },
   {
     key: "si3",
@@ -144,9 +150,12 @@ export const justificacionRegistry: JustificacionEntry[] = [
     label: "Evacuación de ocupantes",
     grupo: "Seguridad en caso de incendio (DB-SI)",
     db: "DB-SI3",
-    edicionDB: "DB-SI (consolidado 2022)",
+    edicionDB: "DB-SI (consolidado 4-mar-2025)",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "si/evacuacion",
+    icon: DoorOpen,
+    schemaVersion: "1",
   },
   {
     key: "si4",
@@ -154,9 +163,12 @@ export const justificacionRegistry: JustificacionEntry[] = [
     label: "Instalaciones de protección",
     grupo: "Seguridad en caso de incendio (DB-SI)",
     db: "DB-SI4",
-    edicionDB: "DB-SI (consolidado 2022)",
+    edicionDB: "DB-SI (consolidado 4-mar-2025)",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "si/instalaciones",
+    icon: FireExtinguisher,
+    schemaVersion: "1",
   },
   {
     key: "si5",
@@ -164,9 +176,12 @@ export const justificacionRegistry: JustificacionEntry[] = [
     label: "Intervención de bomberos",
     grupo: "Seguridad en caso de incendio (DB-SI)",
     db: "DB-SI5",
-    edicionDB: "DB-SI (consolidado 2022)",
+    edicionDB: "DB-SI (consolidado 4-mar-2025)",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "si/bomberos",
+    icon: Truck,
+    schemaVersion: "1",
   },
   {
     key: "si6",
@@ -174,9 +189,12 @@ export const justificacionRegistry: JustificacionEntry[] = [
     label: "Resistencia al fuego de la estructura",
     grupo: "Seguridad en caso de incendio (DB-SI)",
     db: "DB-SI6",
-    edicionDB: "DB-SI (consolidado 2022)",
+    edicionDB: "DB-SI (consolidado 4-mar-2025)",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "si/estructura",
+    icon: Columns3,
+    schemaVersion: "1",
   },
   // ── Utilización y accesibilidad (DB-SUA) ───────────────────────────────────
   {

@@ -192,7 +192,7 @@ function filaDe(ev: EvaluacionJustificacion, p: Proyecto, r: ResumenEdificio): F
       fila.piezas = [{ texto: "no se puede calcular", acento: false }];
       break;
     default:
-      fila.piezas = ev.calculado ? piezasDeQueEntra(ev.key, ev.calculado.queEntra, r) : [];
+      fila.piezas = ev.calculado ? (ev.calculado.piezas ?? piezasDeQueEntra(ev.key, ev.calculado.queEntra, r)) : [];
       if (ev.calculado) fila.frase = ev.calculado.frase;
   }
   if (e.shipped && e.route && ev.estado !== "no_aplica" && ev.estado !== "externo") fila.ruta = e.route;

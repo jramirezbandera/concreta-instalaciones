@@ -46,6 +46,30 @@ export interface OrigenDocumento {
   filas: string[];
 }
 
+/**
+ * Qué es un cuarto de instalaciones (feature-19), por las filas de la tabla 2.1
+ * de SI 1 que se dan en un edificio de viviendas u oficinas:
+ *   - local de riesgo especial bajo en todo caso: contadores de electricidad y
+ *     cuadros generales, sala de máquinas de climatización (RITE), maquinaria de
+ *     ascensor, grupo electrógeno y, por un comentario del Ministerio, RITI/RITS;
+ *   - según su potencia o superficie: sala de calderas, almacén de residuos;
+ *   - no son local de riesgo especial: los cuartos de agua (grupo de presión,
+ *     aljibe, contadores de agua) y cualquier otro cuarto sin fila en la tabla.
+ */
+export type TipoCuarto =
+  | "contadores_electricidad"
+  | "telecomunicaciones"
+  | "sala_maquinas"
+  | "calderas"
+  | "ascensor"
+  | "grupo_electrogeno"
+  | "residuos"
+  | "agua"
+  | "otro";
+
+/** Uso al que se asimila un local sin uso para el DB-SI (feature-19). */
+export type UsoPrevistoLocal = "comercial" | "administrativo";
+
 /** Cuartos húmedos de la unifamiliar en una zona. La cocina es una por vivienda. */
 export interface CuartosZona {
   banos: number;
@@ -78,6 +102,21 @@ export interface Zona {
   cuartos?: CuartosZona;
   /** Grifos de baldeo o limpieza (garajes): puntos de consumo de HS4. */
   grifos?: number;
+  /**
+   * Superficie CONSTRUIDA de la zona en cada planta [m²], si se conoce (feature-19).
+   * La usa el DB-SI, cuyos umbrales son todos de superficie construida; sin ella,
+   * se supone a partir de la útil y se avisa solo si cambia el resultado.
+   */
+  superficieConstruida_m2?: number;
+  /** Qué es un cuarto de instalaciones (feature-19): decide si es local de riesgo especial (SI 1). */
+  cuarto?: TipoCuarto;
+  /** Potencia útil nominal de la sala de calderas [kW] (feature-19, SI 1 tabla 2.1). */
+  potencia_kW?: number;
+  /**
+   * Uso al que se asimila un local sin uso para el DB-SI (feature-19). Sin él se
+   * le aplica el uso Comercial, el más exigente de los dos.
+   */
+  usoPrevisto?: UsoPrevistoLocal;
   /** Nota libre que acompaña a la zona en la sección («planta alta · noche»). */
   nota?: string;
   /** Si viene del cuadro de superficies (feature-13). */

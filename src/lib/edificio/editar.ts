@@ -258,7 +258,7 @@ export function setUso(e: Edificio, zonaId: string, uso: UsoZona): Edificio {
     unidades = previas.length > 0 ? previas : [{ tipoId: tipo.id, cantidad: 1 }];
   }
   return conZona(base, zonaId, (z) => {
-    const { unidades: _u, plazas: _p, numero: _n, cuartos, grifos, ...resto } = z;
+    const { unidades: _u, plazas: _p, numero: _n, cuartos, grifos, cuarto, potencia_kW, usoPrevisto, ...resto } = z;
     return {
       ...resto,
       uso,
@@ -267,6 +267,10 @@ export function setUso(e: Edificio, zonaId: string, uso: UsoZona): Edificio {
       ...(def.contador?.campo === "numero" ? { numero: z.numero ?? 4 } : {}),
       ...(cuartos && uso === "vivienda_unifamiliar" ? { cuartos } : {}),
       ...(grifos !== undefined && admiteGrifos(uso) ? { grifos } : {}),
+      // Los datos del DB-SI (feature-19) que solo tienen sentido en su uso.
+      ...(cuarto && uso === "instalaciones" ? { cuarto } : {}),
+      ...(potencia_kW !== undefined && uso === "instalaciones" ? { potencia_kW } : {}),
+      ...(usoPrevisto && uso === "local_sin_uso" ? { usoPrevisto } : {}),
     };
   });
 }

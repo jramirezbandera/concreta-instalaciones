@@ -60,6 +60,9 @@ export function pdfStr(s: string): string {
     .replace(/≤/g, "<=")
     .replace(/≥/g, ">=")
     .replace(/√/g, "sqrt")
+    // Flechas (feature-19): «EI t (i↔o)» del DB-SI, «24 m → sí».
+    .replace(/↔/g, "<->")
+    .replace(/→/g, "->")
     // «·» (U+00B7) y «Ø» (U+00D8) son Latin-1 y van tal cual (feature-14): en
     // instalaciones «Ø110» es la notación, y «ph110» no la entiende nadie.
     .replace(/°/g, "deg")

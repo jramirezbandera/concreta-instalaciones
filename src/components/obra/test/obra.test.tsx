@@ -40,12 +40,13 @@ afterEach(() => {
 describe("Lo que se justifica", () => {
   it("el recuento y las filas con su estado, enlazadas al módulo", () => {
     montar(<LoQueSeJustifica />);
-    expect(screen.getByText("2 cumple · 4 por revisar · 1 no aplica · 2 externo · 16 pronto")).toBeInTheDocument();
+    expect(screen.getByText("4 cumple · 8 por revisar · 1 no aplica · 2 externo · 10 pronto")).toBeInTheDocument();
     const hs5 = screen.getByRole("link", { name: /HS5.*Evacuación de aguas/ });
     expect(hs5).toHaveAttribute("href", "/hs/saneamiento");
     expect(within(hs5).getByText("revisar")).toBeInTheDocument();
     expect(within(hs5).getByText("garaje · bombeo")).toBeInTheDocument();
-    expect(screen.getByText("Seis apartados")).toBeInTheDocument();
+    // SI1 a SI6 publicadas (feature-19): cada una con su fila y su enlace.
+    expect(screen.getByRole("link", { name: /SI1.*Propagación interior/ })).toHaveAttribute("href", "/si/propagacion-interior");
   });
 
   it("un «no aplica» despliega su párrafo", async () => {
@@ -100,7 +101,7 @@ describe("Antes de entregar", () => {
   it("los avisos sin revisar del Demo, cada uno hacia su módulo", () => {
     montar(<AntesDeEntregar />);
     const items = screen.getAllByRole("listitem");
-    expect(items).toHaveLength(5);
+    expect(items).toHaveLength(11);
     expect(within(items[0]).getByRole("link")).toHaveAttribute("href", "/hs/humedad");
     expect(items[0]).toHaveTextContent("HS1 · Faltan datos del clima: se ha supuesto zona pluviométrica I.");
     expect(within(items[1]).getByRole("link")).toHaveAttribute("href", "/hs/fontaneria");
@@ -124,6 +125,10 @@ describe("Antes de entregar", () => {
         hs4: { ...j.hs4, revisados: ["presion-red-supuesta"] },
         hs5: { ...j.hs5, revisados: ["garaje-s1-bombeo", "pluviometria-supuesta"] },
         hs6: { ...j.hs6, revisados: ["nucleo-garaje"] },
+        si1: { revisados: ["uso-local-z2", "cuarto-z6"] },
+        si3: { revisados: ["recorrido", "recorrido-garaje"] },
+        si4: { revisados: ["construida-garaje"] },
+        si6: { revisados: ["sector-sotano"] },
       },
     });
     expect(screen.getByText(/Nada pendiente/)).toBeInTheDocument();
@@ -133,15 +138,15 @@ describe("Antes de entregar", () => {
 describe("Lo que se entrega", () => {
   it("el recuento de cada entregable", () => {
     montar(<LoQueSeEntrega />);
-    expect(screen.getByText("7 apartados")).toBeInTheDocument();
-    expect(screen.getByText("6 fichas")).toBeInTheDocument();
+    expect(screen.getByText("13 apartados")).toBeInTheDocument();
+    expect(screen.getByText("12 fichas")).toBeInTheDocument();
     expect(screen.getByText("2 esquemas")).toBeInTheDocument();
   });
 
   it("con algo que no cumple, lo nombra y no lo cuenta", () => {
     const p = demo();
     montar(<LoQueSeEntrega />, { ...p, datosGenerales: { ...p.datosGenerales, presionAcometida_kPa: 60 } });
-    expect(screen.getByText("6 de 7 apartados")).toBeInTheDocument();
+    expect(screen.getByText("12 de 13 apartados")).toBeInTheDocument();
     expect(screen.getAllByText("HS4 no cumple")).toHaveLength(3);
     expect(screen.getByText("1 de 2 esquemas")).toBeInTheDocument();
   });

@@ -10,6 +10,8 @@ import type { JustificacionKey, Proyecto } from "../../lib/proyecto/tipos";
 import { PdfPreviewModal } from "../ui/PdfPreviewModal";
 import { showToast } from "../ui/Toast";
 import { formatearFecha } from "../../lib/ui/fecha";
+import type { DefinicionSi } from "../../modules/si/definicion";
+import type { JustificacionSiBase } from "../../modules/si/tipos";
 
 // =============================================================================
 // GeneradorAnejo (feature-8 §D) — el momento del producto: UN PDF con portada,
@@ -79,7 +81,37 @@ function altoClon(data: FichaData): number {
   return Math.round((CLON_W * s.nativeH) / s.nativeW);
 }
 
+/**
+ * Las secciones del DB-SI (feature-19) comparten definición, ficha y dibujo: un
+ * adaptador común que carga la definición de cada una.
+ */
+function adaptadorSi(cargar: () => Promise<DefinicionSi<Record<string, unknown>, JustificacionSiBase>>): Adaptador {
+  return async (inputs, id, proyecto) => {
+    const [def, pdf] = await Promise.all([cargar(), import("../../modules/si/DibujoPdfSi")]);
+    const estado = { ...def.defaults, ...inputs };
+    const revisados = proyecto.justificaciones[def.key]?.revisados ?? [];
+    const j = def.justificar(estado, proyecto);
+    const dibujo = def.dibujo(j, proyecto.edificio);
+    const base = def.ficha(j, { estado, edificio: proyecto.edificio, revisados, svg: { nativeW: dibujo.ancho, nativeH: dibujo.alto } });
+    const data = { ...base, ...id, observaciones: [...(base.observaciones ?? [])] };
+    return {
+      data,
+      nodo: (
+        <Clon id={data.svg!.elementId}>
+          <pdf.DibujoPdfSi def={def} j={j} edificio={proyecto.edificio} revisados={revisados} width={CLON_W} height={altoClon(data)} />
+        </Clon>
+      ),
+    };
+  };
+}
+
 const ADAPTADORES: Partial<Record<JustificacionKey, Adaptador>> = {
+  si1: adaptadorSi(async () => (await import("../../modules/si1/definicion")).si1),
+  si4: adaptadorSi(async () => (await import("../../modules/si4/definicion")).si4),
+  si2: adaptadorSi(async () => (await import("../../modules/si2/definicion")).si2),
+  si3: adaptadorSi(async () => (await import("../../modules/si3/definicion")).si3),
+  si5: adaptadorSi(async () => (await import("../../modules/si5/definicion")).si5),
+  si6: adaptadorSi(async () => (await import("../../modules/si6/definicion")).si6),
   hs1: async (inputs, id, proyecto) => {
     // HS1 (feature-17) sale de El edificio y de los datos de la obra.
     const [estadoMod, just, ficha, seccion, dibujo] = await Promise.all([

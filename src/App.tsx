@@ -96,6 +96,30 @@ const router = createHashRouter([
             path: "he/envolvente",
             lazy: lazyComponent(() => import("./modules/he1/ui"), "He1Module"),
           },
+          {
+            path: "si/propagacion-interior",
+            lazy: lazyComponent(() => import("./modules/si1/ui"), "Si1Module"),
+          },
+          {
+            path: "si/estructura",
+            lazy: lazyComponent(() => import("./modules/si6/ui"), "Si6Module"),
+          },
+          {
+            path: "si/instalaciones",
+            lazy: lazyComponent(() => import("./modules/si4/ui"), "Si4Module"),
+          },
+          {
+            path: "si/propagacion-exterior",
+            lazy: lazyComponent(() => import("./modules/si2/ui"), "Si2Module"),
+          },
+          {
+            path: "si/evacuacion",
+            lazy: lazyComponent(() => import("./modules/si3/ui"), "Si3Module"),
+          },
+          {
+            path: "si/bomberos",
+            lazy: lazyComponent(() => import("./modules/si5/ui"), "Si5Module"),
+          },
         ],
       },
       { path: "hs/*", element: <RedirectLegacy /> },

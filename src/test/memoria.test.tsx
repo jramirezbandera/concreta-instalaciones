@@ -29,12 +29,13 @@ describe("«/p/demo/memoria»", () => {
     await renderApp(`#/p/${DEMO_ID}/memoria`);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Memoria CTE de instalaciones" }, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.getByText("7 de 7 apartados listos")).toBeInTheDocument();
+    expect(screen.getByText("13 de 13 apartados listos")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 5 · Evacuación de aguas" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-SUA6 · Piscinas" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 1 · Protección frente a la humedad" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "DB-SI 1 · Propagación interior" })).toBeInTheDocument();
     expect(screen.getByText(/Aún sin redactar: HS2/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Memoria CTE/ })).toHaveTextContent("7/7");
+    expect(screen.getByRole("link", { name: /Memoria CTE/ })).toHaveTextContent("13/13");
 
     // user-event pone su propio portapapeles: se espía después de crearlo.
     const user = userEvent.setup();

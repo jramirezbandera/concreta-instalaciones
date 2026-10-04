@@ -19,7 +19,19 @@ function conHs4Fallando(): Proyecto {
 describe("antesDeEntregar", () => {
   it("el Demo: los avisos sin revisar, en el orden del registry", () => {
     const l = antesDeEntregar(demo());
-    expect(l.map((x) => `${x.codigo}:${x.tipo}`)).toEqual(["HS1:revisar", "HS4:revisar", "HS5:revisar", "HS5:revisar", "HS6:revisar"]);
+    expect(l.map((x) => `${x.codigo}:${x.tipo}`)).toEqual([
+      "HS1:revisar",
+      "HS4:revisar",
+      "HS5:revisar",
+      "HS5:revisar",
+      "HS6:revisar",
+      "SI1:revisar",
+      "SI1:revisar",
+      "SI3:revisar",
+      "SI3:revisar",
+      "SI4:revisar",
+      "SI6:revisar",
+    ]);
     expect(l[0]).toMatchObject({ id: "hs1:clima-supuesto", ruta: "hs/humedad" });
     expect(l[0].detalle.length).toBeGreaterThan(10);
   });
@@ -41,6 +53,10 @@ describe("antesDeEntregar", () => {
         hs4: { ...j.hs4, revisados: ["presion-red-supuesta"] },
         hs5: { ...j.hs5, revisados: ["garaje-s1-bombeo", "pluviometria-supuesta"] },
         hs6: { ...j.hs6, revisados: ["nucleo-garaje"] },
+        si1: { revisados: ["uso-local-z2", "cuarto-z6"] },
+        si3: { revisados: ["recorrido", "recorrido-garaje"] },
+        si4: { revisados: ["construida-garaje"] },
+        si6: { revisados: ["sector-sotano"] },
       },
     };
     expect(antesDeEntregar(q)).toEqual([]);
@@ -50,16 +66,16 @@ describe("antesDeEntregar", () => {
 describe("entregables", () => {
   it("el Demo: todo listo", () => {
     expect(entregables(demo())).toEqual({
-      memoria: { listos: 7, total: 7, noCumplen: [] },
-      fichas: { listos: 6, total: 6, noCumplen: [] },
+      memoria: { listos: 13, total: 13, noCumplen: [] },
+      fichas: { listos: 12, total: 12, noCumplen: [] },
       esquemas: { listos: 2, total: 2, noCumplen: [], claves: ["hs5", "hs4"] },
     });
   });
 
   it("lo que no cumple no cuenta como listo", () => {
     expect(entregables(conHs4Fallando())).toEqual({
-      memoria: { listos: 6, total: 7, noCumplen: ["HS4"] },
-      fichas: { listos: 5, total: 6, noCumplen: ["HS4"] },
+      memoria: { listos: 12, total: 13, noCumplen: ["HS4"] },
+      fichas: { listos: 11, total: 12, noCumplen: ["HS4"] },
       esquemas: { listos: 1, total: 2, noCumplen: ["HS4"], claves: ["hs5"] },
     });
   });
@@ -74,6 +90,12 @@ describe("memoriaCte", () => {
       "HS4:redactado",
       "HS5:redactado",
       "HS6:redactado",
+      "SI1:redactado",
+      "SI2:redactado",
+      "SI3:redactado",
+      "SI4:redactado",
+      "SI5:redactado",
+      "SI6:redactado",
       "SUA6:no_aplica",
       "HE1:redactado",
       "HE0:externo",
@@ -83,7 +105,7 @@ describe("memoriaCte", () => {
     expect(m.apartados[0].encabezado).toBe("DB-HS 1 · Protección frente a la humedad");
     expect(m.pendientes.map((x) => x.codigo)).toContain("HS2");
     expect(m.pendientes.map((x) => x.codigo)).not.toContain("HS1");
-    expect(m.pendientes).toHaveLength(16);
+    expect(m.pendientes).toHaveLength(10);
   });
 
   it("lo que no cumple sale como pendiente, sin su texto", () => {
@@ -107,6 +129,7 @@ describe("memoriaCte", () => {
     expect(b[1]).toEqual({ tipo: "parrafo", texto: "Demo — Vivienda C/ Mayor 12 · 4 oct 2026" });
     expect(b.flatMap((x) => (x.tipo === "titulo" && x.nivel === 2 ? [x.texto] : []))).toEqual([
       "Salubridad (DB-HS)",
+      "Seguridad en caso de incendio (DB-SI)",
       "Utilización y accesibilidad (DB-SUA)",
       "Ahorro de energía (DB-HE)",
       "Externas",
