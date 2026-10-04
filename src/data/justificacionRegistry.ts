@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import {
   Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation, CloudRain, BrickWallFire, Truck, Columns3, FireExtinguisher, Flame, DoorOpen,
-  Footprints, ShieldAlert, LockKeyhole, Lightbulb, Users, Car, CloudLightning, Accessibility,
+  Footprints, ShieldAlert, LockKeyhole, Lightbulb, Users, Car, CloudLightning, Accessibility, Trash2,
 } from "lucide-react";
 import type { JustificacionKey } from "../lib/proyecto/tipos";
 
@@ -64,9 +64,12 @@ export const justificacionRegistry: JustificacionEntry[] = [
     label: "Recogida de residuos",
     grupo: "Salubridad (DB-HS)",
     db: "DB-HS2",
-    edicionDB: "DB-HS (consolidado 2022)",
+    edicionDB: "DB-HS (consolidado 14-jun-2022)",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "hs/residuos",
+    icon: Trash2,
+    schemaVersion: "1",
   },
   {
     key: "hs3",

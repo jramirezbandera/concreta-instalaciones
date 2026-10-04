@@ -21,6 +21,8 @@ describe("antesDeEntregar", () => {
     const l = antesDeEntregar(demo());
     expect(l.map((x) => `${x.codigo}:${x.tipo}`)).toEqual([
       "HS1:revisar",
+      "HS2:revisar",
+      "HS2:revisar",
       "HS4:revisar",
       "HS5:revisar",
       "HS5:revisar",
@@ -56,6 +58,7 @@ describe("antesDeEntregar", () => {
       justificaciones: {
         ...j,
         hs1: { ...j.hs1, revisados: ["clima-supuesto"] },
+        hs2: { revisados: ["dobles", "recogida"] },
         hs4: { ...j.hs4, revisados: ["presion-red-supuesta"] },
         hs5: { ...j.hs5, revisados: ["garaje-s1-bombeo", "pluviometria-supuesta"] },
         hs6: { ...j.hs6, revisados: ["nucleo-garaje"] },
@@ -77,16 +80,16 @@ describe("antesDeEntregar", () => {
 describe("entregables", () => {
   it("el Demo: todo listo", () => {
     expect(entregables(demo())).toEqual({
-      memoria: { listos: 21, total: 21, noCumplen: [] },
-      fichas: { listos: 19, total: 19, noCumplen: [] },
+      memoria: { listos: 22, total: 22, noCumplen: [] },
+      fichas: { listos: 20, total: 20, noCumplen: [] },
       esquemas: { listos: 2, total: 2, noCumplen: [], claves: ["hs5", "hs4"] },
     });
   });
 
   it("lo que no cumple no cuenta como listo", () => {
     expect(entregables(conHs4Fallando())).toEqual({
-      memoria: { listos: 20, total: 21, noCumplen: ["HS4"] },
-      fichas: { listos: 18, total: 19, noCumplen: ["HS4"] },
+      memoria: { listos: 21, total: 22, noCumplen: ["HS4"] },
+      fichas: { listos: 19, total: 20, noCumplen: ["HS4"] },
       esquemas: { listos: 1, total: 2, noCumplen: ["HS4"], claves: ["hs5"] },
     });
   });
@@ -97,6 +100,7 @@ describe("memoriaCte", () => {
     const m = memoriaCte(demo());
     expect(m.apartados.map((a) => `${a.codigo}:${a.tipo}`)).toEqual([
       "HS1:redactado",
+      "HS2:redactado",
       "HS3:redactado",
       "HS4:redactado",
       "HS5:redactado",
@@ -120,11 +124,12 @@ describe("memoriaCte", () => {
       "HE0:externo",
       "DB-SE:externo",
     ]);
-    expect(m.apartados[3].encabezado).toBe("DB-HS 5 · Evacuación de aguas");
+    expect(m.apartados[4].encabezado).toBe("DB-HS 5 · Evacuación de aguas");
+    expect(m.apartados[1].encabezado).toBe("DB-HS 2 · Recogida y evacuación de residuos");
     expect(m.apartados[0].encabezado).toBe("DB-HS 1 · Protección frente a la humedad");
-    expect(m.pendientes.map((x) => x.codigo)).toContain("HS2");
-    expect(m.pendientes.map((x) => x.codigo)).not.toContain("HS1");
-    expect(m.pendientes).toHaveLength(5);
+    expect(m.pendientes.map((x) => x.codigo)).toContain("HE4");
+    expect(m.pendientes.map((x) => x.codigo)).not.toContain("HS2");
+    expect(m.pendientes).toHaveLength(4);
   });
 
   it("lo que no cumple sale como pendiente, sin su texto", () => {

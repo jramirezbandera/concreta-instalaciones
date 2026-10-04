@@ -58,6 +58,7 @@ import { sua9 } from "../../modules/sua9/definicion";
 import { sua1 } from "../../modules/sua1/definicion";
 import { sua2 } from "../../modules/sua2/definicion";
 import { sua3 } from "../../modules/sua3/definicion";
+import { hs2 } from "../../modules/hs2/definicion";
 import { sua4 } from "../../modules/sua4/definicion";
 import { sua8 } from "../../modules/sua8/definicion";
 
@@ -274,6 +275,7 @@ function moduloSi<E extends Record<string, unknown>, J extends JustificacionSiBa
 /** Los módulos publicados, por clave. */
 export const MODULOS_OBRA: Partial<Record<JustificacionKey, ModuloObra>> = {
   hs1,
+  hs2: moduloSi(hs2),
   hs3,
   hs4,
   hs5,

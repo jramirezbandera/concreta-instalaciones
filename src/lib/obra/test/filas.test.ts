@@ -99,7 +99,7 @@ describe("filasObra — el Demo", () => {
 
   it("las «pronto» solo nombran partes del edificio", () => {
     const p = demo();
-    expect(textos(fila(p, "hs2"))).toEqual(["6 viviendas", "local"]);
+    expect(textos(fila(p, "rebt"))).toEqual(["viviendas", "local", "garaje", "zonas comunes"]);
     for (const g of filasObra(p))
       for (const f of g.filas)
         if (f.estado === "pronto") for (const t of textos(f)) expect(t, f.id).not.toMatch(/W\/m²|kW|l\/s/);
@@ -135,8 +135,8 @@ describe("piezasDeQueEntra", () => {
 describe("recuento", () => {
   it("una a una, no por filas", () => {
     const r = recuentoObra(demo());
-    expect(r).toMatchObject({ cumple: 6, revisar: 13, no_cumple: 0, no_aplica: 2, externo: 2, pronto: 5 });
-    expect(textoRecuento(r)).toBe("6 cumple · 13 por revisar · 2 no aplica · 2 externo · 5 pronto");
+    expect(r).toMatchObject({ cumple: 6, revisar: 14, no_cumple: 0, no_aplica: 2, externo: 2, pronto: 4 });
+    expect(textoRecuento(r)).toBe("6 cumple · 14 por revisar · 2 no aplica · 2 externo · 4 pronto");
   });
 
   it("rotuloGrupo", () => {

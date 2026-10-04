@@ -146,7 +146,7 @@ describe("justificacionesPorGrupo", () => {
       "Desarrollo",
     ]);
     // Contenido shipped exacto de los grupos Salubridad y DB-SI, en orden numérico declarado.
-    expect(grupos[0].entradas.map((j) => j.key)).toEqual(["hs1", "hs3", "hs4", "hs5", "hs6"]);
+    expect(grupos[0].entradas.map((j) => j.key)).toEqual(["hs1", "hs2", "hs3", "hs4", "hs5", "hs6"]);
     expect(grupos[1].entradas.map((j) => j.key)).toEqual(["si1", "si2", "si3", "si4", "si5", "si6"]);
     // SUA 5 no tiene pantalla: no aplica nunca (feature-20).
     expect(grupos[2].entradas.map((j) => j.key)).toEqual(["sua1", "sua2", "sua3", "sua4", "sua6", "sua7", "sua8", "sua9"]);

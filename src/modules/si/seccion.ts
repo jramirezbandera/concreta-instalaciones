@@ -52,7 +52,9 @@ export type IconoSi =
   | "luz"
   | "accesible"
   | "coche"
-  | "puerta";
+  | "puerta"
+  // DB-HS 2 (feature-21): un contenedor de residuos.
+  | "contenedor";
 
 export type MarcaSi =
   | {

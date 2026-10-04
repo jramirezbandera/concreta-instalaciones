@@ -142,6 +142,20 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
       "«Uso Aparcamiento»).",
     cita: "DB-SUA 7, ámbito de aplicación",
   },
+  // ── DB-HS 2 · Recogida y evacuación de residuos (feature-21) ───────────────
+  {
+    // Ámbito (research/verificacion-hs2.md B1): edificios de viviendas de nueva
+    // construcción; los de otros usos, con un estudio específico (ap. 1.1 pto 2).
+    key: "hs2",
+    cuando: (a) => !a.tieneViviendas,
+    resultado: "no_aplica",
+    nota:
+      "DB-HS 2 Recogida y evacuación de residuos: no es de aplicación directa — " +
+      "el edificio no tiene viviendas. La conformidad con la exigencia básica se " +
+      "demuestra mediante un estudio específico, adoptando criterios análogos a " +
+      "los establecidos en la Sección HS 2 (ap. 1.1 pto 2).",
+    cita: "DB-HS 2, ámbito de aplicación",
+  },
   // ── DB-HS 3 · Calidad del aire interior (feature-12) ───────────────────────
   {
     // Ámbito verificado el 2026-10-03 (research/verificacion-edificio-usos.md,

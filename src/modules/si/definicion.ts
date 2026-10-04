@@ -39,7 +39,7 @@ export interface OpcionesFichaSi<E> {
 export interface DefinicionSi<E extends Record<string, unknown>, J extends JustificacionSiBase> {
   key: JustificacionKey;
   /** El documento básico, para los títulos del dibujo y las citas: «DB-SI» si no se dice. */
-  db?: "DB-SI" | "DB-SUA";
+  db?: "DB-SI" | "DB-SUA" | "DB-HS";
   defaults: E;
   /** Sujeto de la cabecera: «Propagación interior». */
   sujeto: string;

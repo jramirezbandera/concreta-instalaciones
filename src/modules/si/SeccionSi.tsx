@@ -169,6 +169,14 @@ function Icono({ icono, x, y, color, P }: { icono: IconoSi; x: number; y: number
           <circle cx={10} cy={8.5} r={0.9} fill={color} stroke="none" />
         </g>
       );
+    case "contenedor":
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <path d="M3.5 5h9l-1 8.5h-7z" fill={P.fondo} strokeLinejoin="round" />
+          <path d="M2 3.2h12M6.5 3.2V1.8h3v1.4M6.5 7.5v3.5M9.5 7.5v3.5" />
+          <circle cx={5.5} cy={14.6} r={1} fill={color} stroke="none" />
+        </g>
+      );
   }
 }
 
