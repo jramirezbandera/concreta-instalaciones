@@ -3,6 +3,7 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { fileURLToPath } from "node:url";
 
 // https://vite.dev/config/
 //
@@ -85,6 +86,8 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: "jsdom",
       setupFiles: ["./src/test/setup.ts"],
+      // El módulo virtual del aviso de versión nueva solo existe en el build.
+      alias: { "virtual:pwa-register/react": fileURLToPath(new URL("./src/test/pwaRegisterMock.ts", import.meta.url)) },
       globals: true,
       // 15 s (vitest trae 5 s). Los tests de integración de módulo montan el
       // router real y sus pantallas van por `lazy()`: la primera aserción de

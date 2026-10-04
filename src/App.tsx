@@ -1,6 +1,7 @@
 import { createHashRouter, RouterProvider, Navigate, Outlet } from "react-router";
 import { HelmetProvider } from "react-helmet-async";
 import { AppShell } from "./components/layout/AppShell";
+import { AvisoActualizacion } from "./components/layout/AvisoActualizacion";
 import { RouteFallback } from "./components/layout/RouteFallback";
 import { RouteHelmet } from "./components/layout/RouteHelmet";
 import { RouteProgressBar } from "./components/layout/RouteProgressBar";
@@ -25,6 +26,7 @@ function RootLayout() {
       <RouteHelmet />
       <RouteProgressBar />
       <Outlet />
+      <AvisoActualizacion />
     </>
   );
 }
