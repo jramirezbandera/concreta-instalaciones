@@ -46,11 +46,11 @@ describe("Sidebar — estado calculado", () => {
     const hs4 = () => screen.getByRole("link", { name: /HS4/ });
     expect(within(hs4()).getByRole("img", { name: "Estado: Cumple, con cosas por revisar" })).toBeInTheDocument();
     const memoria = () => screen.getByRole("link", { name: /Memoria CTE/ });
-    expect(memoria()).toHaveTextContent("6/6");
+    expect(memoria()).toHaveTextContent("7/7");
 
     await user.click(screen.getByRole("button", { name: "Subir plantas" }));
 
     expect(within(hs4()).getByRole("img", { name: "Estado: No cumple" })).toBeInTheDocument();
-    expect(memoria()).toHaveTextContent("5/6");
+    expect(memoria()).toHaveTextContent("6/7");
   });
 });

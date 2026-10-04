@@ -144,6 +144,6 @@ describe("justificacionesPorGrupo", () => {
       "Desarrollo",
     ]);
     // Contenido shipped exacto del grupo Salubridad, en orden numérico declarado.
-    expect(grupos[0].entradas.map((j) => j.key)).toEqual(["hs3", "hs4", "hs5", "hs6"]);
+    expect(grupos[0].entradas.map((j) => j.key)).toEqual(["hs1", "hs3", "hs4", "hs5", "hs6"]);
   });
 });

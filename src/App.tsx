@@ -71,6 +71,10 @@ const router = createHashRouter([
           { path: "edificio", element: <EdificioPage /> },
           { path: "memoria", element: <MemoriaPage /> },
           {
+            path: "hs/humedad",
+            lazy: lazyComponent(() => import("./modules/hs1/ui"), "Hs1Module"),
+          },
+          {
             path: "hs/ventilacion",
             lazy: lazyComponent(() => import("./modules/hs3/ui"), "Hs3Module"),
           },

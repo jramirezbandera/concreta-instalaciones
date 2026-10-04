@@ -19,8 +19,8 @@ function conHs4Fallando(): Proyecto {
 describe("antesDeEntregar", () => {
   it("el Demo: los avisos sin revisar, en el orden del registry", () => {
     const l = antesDeEntregar(demo());
-    expect(l.map((x) => `${x.codigo}:${x.tipo}`)).toEqual(["HS4:revisar", "HS5:revisar", "HS5:revisar", "HS6:revisar"]);
-    expect(l[0]).toMatchObject({ id: "hs4:presion-red-supuesta", ruta: "hs/fontaneria" });
+    expect(l.map((x) => `${x.codigo}:${x.tipo}`)).toEqual(["HS1:revisar", "HS4:revisar", "HS5:revisar", "HS5:revisar", "HS6:revisar"]);
+    expect(l[0]).toMatchObject({ id: "hs1:clima-supuesto", ruta: "hs/humedad" });
     expect(l[0].detalle.length).toBeGreaterThan(10);
   });
 
@@ -37,6 +37,7 @@ describe("antesDeEntregar", () => {
       ...p,
       justificaciones: {
         ...j,
+        hs1: { ...j.hs1, revisados: ["clima-supuesto"] },
         hs4: { ...j.hs4, revisados: ["presion-red-supuesta"] },
         hs5: { ...j.hs5, revisados: ["garaje-s1-bombeo", "pluviometria-supuesta"] },
         hs6: { ...j.hs6, revisados: ["nucleo-garaje"] },
@@ -49,16 +50,16 @@ describe("antesDeEntregar", () => {
 describe("entregables", () => {
   it("el Demo: todo listo", () => {
     expect(entregables(demo())).toEqual({
-      memoria: { listos: 6, total: 6, noCumplen: [] },
-      fichas: { listos: 5, total: 5, noCumplen: [] },
+      memoria: { listos: 7, total: 7, noCumplen: [] },
+      fichas: { listos: 6, total: 6, noCumplen: [] },
       esquemas: { listos: 2, total: 2, noCumplen: [], claves: ["hs5", "hs4"] },
     });
   });
 
   it("lo que no cumple no cuenta como listo", () => {
     expect(entregables(conHs4Fallando())).toEqual({
-      memoria: { listos: 5, total: 6, noCumplen: ["HS4"] },
-      fichas: { listos: 4, total: 5, noCumplen: ["HS4"] },
+      memoria: { listos: 6, total: 7, noCumplen: ["HS4"] },
+      fichas: { listos: 5, total: 6, noCumplen: ["HS4"] },
       esquemas: { listos: 1, total: 2, noCumplen: ["HS4"], claves: ["hs5"] },
     });
   });
@@ -68,6 +69,7 @@ describe("memoriaCte", () => {
   it("los apartados en el orden del registry y lo pendiente al final", () => {
     const m = memoriaCte(demo());
     expect(m.apartados.map((a) => `${a.codigo}:${a.tipo}`)).toEqual([
+      "HS1:redactado",
       "HS3:redactado",
       "HS4:redactado",
       "HS5:redactado",
@@ -77,9 +79,11 @@ describe("memoriaCte", () => {
       "HE0:externo",
       "DB-SE:externo",
     ]);
-    expect(m.apartados[2].encabezado).toBe("DB-HS 5 · Evacuación de aguas");
-    expect(m.pendientes.map((x) => x.codigo)).toContain("HS1");
-    expect(m.pendientes).toHaveLength(17);
+    expect(m.apartados[3].encabezado).toBe("DB-HS 5 · Evacuación de aguas");
+    expect(m.apartados[0].encabezado).toBe("DB-HS 1 · Protección frente a la humedad");
+    expect(m.pendientes.map((x) => x.codigo)).toContain("HS2");
+    expect(m.pendientes.map((x) => x.codigo)).not.toContain("HS1");
+    expect(m.pendientes).toHaveLength(16);
   });
 
   it("lo que no cumple sale como pendiente, sin su texto", () => {

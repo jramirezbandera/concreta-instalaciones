@@ -57,7 +57,9 @@ export type Gobierno =
   /** El caudal sale de una tabla por unidad: 120 l/s por plaza, 0,7 l/s·m² (HS3). */
   | { tipo: "caudal_por_unidad"; tabla: string; unidades: Cantidad; porUnidad: Cantidad }
   /** Equilibrar lo que entra con lo que sale (HS3). */
-  | { tipo: "equilibrado"; entra: number; sale: number };
+  | { tipo: "equilibrado"; entra: number; sale: number }
+  /** Un grado o una clase leídos en una tabla de doble entrada (HS1, tablas 2.1, 2.3, 2.5 y 2.6). */
+  | { tipo: "grado_tabla"; tabla: string; entradas: { k: string; v: string }[] };
 
 /** Alternativa descartada: el valor inmediatamente menor y por qué no vale. */
 export interface Alternativa {

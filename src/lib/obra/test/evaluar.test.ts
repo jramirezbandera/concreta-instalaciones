@@ -29,7 +29,9 @@ describe("evaluarExpediente — el Demo", () => {
     expect(ev.he1!.estado).toBe("cumple");
     expect(ev.sua6!.estado).toBe("no_aplica");
     expect(ev.he0he1_global!.estado).toBe("externo");
-    expect(ev.hs1!.estado).toBe("pronto");
+    // HS1 (feature-17): cumple, con el clima supuesto por revisar.
+    expect(ev.hs1!.estado).toBe("revisar");
+    expect(ev.hs2!.estado).toBe("pronto");
   });
 
   it("los avisos sin revisar, redactados por el módulo", () => {
@@ -110,7 +112,7 @@ describe("estadoEfectivo — las entradas del módulo al abrirse", () => {
   it("sin nada guardado, los valores por defecto con lo heredado", () => {
     const p: Proyecto = { ...demo(), justificaciones: {} };
     expect(estadoEfectivo(p, "hs6")).toMatchObject({ zona: "II", municipio: "Cáceres" });
-    expect(estadoEfectivo(p, "hs1")).toBeNull();
+    expect(estadoEfectivo(p, "hs2")).toBeNull();
   });
 
   it("en los cuatro casos de El edificio, el veredicto es el del motor del módulo", () => {

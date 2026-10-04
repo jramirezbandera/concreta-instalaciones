@@ -34,6 +34,7 @@ import { crearProyecto, setProyectoActivo } from "../lib/proyecto/storage";
 import type { DatosGenerales, Intervencion, ZonaRadon } from "../lib/proyecto/tipos";
 import { intensidadDe } from "../modules/hs5/pluviales";
 import { ISOYETAS, type Isoyeta, type ZonaPluviometrica } from "../modules/hs5/tablas";
+import type { ClaseKs, NivelFreatico, TerrenoTipo, ZonaEolica, ZonaPluviometricaHs1 } from "../modules/hs1/tipos";
 
 // -----------------------------------------------------------------------------
 // Opciones de los selects (a nivel de módulo: identidad estable entre renders).
@@ -64,6 +65,45 @@ const ISOYETA_OPTIONS: { value: string; label: string }[] = ISOYETAS.map((i) => 
   value: String(i),
   label: `Isoyeta ${i}`,
 }));
+
+// HS 1 (feature-17). "" = no indicada: HS1 supone y lo avisa.
+const ZONA_PLUV_HS1_OPTIONS: { value: "" | ZonaPluviometricaHs1; label: string }[] = [
+  { value: "", label: "— No indicada —" },
+  { value: "I", label: "Zona I" },
+  { value: "II", label: "Zona II" },
+  { value: "III", label: "Zona III" },
+  { value: "IV", label: "Zona IV" },
+  { value: "V", label: "Zona V" },
+];
+
+const ZONA_EOLICA_OPTIONS: { value: "" | ZonaEolica; label: string }[] = [
+  { value: "", label: "— No indicada —" },
+  { value: "A", label: "Zona A · 26 m/s" },
+  { value: "B", label: "Zona B · 27 m/s" },
+  { value: "C", label: "Zona C · 29 m/s" },
+];
+
+const TERRENO_TIPO_OPTIONS: { value: "" | TerrenoTipo; label: string }[] = [
+  { value: "", label: "— No indicado —" },
+  { value: "I", label: "I · Costa (E0)" },
+  { value: "II", label: "II · Rural llano (E0)" },
+  { value: "III", label: "III · Rural (E0)" },
+  { value: "IV", label: "IV · Urbano (E1)" },
+  { value: "V", label: "V · Gran ciudad (E1)" },
+];
+
+const FREATICO_OPTIONS: { value: "" | NivelFreatico["tipo"]; label: string }[] = [
+  { value: "", label: "— No indicado —" },
+  { value: "no_detectado", label: "No se detecta" },
+  { value: "profundidad", label: "A una profundidad" },
+];
+
+const KS_OPTIONS: { value: "" | ClaseKs; label: string }[] = [
+  { value: "", label: "— No indicado —" },
+  { value: "alto", label: "Ks ≥ 10⁻² cm/s" },
+  { value: "medio", label: "10⁻⁵ < Ks < 10⁻² cm/s" },
+  { value: "bajo", label: "Ks ≤ 10⁻⁵ cm/s" },
+];
 
 /** "" = sin seleccionar (opción placeholder) + las 52 provincias del Anejo B. */
 const PROVINCIA_OPTIONS: { value: string; label: string }[] = [
@@ -111,6 +151,21 @@ function validar(dg: DatosGenerales, nombre: string): string[] {
     (!Number.isFinite(dg.cotaAlcantarillado_m) || dg.cotaAlcantarillado_m < -20 || dg.cotaAlcantarillado_m > 5)
   ) {
     errores.push("La cota del alcantarillado, si se informa, debe estar entre −20 y +5 m.");
+  }
+  if (
+    dg.nivelFreatico?.tipo === "profundidad" &&
+    (!Number.isFinite(dg.nivelFreatico.profundidad_m) ||
+      dg.nivelFreatico.profundidad_m < 0 ||
+      dg.nivelFreatico.profundidad_m > 50)
+  ) {
+    errores.push("La profundidad del nivel freático debe estar entre 0 y 50 m bajo el terreno.");
+  }
+  if (
+    dg.nivelFreatico?.tipo === "no_detectado" &&
+    dg.nivelFreatico.reconocimiento_m !== undefined &&
+    (!Number.isFinite(dg.nivelFreatico.reconocimiento_m) || dg.nivelFreatico.reconocimiento_m <= 0 || dg.nivelFreatico.reconocimiento_m > 100)
+  ) {
+    errores.push("La profundidad del reconocimiento, si se indica, debe estar entre 0 y 100 m.");
   }
   return errores;
 }
@@ -252,6 +307,43 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
     setCotaTxt(txt);
     const n = Number(txt.replace(",", ".").replace("−", "-"));
     set("cotaAlcantarillado_m", txt.trim() === "" || !Number.isFinite(n) ? undefined : n);
+  }
+
+  // Borrador textual de la profundidad del freático (mismo motivo que la cota).
+  const [freaticoTxt, setFreaticoTxt] = useState<string>(() => {
+    const f = modo === "editar" && ctx !== null ? ctx.proyecto.datosGenerales.nivelFreatico : undefined;
+    return f?.tipo === "profundidad" ? String(f.profundidad_m).replace(".", ",") : "";
+  });
+
+  // Borrador textual de la profundidad del reconocimiento (freático no detectado).
+  const [reconocimientoTxt, setReconocimientoTxt] = useState<string>(() => {
+    const f = modo === "editar" && ctx !== null ? ctx.proyecto.datosGenerales.nivelFreatico : undefined;
+    return f?.tipo === "no_detectado" && f.reconocimiento_m !== undefined ? String(f.reconocimiento_m).replace(".", ",") : "";
+  });
+
+  function onReconocimiento(txt: string): void {
+    setReconocimientoTxt(txt);
+    const n = Number(txt.replace(",", "."));
+    set("nivelFreatico", txt.trim() === "" ? { tipo: "no_detectado" } : { tipo: "no_detectado", reconocimiento_m: n });
+  }
+
+  function onFreaticoTipo(v: "" | NivelFreatico["tipo"]): void {
+    if (v === "") set("nivelFreatico", undefined);
+    else if (v === "no_detectado") {
+      const n = Number(reconocimientoTxt.replace(",", "."));
+      set("nivelFreatico", reconocimientoTxt.trim() === "" ? { tipo: "no_detectado" } : { tipo: "no_detectado", reconocimiento_m: n });
+    }
+    else {
+      // Sin cifra escrita queda NaN: la validación pide la profundidad.
+      const n = Number(freaticoTxt.replace(",", "."));
+      set("nivelFreatico", { tipo: "profundidad", profundidad_m: freaticoTxt.trim() === "" ? Number.NaN : n });
+    }
+  }
+
+  function onFreaticoProfundidad(txt: string): void {
+    setFreaticoTxt(txt);
+    const n = Number(txt.replace(",", "."));
+    set("nivelFreatico", { tipo: "profundidad", profundidad_m: txt.trim() === "" ? Number.NaN : n });
   }
 
   function onZonaPluviometrica(v: "" | ZonaPluviometrica): void {
@@ -514,7 +606,7 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
             <Field
               id="dg-zona-pluviometrica"
               label="Zona pluviométrica"
-              sub="(opcional)"
+              sub="(HS5, opcional)"
               help="Zona A o B del mapa de la Figura B.1 del DB-HS5. Es una ENTRADA MANUAL: el DB solo da el mapa. Sin ella, HS5 calcula los pluviales con 100 mm/h y lo avisa."
               refText="DB-HS5 Apéndice B, Figura B.1"
             >
@@ -546,6 +638,114 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
                 (Tabla B.1).
               </p>
             )}
+          </CollapsibleSection>
+
+          <CollapsibleSection label="Clima y terreno" refNorma="DB-HS1, figuras 2.4 y 2.5 · estudio geotécnico">
+            <Field
+              id="dg-zona-pluv-hs1"
+              label="Zona pluviométrica"
+              sub="(HS1)"
+              help="Zona I a V del mapa de la figura 2.4 del DB-HS1, por el índice pluviométrico anual. No es la zona A/B de HS5. ENTRADA MANUAL: el DB solo da el mapa. Sin ella, HS1 supone la zona más lluviosa y lo avisa."
+              refText="DB-HS1 2.3.1, figura 2.4"
+            >
+              <SelectInput<"" | ZonaPluviometricaHs1>
+                id="dg-zona-pluv-hs1"
+                value={dg.zonaPluviometricaHs1 ?? ""}
+                options={ZONA_PLUV_HS1_OPTIONS}
+                onChange={(v) => set("zonaPluviometricaHs1", v === "" ? undefined : v)}
+              />
+            </Field>
+            <Field
+              id="dg-zona-eolica"
+              label="Zona eólica"
+              help="Zona A, B o C del mapa de la figura 2.5 del DB-HS1 (velocidad básica del viento). ENTRADA MANUAL. Sin ella, HS1 supone la zona C y lo avisa."
+              refText="DB-HS1 2.3.1, figura 2.5"
+            >
+              <SelectInput<"" | ZonaEolica>
+                id="dg-zona-eolica"
+                value={dg.zonaEolica ?? ""}
+                options={ZONA_EOLICA_OPTIONS}
+                onChange={(v) => set("zonaEolica", v === "" ? undefined : v)}
+              />
+            </Field>
+            <Field
+              id="dg-terreno-tipo"
+              label="Entorno del edificio"
+              help="Terreno tipo del DB-SE. I: borde del mar o de un lago con 5 km despejados de agua; II: rural llano sin obstáculos ni arbolado de importancia; III: rural accidentado o llano con obstáculos aislados; IV: zona urbana, industrial o forestal; V: centro de negocios de gran ciudad, con profusión de edificios en altura. Da la clase del entorno de HS1: E0 con I, II o III; E1 con IV o V. Sin él, HS1 supone E0 y lo avisa."
+              refText="DB-HS1 2.3.1 b)"
+            >
+              <SelectInput<"" | TerrenoTipo>
+                id="dg-terreno-tipo"
+                value={dg.terrenoTipo ?? ""}
+                options={TERRENO_TIPO_OPTIONS}
+                onChange={(v) => set("terrenoTipo", v === "" ? undefined : v)}
+              />
+            </Field>
+            <Field
+              id="dg-freatico"
+              label="Nivel freático"
+              help="Del estudio geotécnico: valor medio anual de la profundidad del nivel freático, medida desde la superficie del terreno. Decide la presencia de agua frente a la cara inferior del suelo en contacto con el terreno. Sin él, HS1 supone presencia alta y lo avisa."
+              refText="DB-HS1 2.1.1 pto 2 y Apéndice A"
+            >
+              <SelectInput<"" | NivelFreatico["tipo"]>
+                id="dg-freatico"
+                value={dg.nivelFreatico?.tipo ?? ""}
+                options={FREATICO_OPTIONS}
+                onChange={onFreaticoTipo}
+              />
+            </Field>
+            {dg.nivelFreatico?.tipo === "profundidad" && (
+              <Field
+                id="dg-freatico-prof"
+                label="Profundidad bajo la rasante"
+                unit="m"
+                help="Profundidad media anual del nivel freático bajo la superficie del terreno, en positivo."
+                warning={avisoDe(errores, "freático")}
+              >
+                <input
+                  id="dg-freatico-prof"
+                  type="text"
+                  inputMode="decimal"
+                  value={freaticoTxt}
+                  onChange={(e) => onFreaticoProfundidad(e.target.value)}
+                  placeholder="—"
+                  className={`${INPUT_CLS} text-right tabular-nums`}
+                />
+              </Field>
+            )}
+            {dg.nivelFreatico?.tipo === "no_detectado" && (
+              <Field
+                id="dg-reconocimiento"
+                label="Reconocido hasta"
+                sub="(opcional)"
+                unit="m"
+                help="Hasta dónde llegó el reconocimiento del estudio geotécnico sin encontrar agua. «No se detecta» solo equivale a presencia baja si llegó más hondo que la cara inferior del suelo; si no se indica, HS1 lo avisa."
+                warning={avisoDe(errores, "reconocimiento")}
+              >
+                <input
+                  id="dg-reconocimiento"
+                  type="text"
+                  inputMode="decimal"
+                  value={reconocimientoTxt}
+                  onChange={(e) => onReconocimiento(e.target.value)}
+                  placeholder="—"
+                  className={`${INPUT_CLS} text-right tabular-nums`}
+                />
+              </Field>
+            )}
+            <Field
+              id="dg-ks"
+              label="Permeabilidad del terreno"
+              help="Coeficiente de permeabilidad Ks del estudio geotécnico, por las columnas de la tabla 2.1 del DB-HS1."
+              refText="DB-HS1 tablas 2.1 y 2.3"
+            >
+              <SelectInput<"" | ClaseKs>
+                id="dg-ks"
+                value={dg.permeabilidadTerreno ?? ""}
+                options={KS_OPTIONS}
+                onChange={(v) => set("permeabilidadTerreno", v === "" ? undefined : v)}
+              />
+            </Field>
           </CollapsibleSection>
 
           <CollapsibleSection label="Suministro y saneamiento" defaultOpen={false}>

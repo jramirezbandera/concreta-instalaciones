@@ -283,7 +283,7 @@ Crítico en rojo + etiqueta + grosor (multicanal, WCAG AA, como hasta ahora).
 |---|---|---|---|---|---|
 | HS3 · HS4 · HS5 · HE1-predim | Cálculo | ✓ | ✓ (vivienda tipo) | — | Hecho (Tier 1), a re-patronar |
 | HS6 radón | Checker | ✓ | ✓ | — | Hecho, a re-patronar |
-| HS1 humedad (fachadas/muros/suelos/cubiertas) | Cálculo ligero | ✓ | ✓ | Medio | **Muy demandado — prioridad alta** |
+| HS1 humedad (fachadas/muros/suelos/cubiertas) | Cálculo ligero | ✓ | ✓ | Medio | **Hecho** (feature-17, patrón v4) |
 | HS2 residuos | Checker | ✓ | ✓ | Bajo | Pendiente |
 | SI1–SI6 (rama vivienda) | Checkers | ✓ | ✓ | Medio total, bajo por sección | Pendiente |
 | SUA1 · SUA4 · SUA8 · SUA9 | Checkers | ✓ | ✓ | Bajo | Pendiente |

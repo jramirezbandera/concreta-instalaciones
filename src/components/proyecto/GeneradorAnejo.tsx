@@ -80,6 +80,30 @@ function altoClon(data: FichaData): number {
 }
 
 const ADAPTADORES: Partial<Record<JustificacionKey, Adaptador>> = {
+  hs1: async (inputs, id, proyecto) => {
+    // HS1 (feature-17) sale de El edificio y de los datos de la obra.
+    const [estadoMod, just, ficha, seccion, dibujo] = await Promise.all([
+      import("../../modules/hs1/estado"),
+      import("../../modules/hs1/justificacion"),
+      import("../../modules/hs1/ficha"),
+      import("../../modules/hs1/seccion"),
+      import("../../modules/hs1/SeccionHs1"),
+    ]);
+    const estado = { ...estadoMod.hs1EstadoDefaults, ...inputs } as typeof estadoMod.hs1EstadoDefaults;
+    const revisados = proyecto.justificaciones.hs1?.revisados ?? [];
+    const j = just.justificarHs1(estado, proyecto.edificio, just.obraHs1De(proyecto.datosGenerales));
+    const svg = seccion.tamanoDibujoHs1(j, proyecto.edificio);
+    const base = ficha.toFichaData(j, { estado, edificio: proyecto.edificio, revisados, svg });
+    const data = { ...base, ...id, observaciones: [...(base.observaciones ?? [])] };
+    return {
+      data,
+      nodo: (
+        <Clon id={data.svg!.elementId}>
+          <dibujo.DibujoPdfHs1 j={j} edificio={proyecto.edificio} revisados={revisados} width={CLON_W} height={altoClon(data)} />
+        </Clon>
+      ),
+    };
+  },
   hs3: async (inputs, id, proyecto) => {
     // Desde feature-15 HS3 se deduce de El edificio, como HS5.
     const [estadoMod, just, ficha, planta, dibujo] = await Promise.all([

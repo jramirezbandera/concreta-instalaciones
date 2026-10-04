@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation } from "lucide-react";
+import { Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation, CloudRain } from "lucide-react";
 import type { JustificacionKey } from "../lib/proyecto/tipos";
 
 // Registry de justificaciones (feature-6 §C, UX-RECONCEPT §3 y §10). Única fuente
@@ -48,9 +48,12 @@ export const justificacionRegistry: JustificacionEntry[] = [
     label: "Protección frente a la humedad",
     grupo: "Salubridad (DB-HS)",
     db: "DB-HS1",
-    edicionDB: "DB-HS (consolidado 2022)",
+    edicionDB: "DB-HS1 (consolidado 2022)",
     formato: "calculo",
-    shipped: false,
+    shipped: true,
+    route: "hs/humedad",
+    icon: CloudRain,
+    schemaVersion: "1",
   },
   {
     key: "hs2",

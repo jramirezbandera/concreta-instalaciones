@@ -76,9 +76,13 @@ describe("filasObra — el Demo", () => {
     expect(textos(fila(q, "he0he1_global"))).toEqual(["HULC · EXP-7"]);
   });
 
+  it("HS1 publicada: sus partes salen de «Qué entra», sin el terreno", () => {
+    expect(textos(fila(demo(), "hs1"))).toEqual(["muros del sótano", "suelo del sótano", "fachadas", "cubierta"]);
+  });
+
   it("las «pronto» solo nombran partes del edificio", () => {
     const p = demo();
-    expect(textos(fila(p, "hs1"))).toEqual(["muros de sótano", "fachadas", "cubierta"]);
+    expect(textos(fila(p, "hs2"))).toEqual(["6 viviendas", "local"]);
     expect(textos(fila(p, "junta-si"))).toEqual(["viviendas", "local", "garaje"]);
     for (const g of filasObra(p))
       for (const f of g.filas)
@@ -115,8 +119,8 @@ describe("piezasDeQueEntra", () => {
 describe("recuento", () => {
   it("una a una, no por filas", () => {
     const r = recuentoObra(demo());
-    expect(r).toMatchObject({ cumple: 2, revisar: 3, no_cumple: 0, no_aplica: 1, externo: 2, pronto: 17 });
-    expect(textoRecuento(r)).toBe("2 cumple · 3 por revisar · 1 no aplica · 2 externo · 17 pronto");
+    expect(r).toMatchObject({ cumple: 2, revisar: 4, no_cumple: 0, no_aplica: 1, externo: 2, pronto: 16 });
+    expect(textoRecuento(r)).toBe("2 cumple · 4 por revisar · 1 no aplica · 2 externo · 16 pronto");
   });
 
   it("rotuloGrupo", () => {

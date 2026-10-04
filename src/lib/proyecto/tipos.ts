@@ -2,6 +2,7 @@ import type { Veredicto } from "../pdf/renderFicha";
 import type { ZonaRadon } from "../../modules/hs6/tablas";
 import type { ZonaTermica } from "../../modules/hs3/tablas";
 import type { Isoyeta, ZonaPluviometrica } from "../../modules/hs5/tablas";
+import type { ClaseKs, NivelFreatico, TerrenoTipo, ZonaEolica, ZonaPluviometricaHs1 } from "../../modules/hs1/tipos";
 import type { Edificio, TipoCubierta } from "../edificio/tipos";
 import type { ResumenEdificio } from "../edificio/derivar";
 
@@ -109,6 +110,21 @@ export interface DatosGenerales {
    * ella, HS5 supone que los sótanos quedan por debajo y lo avisa.
    */
   cotaAlcantarillado_m?: number;
+  /**
+   * HS 1 (feature-17): zona pluviométrica de promedios (figura 2.4), zona eólica
+   * (figura 2.5) y terreno tipo del DB-SE (clase del entorno), leídos por el
+   * proyectista como la zona de radón. Sin ellos, HS1 supone lo más desfavorable
+   * y lo avisa.
+   */
+  zonaPluviometricaHs1?: ZonaPluviometricaHs1;
+  zonaEolica?: ZonaEolica;
+  terrenoTipo?: TerrenoTipo;
+  /**
+   * Del estudio geotécnico (feature-17): el nivel freático y el coeficiente de
+   * permeabilidad del terreno. Sin ellos, HS1 supone y lo avisa.
+   */
+  nivelFreatico?: NivelFreatico;
+  permeabilidadTerreno?: ClaseKs;
 }
 
 // -----------------------------------------------------------------------------

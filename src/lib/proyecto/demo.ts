@@ -13,6 +13,7 @@ import { hs3EstadoDefaults, type Hs3Estado } from "../../modules/hs3/estado";
 import { hs4EstadoDefaults, type Hs4Estado } from "../../modules/hs4/estado";
 import { hs5EstadoDefaults, type Hs5Estado } from "../../modules/hs5/estado";
 import { hs6EstadoDefaults, type Hs6Estado } from "../../modules/hs6/estado";
+import { hs1EstadoDefaults, type Hs1Estado } from "../../modules/hs1/estado";
 import { he1EstadoDefaults, type He1Estado } from "../../modules/he1/estado";
 import type { ZonaClimatica } from "../../modules/he1/tablas";
 import {
@@ -64,6 +65,17 @@ const DATOS_GENERALES_DEMO: DatosGenerales = {
   // oficial por municipio (research/verificacion-hs5-pluviales.md, A6e). El
   // Demo enseña el aviso de la intensidad supuesta.
   cotaAlcantarillado_m: -1.2,
+  // HS1 (feature-17). Entorno urbano: Cáceres capital es «zona urbana» (terreno
+  // tipo IV, por la definición literal de HS 1 · 2.3.1 b). El estudio
+  // geotécnico es de DEMOSTRACIÓN, como la cota del alcantarillado: freático no
+  // detectado en un reconocimiento de 10 m y Ks entre 10⁻⁵ y 10⁻² cm/s. Las zonas
+  // pluviométrica y eólica NO se rellenan: Cáceres cae junto a los límites de las
+  // figuras 2.4 y 2.5 y no hay relación oficial por municipio
+  // (research/verificacion-hs1.md, 6.3 y 6.4). El Demo enseña el aviso del clima
+  // supuesto; con 13 m de altura la zona eólica no influye y no se pide.
+  terrenoTipo: "IV",
+  nivelFreatico: { tipo: "no_detectado", reconocimiento_m: 10 },
+  permeabilidadTerreno: "medio",
 };
 
 // -----------------------------------------------------------------------------
@@ -124,6 +136,9 @@ export function crearProyectoDemo(nowIso: string): Proyecto {
   // MATERIALIZADOS de forma coherente con los datos generales del Demo.
   // structuredClone ⇒ arrays/objetos anidados frescos (no se comparten los de
   // los defaults, que deben permanecer inmutables).
+  // HS1 sale de El edificio y de los datos de la obra (feature-17), con las
+  // decisiones habituales.
+  const hs1Inputs: Hs1Estado = structuredClone({ ...hs1EstadoDefaults });
   // HS3 sale de El edificio (feature-15), con la zona térmica heredada.
   const hs3Inputs: Hs3Estado = structuredClone({ ...hs3EstadoDefaults, zonaTermica: zt.zona });
   // HS4 sale de El edificio (feature-15); la presión es el dato de la obra.
@@ -156,6 +171,7 @@ export function crearProyectoDemo(nowIso: string): Proyecto {
     datosGenerales: { ...dg },
     edificio,
     justificaciones: {
+      hs1: justificacionDemo(hs1Inputs),
       hs3: justificacionDemo(hs3Inputs),
       hs4: justificacionDemo(hs4Inputs),
       hs5: justificacionDemo(hs5Inputs),

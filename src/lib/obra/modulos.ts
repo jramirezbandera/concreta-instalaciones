@@ -14,6 +14,11 @@ import { estadosElementos } from "../cte/estados";
 import type { DetalleElemento, MemoriaDoc } from "../cte/presentacion";
 import type { Aviso, ElementoResultado } from "../cte/resultado";
 import type { JustificacionKey, Proyecto, Veredicto } from "../proyecto/tipos";
+import { hs1EstadoDefaults, type Hs1Estado } from "../../modules/hs1/estado";
+import { justificarHs1, obraHs1De, type JustificacionHs1 } from "../../modules/hs1/justificacion";
+import { filasQueEntraHs1 } from "../../modules/hs1/entra";
+import { memoriaHs1 } from "../../modules/hs1/memoria";
+import * as textosHs1 from "../../modules/hs1/textos";
 import { hs3EstadoDefaults, type Hs3Estado } from "../../modules/hs3/estado";
 import { justificarHs3, type JustificacionHs3 } from "../../modules/hs3/justificacion";
 import { filasQueEntraHs3 } from "../../modules/hs3/entra";
@@ -81,6 +86,27 @@ function incumplimientoDeFranja(f: DetalleElemento): TextoObra {
 function estadosDe(j: { elementos: readonly ElementoResultado[]; avisos: readonly Aviso[] }, revisados: readonly string[]) {
   return estadosElementos(j.elementos, j.avisos, revisados);
 }
+
+const hs1: ModuloObra = {
+  key: "hs1",
+  defaults: hs1EstadoDefaults as unknown as Record<string, unknown>,
+  calcular(estado, p, revisados) {
+    const j: JustificacionHs1 = justificarHs1(estado as unknown as Hs1Estado, p.edificio, obraHs1De(p.datosGenerales));
+    return {
+      veredicto: j.veredicto,
+      elementos: j.elementos,
+      avisos: j.avisos,
+      frase: textosHs1.fraseHs1(j),
+      queEntra: filasQueEntraHs1(j, estadosDe(j, revisados)),
+      textoAviso: (a) => textosHs1.textoAviso(a),
+      textoIncumplimiento: (el) => {
+        const e = j.elementos.find((x) => x.id === el.id);
+        return e ? textosHs1.textoIncumplimiento(e) : null;
+      },
+      memoria: () => memoriaHs1(j),
+    };
+  },
+};
 
 const hs3: ModuloObra = {
   key: "hs3",
@@ -200,4 +226,4 @@ const he1: ModuloObra = {
 };
 
 /** Los módulos publicados, por clave. */
-export const MODULOS_OBRA: Partial<Record<JustificacionKey, ModuloObra>> = { hs3, hs4, hs5, hs6, he1 };
+export const MODULOS_OBRA: Partial<Record<JustificacionKey, ModuloObra>> = { hs1, hs3, hs4, hs5, hs6, he1 };

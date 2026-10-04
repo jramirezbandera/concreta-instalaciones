@@ -62,6 +62,8 @@ export function rotuloGrupo(grupo: string): string {
 const NO_SON_PARTES = new Set(["zona", "envolvente", "acometida"]);
 const SIN_PIEZA: Partial<Record<JustificacionKey, Set<string>>> = {
   hs5: new Set(["cubierta"]),
+  // El terreno es un dato de partida de HS1, no una parte del edificio.
+  hs1: new Set(["terreno"]),
 };
 
 function minuscula(s: string): string {

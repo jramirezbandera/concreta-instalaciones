@@ -48,7 +48,7 @@ describe("Datos de la obra", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /Suministro y saneamiento/ }));
     expect(screen.getByRole("textbox", { name: /Cota del alcantarillado/ })).toHaveValue("-1.2");
-    const zona = screen.getByRole("combobox", { name: /Zona pluviométrica/ });
+    const zona = screen.getByRole("combobox", { name: /Zona pluviométrica\s*\(HS5/ });
     expect(zona).toHaveValue("");
     expect(screen.queryByRole("combobox", { name: /Isoyeta/ })).toBeNull();
     await user.selectOptions(zona, "A");
@@ -64,6 +64,29 @@ describe("Datos de la obra", () => {
     });
     document.body.dispatchEvent(evento);
     expect(evento.defaultPrevented).toBe(true);
+  });
+
+  it("clima y terreno de HS1: lo del Demo, el freático a una profundidad y su validación", async () => {
+    inicializarStorage("2026-08-23T00:00:00.000Z");
+    await renderApp(`#/p/${DEMO_ID}/datos`);
+    await screen.findByRole("heading", { name: "Datos de la obra" });
+    const user = userEvent.setup();
+
+    // El Demo: entorno urbano, freático no detectado en 10 m y Ks medio; sin zonas de las figuras.
+    expect(screen.getByRole("combobox", { name: /Zona pluviométrica\s*\(HS1/ })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: /Zona eólica/ })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: /Entorno del edificio/ })).toHaveValue("IV");
+    expect(screen.getByRole("combobox", { name: /Nivel freático/ })).toHaveValue("no_detectado");
+    expect(screen.getByRole("textbox", { name: /Reconocido hasta/ })).toHaveValue("10");
+    expect(screen.getByRole("combobox", { name: /Permeabilidad del terreno/ })).toHaveValue("medio");
+
+    await user.selectOptions(screen.getByRole("combobox", { name: /Zona pluviométrica\s*\(HS1/ }), "III");
+    await user.selectOptions(screen.getByRole("combobox", { name: /Nivel freático/ }), "profundidad");
+    const prof = screen.getByRole("textbox", { name: /Profundidad bajo la rasante/ });
+    // Sin cifra, el aviso en el campo y en el resumen de errores.
+    expect(screen.getAllByText(/La profundidad del nivel freático debe estar entre 0 y 50 m/)).toHaveLength(2);
+    await user.type(prof, "4,5");
+    expect(screen.queryAllByText(/La profundidad del nivel freático debe estar/)).toHaveLength(0);
   });
 
   it("dentro de un campo de texto, Backspace se respeta (sigue borrando)", async () => {
