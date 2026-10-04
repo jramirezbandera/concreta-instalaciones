@@ -11,7 +11,7 @@ import { inicializarStorage } from "../../../lib/proyecto/storage";
 // HS5 (hash ANTES de importar App y resetModules).
 // =============================================================================
 
-const ESPERA_CHUNK = { timeout: 8000 };
+const ESPERA_CHUNK = { timeout: 20000 };
 const DIBUJO = "Lo que toca el terreno";
 
 async function renderHs6() {

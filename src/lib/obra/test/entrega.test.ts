@@ -31,6 +31,12 @@ describe("antesDeEntregar", () => {
       "SI3:revisar",
       "SI4:revisar",
       "SI6:revisar",
+      "SUA2:revisar",
+      "SUA3:revisar",
+      "SUA4:revisar",
+      "SUA8:revisar",
+      "SUA8:revisar",
+      "SUA9:revisar",
     ]);
     expect(l[0]).toMatchObject({ id: "hs1:clima-supuesto", ruta: "hs/humedad" });
     expect(l[0].detalle.length).toBeGreaterThan(10);
@@ -57,6 +63,11 @@ describe("antesDeEntregar", () => {
         si3: { revisados: ["recorrido", "recorrido-garaje"] },
         si4: { revisados: ["construida-garaje"] },
         si6: { revisados: ["sector-sotano"] },
+        sua2: { revisados: ["garaje-altura"] },
+        sua3: { revisados: ["cierrapuertas"] },
+        sua4: { revisados: ["cuarto-sin-tipo"] },
+        sua8: { revisados: ["ng-supuesto", "local-comercial"] },
+        sua9: { revisados: ["viviendas-accesibles"] },
       },
     };
     expect(antesDeEntregar(q)).toEqual([]);
@@ -66,16 +77,16 @@ describe("antesDeEntregar", () => {
 describe("entregables", () => {
   it("el Demo: todo listo", () => {
     expect(entregables(demo())).toEqual({
-      memoria: { listos: 13, total: 13, noCumplen: [] },
-      fichas: { listos: 12, total: 12, noCumplen: [] },
+      memoria: { listos: 21, total: 21, noCumplen: [] },
+      fichas: { listos: 19, total: 19, noCumplen: [] },
       esquemas: { listos: 2, total: 2, noCumplen: [], claves: ["hs5", "hs4"] },
     });
   });
 
   it("lo que no cumple no cuenta como listo", () => {
     expect(entregables(conHs4Fallando())).toEqual({
-      memoria: { listos: 12, total: 13, noCumplen: ["HS4"] },
-      fichas: { listos: 11, total: 12, noCumplen: ["HS4"] },
+      memoria: { listos: 20, total: 21, noCumplen: ["HS4"] },
+      fichas: { listos: 18, total: 19, noCumplen: ["HS4"] },
       esquemas: { listos: 1, total: 2, noCumplen: ["HS4"], claves: ["hs5"] },
     });
   });
@@ -96,7 +107,15 @@ describe("memoriaCte", () => {
       "SI4:redactado",
       "SI5:redactado",
       "SI6:redactado",
+      "SUA1:redactado",
+      "SUA2:redactado",
+      "SUA3:redactado",
+      "SUA4:redactado",
+      "SUA5:no_aplica",
       "SUA6:no_aplica",
+      "SUA7:redactado",
+      "SUA8:redactado",
+      "SUA9:redactado",
       "HE1:redactado",
       "HE0:externo",
       "DB-SE:externo",
@@ -105,7 +124,7 @@ describe("memoriaCte", () => {
     expect(m.apartados[0].encabezado).toBe("DB-HS 1 · Protección frente a la humedad");
     expect(m.pendientes.map((x) => x.codigo)).toContain("HS2");
     expect(m.pendientes.map((x) => x.codigo)).not.toContain("HS1");
-    expect(m.pendientes).toHaveLength(10);
+    expect(m.pendientes).toHaveLength(5);
   });
 
   it("lo que no cumple sale como pendiente, sin su texto", () => {

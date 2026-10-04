@@ -35,6 +35,7 @@ import type { DatosGenerales, Intervencion, ZonaRadon } from "../lib/proyecto/ti
 import { intensidadDe } from "../modules/hs5/pluviales";
 import { ISOYETAS, type Isoyeta, type ZonaPluviometrica } from "../modules/hs5/tablas";
 import type { ClaseKs, NivelFreatico, TerrenoTipo, ZonaEolica, ZonaPluviometricaHs1 } from "../modules/hs1/tipos";
+import { SUA8_NG } from "../modules/sua8/tablas";
 
 // -----------------------------------------------------------------------------
 // Opciones de los selects (a nivel de módulo: identidad estable entre renders).
@@ -81,6 +82,12 @@ const ZONA_EOLICA_OPTIONS: { value: "" | ZonaEolica; label: string }[] = [
   { value: "A", label: "Zona A · 26 m/s" },
   { value: "B", label: "Zona B · 27 m/s" },
   { value: "C", label: "Zona C · 29 m/s" },
+];
+
+/** SUA 8 (feature-20): las cifras del mapa de la figura 1.1, sin 3,50 ni 4,50. */
+const NG_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "— No indicada —" },
+  ...SUA8_NG.datos.map((v) => ({ value: String(v), label: `${v.toFixed(2).replace(".", ",")} impactos/año·km²` })),
 ];
 
 const TERRENO_TIPO_OPTIONS: { value: "" | TerrenoTipo; label: string }[] = [
@@ -640,7 +647,7 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
             )}
           </CollapsibleSection>
 
-          <CollapsibleSection label="Clima y terreno" refNorma="DB-HS1, figuras 2.4 y 2.5 · estudio geotécnico">
+          <CollapsibleSection label="Clima y terreno" refNorma="DB-HS1, figuras 2.4 y 2.5 · DB-SUA 8, figura 1.1 · estudio geotécnico">
             <Field
               id="dg-zona-pluv-hs1"
               label="Zona pluviométrica"
@@ -666,6 +673,20 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
                 value={dg.zonaEolica ?? ""}
                 options={ZONA_EOLICA_OPTIONS}
                 onChange={(v) => set("zonaEolica", v === "" ? undefined : v)}
+              />
+            </Field>
+            <Field
+              id="dg-ng"
+              label="Densidad de impactos Ng"
+              sub="(SUA 8)"
+              help="Densidad de impactos sobre el terreno, leída en el mapa de la figura 1.1 del DB-SUA para el municipio de la obra. ENTRADA MANUAL: el mapa no da un valor por provincia; si el municipio cae sobre una línea o entre dos zonas, toma el mayor. Sin ella, SUA 8 supone 6,00 (el mayor del mapa) y lo avisa si cambia el resultado."
+              refText="DB-SUA 8 ap. 1 pto 3, figura 1.1"
+            >
+              <SelectInput<string>
+                id="dg-ng"
+                value={dg.densidadImpactosNg === undefined ? "" : String(dg.densidadImpactosNg)}
+                options={NG_OPTIONS}
+                onChange={(v) => set("densidadImpactosNg", v === "" ? undefined : Number(v))}
               />
             </Field>
             <Field

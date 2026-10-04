@@ -172,6 +172,12 @@ export type UnidadTipo = ViviendaTipo | NucleoAseos;
 
 export interface Edificio {
   cubierta: { tipo: TipoCubierta; superficie_m2: number };
+  /**
+   * Si el edificio tiene ascensor (feature-20, DB-SUA): decide la escalera de SUA 1
+   * (contrahuella y altura de tramo) y la accesibilidad entre plantas de SUA 9. Sin
+   * él, se supone que lo hay solo cuando SUA 9 lo exige.
+   */
+  ascensor?: boolean;
   /** De ARRIBA abajo. Siempre hay al menos un grupo sobre rasante (la PB). */
   grupos: GrupoPlantas[];
   unidades: UnidadTipo[];

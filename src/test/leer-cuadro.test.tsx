@@ -78,7 +78,7 @@ async function renderEdificio() {
 
 async function abrirYElegir(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Leer el cuadro de superficies" }));
-  const dialogo = await screen.findByRole("dialog", { name: "Leer el cuadro de superficies" }, { timeout: 8000 });
+  const dialogo = await screen.findByRole("dialog", { name: "Leer el cuadro de superficies" }, { timeout: 20000 });
   await user.upload(
     within(dialogo).getByLabelText("PDF o imágenes del cuadro de superficies"),
     new File(["%PDF-1.7"], "cuadro.pdf", { type: "application/pdf" }),

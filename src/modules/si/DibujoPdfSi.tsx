@@ -31,7 +31,7 @@ export function DibujoPdfSi<E extends Record<string, unknown>, J extends Justifi
       mode="pdf"
       width={width}
       height={height}
-      titulo={`${def.sujeto} (DB-SI): ${def.tituloDibujo.toLowerCase()}`}
+      titulo={`${def.sujeto} (${def.db ?? "DB-SI"}): ${def.tituloDibujo.toLowerCase()}`}
       descripcion={def.describirDibujo(j)}
       estados={estados}
       textos={textos}

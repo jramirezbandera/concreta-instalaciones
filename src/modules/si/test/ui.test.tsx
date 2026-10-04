@@ -10,7 +10,7 @@ import { inicializarStorage } from "../../../lib/proyecto/storage";
 // Mismo patrón que HS1 (hash ANTES de importar App y resetModules).
 // =============================================================================
 
-const ESPERA_CHUNK = { timeout: 8000 };
+const ESPERA_CHUNK = { timeout: 20000 };
 
 async function renderRuta(ruta: string, dibujo: string) {
   window.location.hash = `#/p/${DEMO_ID}/${ruta}`;

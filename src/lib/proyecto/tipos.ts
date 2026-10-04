@@ -31,7 +31,7 @@ export type JustificacionKey =
   | "hs3" | "hs4" | "hs5" | "hs6" | "he1"
   | "hs1" | "hs2"
   | "si1" | "si2" | "si3" | "si4" | "si5" | "si6"
-  | "sua1" | "sua4" | "sua6" | "sua7" | "sua8" | "sua9"
+  | "sua1" | "sua2" | "sua3" | "sua4" | "sua5" | "sua6" | "sua7" | "sua8" | "sua9"
   | "hr" | "he4" | "he5" | "rebt" | "he0he1_global" | "dbse";
 
 // -----------------------------------------------------------------------------
@@ -125,6 +125,13 @@ export interface DatosGenerales {
    */
   nivelFreatico?: NivelFreatico;
   permeabilidadTerreno?: ClaseKs;
+  /**
+   * SUA 8 (feature-20): densidad de impactos sobre el terreno Ng [impactos/año·km²],
+   * leída por el proyectista en la figura 1.1 del DB-SUA para su municipio (el mapa
+   * no da un valor por provincia). Sin ella, SUA 8 supone el mayor del mapa y lo
+   * avisa solo si cambia el resultado.
+   */
+  densidadImpactosNg?: number;
 }
 
 // -----------------------------------------------------------------------------

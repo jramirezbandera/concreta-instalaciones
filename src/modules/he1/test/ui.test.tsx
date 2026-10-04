@@ -12,7 +12,7 @@ import { inicializarStorage } from "../../../lib/proyecto/storage";
 // (hash ANTES de importar App y resetModules).
 // =============================================================================
 
-const ESPERA_CHUNK = { timeout: 8000 };
+const ESPERA_CHUNK = { timeout: 20000 };
 const FACHADA = "Sección de la fachada · a escala";
 
 async function renderHe1() {

@@ -105,6 +105,8 @@ export function PantallaSi<E extends Record<string, unknown>, J extends Justific
     };
   });
 
+  const cambiarEdificio = (e: Edificio) => actualizarEdificio(e, new Date().toISOString());
+
   // Lo que no cumple, con el cambio que lo arregla.
   const incumplimientos: IncumplimientoModulo[] = j.elementos.flatMap((el) => {
     const t = def.textoIncumplimiento(el);
@@ -121,6 +123,7 @@ export function PantallaSi<E extends Record<string, unknown>, J extends Justific
               etiqueta: a.etiqueta,
               onClick: () => {
                 for (const k of Object.keys(a.cambios) as (keyof E)[]) setField(k, a.cambios[k] as E[keyof E]);
+                if (a.edificio) cambiarEdificio(a.edificio(edificio));
               },
             }
           : undefined,
@@ -163,7 +166,6 @@ export function PantallaSi<E extends Record<string, unknown>, J extends Justific
       enlace={{ to: `/p/${proyecto.id}/edificio`, label: "Editar el edificio" }}
     />
   );
-  const cambiarEdificio = (e: Edificio) => actualizarEdificio(e, new Date().toISOString());
   const entradas = <Decisiones state={state} setField={setField} j={j} edificio={edificio} cambiarEdificio={cambiarEdificio} />;
 
   // ── El dibujo ──────────────────────────────────────────────────────────────
@@ -191,7 +193,7 @@ export function PantallaSi<E extends Record<string, unknown>, J extends Justific
                 mode="screen"
                 width={width}
                 height={height}
-                titulo={`${def.sujeto} (DB-SI): ${def.tituloDibujo.toLowerCase()}`}
+                titulo={`${def.sujeto} (${def.db ?? "DB-SI"}): ${def.tituloDibujo.toLowerCase()}`}
                 descripcion={def.describirDibujo(j)}
                 seleccion={selVigente}
                 estados={estados}

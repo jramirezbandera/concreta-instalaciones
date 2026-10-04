@@ -14,7 +14,7 @@ import { inicializarStorage } from "../../../lib/proyecto/storage";
 // =============================================================================
 
 // El módulo es LAZY: el primer render del archivo paga la carga del chunk.
-const ESPERA_CHUNK = { timeout: 8000 };
+const ESPERA_CHUNK = { timeout: 20000 };
 
 async function renderHs5() {
   window.location.hash = `#/p/${DEMO_ID}/hs/saneamiento`;

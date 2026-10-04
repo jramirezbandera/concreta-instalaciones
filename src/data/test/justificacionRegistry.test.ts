@@ -20,7 +20,7 @@ const KEYS_ESPERADAS = [
   "hs3", "hs4", "hs5", "hs6", "he1",
   "hs1", "hs2",
   "si1", "si2", "si3", "si4", "si5", "si6",
-  "sua1", "sua4", "sua6", "sua7", "sua8", "sua9",
+  "sua1", "sua2", "sua3", "sua4", "sua5", "sua6", "sua7", "sua8", "sua9",
   "hr", "he4", "he5", "rebt",
   "he0he1_global", "dbse",
   "smoke",
@@ -136,16 +136,19 @@ describe("justificacionesPorGrupo", () => {
       expect(g.entradas.length).toBeGreaterThan(0);
       expect(g.entradas.every((j) => j.shipped)).toBe(true);
     }
-    // Los grupos sin entradas shipped (SUA, HR, Electricidad, Externas) no
+    // Los grupos sin entradas shipped (HR, Electricidad, Externas) no
     // aparecen; los que quedan mantienen el orden de declaración.
     expect(grupos.map((g) => g.grupo)).toEqual([
       "Salubridad (DB-HS)",
       "Seguridad en caso de incendio (DB-SI)",
+      "Utilización y accesibilidad (DB-SUA)",
       "Ahorro de energía (DB-HE)",
       "Desarrollo",
     ]);
     // Contenido shipped exacto de los grupos Salubridad y DB-SI, en orden numérico declarado.
     expect(grupos[0].entradas.map((j) => j.key)).toEqual(["hs1", "hs3", "hs4", "hs5", "hs6"]);
     expect(grupos[1].entradas.map((j) => j.key)).toEqual(["si1", "si2", "si3", "si4", "si5", "si6"]);
+    // SUA 5 no tiene pantalla: no aplica nunca (feature-20).
+    expect(grupos[2].entradas.map((j) => j.key)).toEqual(["sua1", "sua2", "sua3", "sua4", "sua6", "sua7", "sua8", "sua9"]);
   });
 });

@@ -148,7 +148,7 @@ const JUNTAS: Junta[] = [
     codigo: "SI",
     todas: { codigo: "SI1–6", titulo: "Seis apartados" },
   },
-  { familia: "sua", claves: ["sua1", "sua4", "sua6", "sua7", "sua8", "sua9"], codigo: "SUA" },
+  { familia: "sua", claves: ["sua1", "sua2", "sua3", "sua4", "sua5", "sua6", "sua7", "sua8", "sua9"], codigo: "SUA" },
   { familia: "he45", claves: ["he4", "he5"], codigo: "HE", todas: { codigo: "HE4·5", titulo: "ACS y fotovoltaica" } },
 ];
 

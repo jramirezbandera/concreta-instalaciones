@@ -55,7 +55,7 @@ async function esperarListado() {
         "Cargando municipios…",
       );
     },
-    { timeout: 8000 },
+    { timeout: 20000 },
   );
 }
 

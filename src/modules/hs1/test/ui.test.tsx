@@ -11,7 +11,7 @@ import { inicializarStorage } from "../../../lib/proyecto/storage";
 // importar App y resetModules).
 // =============================================================================
 
-const ESPERA_CHUNK = { timeout: 8000 };
+const ESPERA_CHUNK = { timeout: 20000 };
 const DIBUJO = "La envolvente";
 
 async function renderHs1() {

@@ -120,6 +120,38 @@ const router = createHashRouter([
             path: "si/bomberos",
             lazy: lazyComponent(() => import("./modules/si5/ui"), "Si5Module"),
           },
+          {
+            path: "sua/piscinas",
+            lazy: lazyComponent(() => import("./modules/sua6/ui"), "Sua6Module"),
+          },
+          {
+            path: "sua/vehiculos",
+            lazy: lazyComponent(() => import("./modules/sua7/ui"), "Sua7Module"),
+          },
+          {
+            path: "sua/accesibilidad",
+            lazy: lazyComponent(() => import("./modules/sua9/ui"), "Sua9Module"),
+          },
+          {
+            path: "sua/caidas",
+            lazy: lazyComponent(() => import("./modules/sua1/ui"), "Sua1Module"),
+          },
+          {
+            path: "sua/impacto",
+            lazy: lazyComponent(() => import("./modules/sua2/ui"), "Sua2Module"),
+          },
+          {
+            path: "sua/aprisionamiento",
+            lazy: lazyComponent(() => import("./modules/sua3/ui"), "Sua3Module"),
+          },
+          {
+            path: "sua/iluminacion",
+            lazy: lazyComponent(() => import("./modules/sua4/ui"), "Sua4Module"),
+          },
+          {
+            path: "sua/rayo",
+            lazy: lazyComponent(() => import("./modules/sua8/ui"), "Sua8Module"),
+          },
         ],
       },
       { path: "hs/*", element: <RedirectLegacy /> },

@@ -33,6 +33,9 @@ export interface PiezasFichaSi<E> {
   valor: (el: ElementoSi<unknown>) => string;
   textoAviso: (a: Aviso) => TextoSi;
   observaciones?: string[];
+  /** Edición del DB y documento de las citas: los del DB-SI si no se dicen (feature-20, DB-SUA). */
+  edicionDB?: string;
+  db?: string;
   memoria: MemoriaDoc;
   caption: string;
   pdfSvgId: string;
@@ -53,7 +56,7 @@ export function fichaSi<E>(j: JustificacionSiBase, p: PiezasFichaSi<E>): FichaDa
   return {
     titulo: p.titulo,
     engineVersion: ENGINE_VERSION,
-    edicionDB: EDICION_SI,
+    edicionDB: p.edicionDB ?? EDICION_SI,
     normativa: p.normativa,
     datosPartida,
     verificaciones: j.elementos.map((el) => ({
@@ -61,7 +64,7 @@ export function fichaSi<E>(j: JustificacionSiBase, p: PiezasFichaSi<E>): FichaDa
       valor: p.valor(el),
       limite: p.limite(el),
       estado: VEREDICTO_FICHA[el.veredicto],
-      referencia: el.cita[0] ?? "DB-SI",
+      referencia: el.cita[0] ?? p.db ?? "DB-SI",
     })),
     veredictoGlobal: j.veredicto,
     observaciones,

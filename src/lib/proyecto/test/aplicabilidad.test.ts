@@ -17,12 +17,12 @@ type Uso = "vivienda_unifamiliar" | "vivienda_colectiva";
 // La herramienta propone con cita; el proyectista dispone (forzado).
 // =============================================================================
 
-/** Las 24 claves del union JustificacionKey — el Record debe cubrirlas TODAS. */
+/** Las 27 claves del union JustificacionKey — el Record debe cubrirlas TODAS. */
 const TODAS_LAS_KEYS: JustificacionKey[] = [
   "hs3", "hs4", "hs5", "hs6", "he1",
   "hs1", "hs2",
   "si1", "si2", "si3", "si4", "si5", "si6",
-  "sua1", "sua4", "sua6", "sua7", "sua8", "sua9",
+  "sua1", "sua2", "sua3", "sua4", "sua5", "sua6", "sua7", "sua8", "sua9",
   "hr", "he4", "he5", "rebt", "he0he1_global", "dbse",
 ];
 

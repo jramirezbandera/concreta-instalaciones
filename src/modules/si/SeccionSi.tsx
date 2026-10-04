@@ -132,6 +132,43 @@ function Icono({ icono, x, y, color, P }: { icono: IconoSi; x: number; y: number
           <path d="M8 3.5 10.5 6.5h-5zM8 12.5 5.5 9.5h5z" fill={color} stroke="none" />
         </g>
       );
+    case "rayo":
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <path d="M9.5 1 4 9h4l-1.5 6L12 7H8z" fill={P.fondo} strokeLinejoin="round" />
+        </g>
+      );
+    case "luz":
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <rect x={2} y={5} width={12} height={6} rx={1} fill={P.fondo} />
+          <path d="M5 13.5 4 15M8 13.5V15.5M11 13.5l1 1.5" />
+          <path d="M5.5 8h5" />
+        </g>
+      );
+    case "accesible":
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <circle cx={7} cy={2.5} r={1.4} fill={color} stroke="none" />
+          <path d="M7 4.5v5h4l1.5 4M7 7h3.5" />
+          <path d="M5 8.2a4 4 0 1 0 5.6 4.6" />
+        </g>
+      );
+    case "coche":
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <path d="M1.5 11V8.5l2-4h9l2 4V11z" fill={P.fondo} strokeLinejoin="round" />
+          <circle cx={4.5} cy={12} r={1.6} fill={P.fondo} />
+          <circle cx={11.5} cy={12} r={1.6} fill={P.fondo} />
+        </g>
+      );
+    case "puerta":
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <rect x={3.5} y={1.5} width={9} height={13.5} fill={P.fondo} />
+          <circle cx={10} cy={8.5} r={0.9} fill={color} stroke="none" />
+        </g>
+      );
   }
 }
 

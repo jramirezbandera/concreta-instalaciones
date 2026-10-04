@@ -1,6 +1,7 @@
 // =============================================================================
 // DB-SI — Lo que cada sección (SI 1 a SI 6) aporta a la pantalla común, a La obra
-// y al anejo (feature-19). Las seis comparten la anatomía v4 entera (cabecera,
+// y al anejo (feature-19). Desde feature-20 la usan también las nueve secciones
+// del DB-SUA, que leen el edificio con el mismo dibujo y la misma pantalla. Las seis comparten la anatomía v4 entera (cabecera,
 // «Qué entra», decisiones, el dibujo con sus etiquetas, la franja, la lista y la
 // memoria), así que cada sección solo da sus funciones PURAS: justificar,
 // redactar y dibujar. Las decisiones (React) van aparte, en su `ui.tsx`, para
@@ -12,9 +13,9 @@ import type { DetalleElemento, EstadoPresentacion, MemoriaDoc } from "../../lib/
 import type { Aviso } from "../../lib/cte/resultado";
 import type { Edificio } from "../../lib/edificio/tipos";
 import type { FichaData } from "../../lib/pdf/renderFicha";
-import type { DatosGenerales } from "../../lib/proyecto/tipos";
+import type { DatosGenerales, JustificacionKey } from "../../lib/proyecto/tipos";
 import type { DibujoSi } from "./seccion";
-import type { ClaveSi, ElementoSi, JustificacionSiBase } from "./tipos";
+import type { ElementoSi, JustificacionSiBase } from "./tipos";
 
 /** Un título y su explicación: un aviso o lo que no cumple, ya redactado. */
 export interface TextoSi {
@@ -36,7 +37,9 @@ export interface OpcionesFichaSi<E> {
 }
 
 export interface DefinicionSi<E extends Record<string, unknown>, J extends JustificacionSiBase> {
-  key: ClaveSi;
+  key: JustificacionKey;
+  /** El documento básico, para los títulos del dibujo y las citas: «DB-SI» si no se dice. */
+  db?: "DB-SI" | "DB-SUA";
   defaults: E;
   /** Sujeto de la cabecera: «Propagación interior». */
   sujeto: string;
@@ -53,8 +56,11 @@ export interface DefinicionSi<E extends Record<string, unknown>, J extends Justi
   resultadoLista(el: ElementoSi<unknown>): string;
   textoAviso(a: Aviso): TextoSi;
   textoIncumplimiento(el: ElementoSi<unknown>): TextoSi | null;
-  /** El cambio de las decisiones que arregla lo que no cumple. */
-  arreglo?(el: ElementoSi<unknown>, j: J): { etiqueta: string; cambios: Partial<E> } | null;
+  /**
+   * El cambio de las decisiones que arregla lo que no cumple; `edificio`, si además
+   * hay que cambiar El edificio (el ascensor de SUA 9, feature-20).
+   */
+  arreglo?(el: ElementoSi<unknown>, j: J): { etiqueta: string; cambios: Partial<E>; edificio?: (e: Edificio) => Edificio } | null;
   /** Avisos que se arreglan en Datos de la obra o en El edificio (llevan el enlace). */
   avisosADatos?: ReadonlySet<string>;
   avisosAEdificio?: ReadonlySet<string>;

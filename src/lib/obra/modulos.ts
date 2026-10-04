@@ -52,6 +52,14 @@ import { si2 } from "../../modules/si2/definicion";
 import { si3 } from "../../modules/si3/definicion";
 import { si5 } from "../../modules/si5/definicion";
 import { si6 } from "../../modules/si6/definicion";
+import { sua6 } from "../../modules/sua6/definicion";
+import { sua7 } from "../../modules/sua7/definicion";
+import { sua9 } from "../../modules/sua9/definicion";
+import { sua1 } from "../../modules/sua1/definicion";
+import { sua2 } from "../../modules/sua2/definicion";
+import { sua3 } from "../../modules/sua3/definicion";
+import { sua4 } from "../../modules/sua4/definicion";
+import { sua8 } from "../../modules/sua8/definicion";
 
 /** Un título y su explicación: un aviso o algo que no cumple, ya redactado. */
 export interface TextoObra {
@@ -277,4 +285,12 @@ export const MODULOS_OBRA: Partial<Record<JustificacionKey, ModuloObra>> = {
   si3: moduloSi(si3),
   si5: moduloSi(si5),
   si6: moduloSi(si6),
+  sua6: moduloSi(sua6),
+  sua7: moduloSi(sua7),
+  sua9: moduloSi(sua9),
+  sua1: moduloSi(sua1),
+  sua2: moduloSi(sua2),
+  sua3: moduloSi(sua3),
+  sua4: moduloSi(sua4),
+  sua8: moduloSi(sua8),
 };

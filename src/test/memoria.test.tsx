@@ -28,14 +28,14 @@ describe("«/p/demo/memoria»", () => {
     inicializarStorage("2026-10-04T10:00:00.000Z");
     await renderApp(`#/p/${DEMO_ID}/memoria`);
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Memoria CTE de instalaciones" }, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.getByText("13 de 13 apartados listos")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Memoria CTE de instalaciones" }, { timeout: 20000 })).toBeInTheDocument();
+    expect(screen.getByText("21 de 21 apartados listos")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 5 · Evacuación de aguas" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "DB-SUA6 · Piscinas" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "DB-SUA6 · Ahogamiento" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 1 · Protección frente a la humedad" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-SI 1 · Propagación interior" })).toBeInTheDocument();
     expect(screen.getByText(/Aún sin redactar: HS2/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Memoria CTE/ })).toHaveTextContent("13/13");
+    expect(screen.getByRole("link", { name: /Memoria CTE/ })).toHaveTextContent("21/21");
 
     // user-event pone su propio portapapeles: se espía después de crearlo.
     const user = userEvent.setup();

@@ -286,7 +286,7 @@ Crítico en rojo + etiqueta + grosor (multicanal, WCAG AA, como hasta ahora).
 | HS1 humedad (fachadas/muros/suelos/cubiertas) | Cálculo ligero | ✓ | ✓ | Medio | **Hecho** (feature-17, patrón v4) |
 | HS2 residuos | Checker | ✓ | ✓ | Bajo | Pendiente |
 | SI1–SI6 (rama vivienda) | Checkers | ✓ | ✓ | Medio total, bajo por sección | **Hecho** (feature-19, patrón v4, núcleo común) |
-| SUA1 · SUA4 · SUA8 · SUA9 | Checkers | ✓ | ✓ | Bajo | Pendiente |
+| SUA1–SUA9 | Checkers (SUA 8: cálculo ligero; SUA 5: no aplica) | ✓ | ✓ | Bajo | **Hecho** (feature-20, núcleo de SI) |
 | HR opción simplificada | Checker | — (unif. aislada exenta entre usuarios) | ✓ | Medio | Pendiente |
 | HE4 ACS · HE5 FV | Checkers | ✓ | ✓ | Bajo | Pendiente |
 | **REBT** grado electrificación + previsión de cargas (ITC-BT-10) | Checker | ✓ | ✓ | Bajo | **Entra** (decidido) |

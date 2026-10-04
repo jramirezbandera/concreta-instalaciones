@@ -39,8 +39,11 @@ function proyecto(
   };
 }
 
-/** Las doce publicadas. */
-const PUBLICADAS: JustificacionKey[] = ["hs1", "hs3", "hs4", "hs5", "hs6", "si1", "si2", "si3", "si4", "si5", "si6", "he1"];
+/** Las veinte publicadas (SUA 5 no tiene pantalla: no aplica nunca). */
+const PUBLICADAS: JustificacionKey[] = [
+  "hs1", "hs3", "hs4", "hs5", "hs6", "si1", "si2", "si3", "si4", "si5", "si6",
+  "sua1", "sua2", "sua3", "sua4", "sua6", "sua7", "sua8", "sua9", "he1",
+];
 
 describe("estadoDe — calculado con el motor del módulo", () => {
   it("una justificación aún no publicada queda sin iniciar y sin veredicto", () => {
@@ -107,19 +110,20 @@ describe("resumenProyecto — recuento del expediente", () => {
   /** Nº de claves reales del expediente (registry sin entradas dev). */
   const TOTAL = justificacionRegistry.filter((e) => !e.dev).length;
 
-  it("el registry sin dev cubre las 25 claves del union", () => {
-    expect(TOTAL).toBe(25);
+  it("el registry sin dev cubre las 28 claves del union", () => {
+    expect(TOTAL).toBe(28);
   });
 
-  it("proyecto sin abrir nada: las doce publicadas calculadas, el resto sin iniciar", () => {
+  it("proyecto sin abrir nada: las veinte publicadas calculadas, el resto sin iniciar", () => {
     const r = resumenProyecto(proyecto());
-    // he0he1_global (HULC) y dbse (Concreta estructura) son externas de base.
+    // he0he1_global (HULC) y dbse (Concreta estructura) son externas de base;
+    // SUA 5 no aplica nunca a viviendas ni oficinas.
     expect(r.externas).toBe(2);
-    expect(r.noAplica).toBe(0);
-    expect(r.aplicables).toBe(TOTAL - 2);
-    expect(r.cumplen + r.noCumplen).toBe(12);
+    expect(r.noAplica).toBe(1);
+    expect(r.aplicables).toBe(TOTAL - 3);
+    expect(r.cumplen + r.noCumplen).toBe(PUBLICADAS.length);
     expect(r.enCurso).toBe(0);
-    expect(r.sinIniciar).toBe(TOTAL - 2 - 12);
+    expect(r.sinIniciar).toBe(TOTAL - 3 - PUBLICADAS.length);
   });
 
   it("no_aplica y externo forzados no cuentan como aplicables", () => {
@@ -129,10 +133,10 @@ describe("resumenProyecto — recuento del expediente", () => {
       he4: { aplicabilidadForzada: { valor: "externo" }, refExterna: "EXP-123" },
     });
     const r = resumenProyecto(p);
-    expect(r.noAplica).toBe(2);
+    expect(r.noAplica).toBe(3); // hr y hs5 forzadas + sua5
     expect(r.externas).toBe(3); // he0he1_global + dbse (base) + he4 forzada
-    expect(r.aplicables).toBe(TOTAL - 5);
-    expect(r.cumplen + r.noCumplen).toBe(11); // hs5 ya no se calcula
+    expect(r.aplicables).toBe(TOTAL - 6);
+    expect(r.cumplen + r.noCumplen).toBe(PUBLICADAS.length - 1); // hs5 ya no se calcula
     // Invariante: el desglose de progreso suma exactamente las aplicables.
     expect(r.cumplen + r.noCumplen + r.enCurso + r.sinIniciar).toBe(r.aplicables);
   });

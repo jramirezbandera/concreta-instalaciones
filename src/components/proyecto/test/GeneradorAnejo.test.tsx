@@ -58,8 +58,14 @@ afterEach(() => {
 });
 
 
-/** Los módulos publicados, ordenados por clave (feature-19 añade SI1 a SI6). */
-const PUBLICADAS = ["he1", "hs1", "hs3", "hs4", "hs5", "hs6", "si1", "si2", "si3", "si4", "si5", "si6"];
+/**
+ * Los módulos publicados que aplican al Demo, ordenados por clave (feature-19 añade
+ * SI1 a SI6; feature-20, las SUA salvo SUA5 y SUA6, que no le aplican).
+ */
+const PUBLICADAS = [
+  "he1", "hs1", "hs3", "hs4", "hs5", "hs6", "si1", "si2", "si3", "si4", "si5", "si6",
+  "sua1", "sua2", "sua3", "sua4", "sua7", "sua8", "sua9",
+];
 
 describe("GeneradorAnejo · anejo del expediente (feature-8 §D)", () => {
   it("el PDF de las fichas está disponible con el Demo", () => {

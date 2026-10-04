@@ -79,13 +79,22 @@ function NavJustificacion(props: {
   const { entrada, proyecto, onClose } = props;
 
   // No publicada (o externa sin pantalla): se lista, atenuada y sin enlace.
+  // Una que no aplica nunca (SUA 5, feature-20) dice «no aplica», no «pronto».
   if (!entrada.shipped || entrada.route === undefined) {
     const externa = entrada.formato === "externo";
+    const noAplica =
+      !externa && proyecto !== null && !entrada.dev && estadoDe(proyecto, entrada.key as JustificacionKey).aplicabilidad === "no_aplica";
     return (
       <div className={`${ITEM} text-text-disabled`} title={`${entrada.codigo} — ${entrada.label}`}>
         <Codigo>{entrada.codigo}</Codigo>
         <span className="min-w-0 flex-1 truncate">{entrada.label}</span>
-        <span className="ml-auto font-mono text-[10px]">{externa ? "↗" : "pronto"}</span>
+        {noAplica ? (
+          <span className="ml-auto font-mono text-[11px]" role="img" aria-label="Estado: No aplica" title="No aplica">
+            —
+          </span>
+        ) : (
+          <span className="ml-auto font-mono text-[10px]">{externa ? "↗" : "pronto"}</span>
+        )}
       </div>
     );
   }

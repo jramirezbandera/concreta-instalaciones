@@ -35,7 +35,24 @@ export interface ZonaDibujada {
 /** Cómo se rellena una zona. */
 export type TonoZona = "vivienda" | "comun" | "garaje" | "local" | "oficinas" | "acento";
 
-export type IconoSi = "extintor" | "bie" | "columna" | "hidrante" | "detector" | "alarma" | "camion" | "salida" | "humo" | "ascensor";
+export type IconoSi =
+  | "extintor"
+  | "bie"
+  | "columna"
+  | "hidrante"
+  | "detector"
+  | "alarma"
+  | "camion"
+  | "salida"
+  | "humo"
+  | "ascensor"
+  // DB-SUA (feature-20): el pararrayos, una luminaria de emergencia, el símbolo
+  // de accesibilidad, un coche y una puerta.
+  | "rayo"
+  | "luz"
+  | "accesible"
+  | "coche"
+  | "puerta";
 
 export type MarcaSi =
   | {

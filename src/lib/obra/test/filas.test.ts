@@ -49,21 +49,31 @@ describe("filasObra — el Demo", () => {
 
   it("las «pronto» de una familia van juntas", () => {
     const p = demo();
-    // SUA6 no aplica (sin piscina): sale aparte y la junta lista las demás.
-    expect(fila(p, "junta-sua")).toMatchObject({ codigo: "SUA", titulo: "SUA1 · SUA4 · SUA7 · SUA8 · SUA9" });
-    expect(fila(p, "sua6")).toMatchObject({ estado: "no_aplica", piezas: [{ texto: "párrafo redactado", acento: false }] });
     expect(fila(p, "junta-he45")).toMatchObject({ codigo: "HE4·5", titulo: "ACS y fotovoltaica" });
-    expect(fila(p, "sua6").ruta).toBeUndefined();
+    // SUA (feature-20) ya no es «pronto»: cada sección tiene su fila.
+    expect(filasObra(p).flatMap((g) => g.filas).some((f) => f.id === "junta-sua")).toBe(false);
   });
 
-  it("si una sale de la familia, la junta enseña los códigos de las que quedan", () => {
+  it("si una sale de la familia y queda sola, va en su fila", () => {
     const p = demo();
     const q: Proyecto = {
       ...p,
-      justificaciones: { ...p.justificaciones, sua4: { aplicabilidadForzada: { valor: "no_aplica", nota: "n/a" } } },
+      justificaciones: { ...p.justificaciones, he4: { aplicabilidadForzada: { valor: "no_aplica", nota: "n/a" } } },
     };
-    expect(fila(q, "junta-sua")).toMatchObject({ codigo: "SUA", titulo: "SUA1 · SUA7 · SUA8 · SUA9" });
-    expect(fila(q, "sua4")).toMatchObject({ estado: "no_aplica", forzada: true, nota: "n/a" });
+    expect(fila(q, "he4")).toMatchObject({ estado: "no_aplica", forzada: true, nota: "n/a" });
+    expect(fila(q, "he5")).toMatchObject({ estado: "pronto", codigo: "HE5" });
+    expect(filasObra(q).flatMap((g) => g.filas).some((f) => f.id === "junta-he45")).toBe(false);
+  });
+
+  it("SUA1 a SUA9 (feature-20): fila y ruta propias; SUA5 y SUA6 no aplican con su párrafo", () => {
+    const p = demo();
+    expect(fila(p, "sua1")).toMatchObject({ codigo: "SUA1", ruta: "sua/caidas", estado: "cumple" });
+    expect(fila(p, "sua8")).toMatchObject({ codigo: "SUA8", ruta: "sua/rayo", estado: "revisar" });
+    expect(fila(p, "sua7")).toMatchObject({ ruta: "sua/vehiculos" });
+    for (const k of ["sua5", "sua6"]) {
+      expect(fila(p, k)).toMatchObject({ estado: "no_aplica", piezas: [{ texto: "párrafo redactado", acento: false }] });
+      expect(fila(p, k).ruta).toBeUndefined();
+    }
   });
 
   it("SI1 a SI6 publicadas (feature-19): cada una con su fila, su ruta y sus piezas", () => {
@@ -90,7 +100,6 @@ describe("filasObra — el Demo", () => {
   it("las «pronto» solo nombran partes del edificio", () => {
     const p = demo();
     expect(textos(fila(p, "hs2"))).toEqual(["6 viviendas", "local"]);
-    expect(textos(fila(p, "junta-sua"))).toEqual(["escaleras", "garaje", "itinerario accesible"]);
     for (const g of filasObra(p))
       for (const f of g.filas)
         if (f.estado === "pronto") for (const t of textos(f)) expect(t, f.id).not.toMatch(/W\/m²|kW|l\/s/);
@@ -126,8 +135,8 @@ describe("piezasDeQueEntra", () => {
 describe("recuento", () => {
   it("una a una, no por filas", () => {
     const r = recuentoObra(demo());
-    expect(r).toMatchObject({ cumple: 4, revisar: 8, no_cumple: 0, no_aplica: 1, externo: 2, pronto: 10 });
-    expect(textoRecuento(r)).toBe("4 cumple · 8 por revisar · 1 no aplica · 2 externo · 10 pronto");
+    expect(r).toMatchObject({ cumple: 6, revisar: 13, no_cumple: 0, no_aplica: 2, externo: 2, pronto: 5 });
+    expect(textoRecuento(r)).toBe("6 cumple · 13 por revisar · 2 no aplica · 2 externo · 5 pronto");
   });
 
   it("rotuloGrupo", () => {

@@ -29,16 +29,16 @@ describe("rutas del expediente (F4) · legacy y sandbox", () => {
       () => {
         expect(window.location.hash).toMatch(/^#\/p\/[^/]+\/hs\/saneamiento\?numPlantas=7$/);
       },
-      { timeout: 8000 },
+      { timeout: 20000 },
     );
     // El módulo HS5 (lazy, aún con su UI legacy) debe montar bajo /p/<activo>/…
-    const hs5 = await findAllByText(/HS5 Saneamiento|Evacuación de aguas/, {}, { timeout: 8000 });
+    const hs5 = await findAllByText(/HS5 Saneamiento|Evacuación de aguas/, {}, { timeout: 20000 });
     expect(hs5.length).toBeGreaterThan(0);
   });
 
   it("«/_smoke» sigue funcionando sin provider de proyecto (sandbox)", async () => {
     const { findAllByText } = await renderApp("#/_smoke");
-    const smoke = await findAllByText(/Demo cimientos/, {}, { timeout: 8000 });
+    const smoke = await findAllByText(/Demo cimientos/, {}, { timeout: 20000 });
     expect(smoke.length).toBeGreaterThan(0);
   });
 });

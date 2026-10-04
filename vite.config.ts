@@ -95,7 +95,10 @@ export default defineConfig(({ mode }) => {
       // que con la suite entera en paralelo supera de largo los 5 s. Con el
       // valor por defecto el propio test moría ANTES que su `waitFor` (8 s),
       // así que el fallo se veía como "timed out", no como un error real.
-      testTimeout: 15000,
+      // 30 s desde feature-20: con las nueve secciones del DB-SUA, La obra
+      // importa veinte definiciones y cada test de interfaz transforma el doble
+      // de ficheros; solos tardan ~12 s, con la suite en paralelo pasaban de 15.
+      testTimeout: 30000,
     },
   };
 });

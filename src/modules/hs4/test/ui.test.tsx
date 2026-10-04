@@ -11,7 +11,7 @@ import { inicializarStorage } from "../../../lib/proyecto/storage";
 // la lista, la memoria y «Ajustar a mano». Mismo patrón que HS5.
 // =============================================================================
 
-const ESPERA_CHUNK = { timeout: 8000 };
+const ESPERA_CHUNK = { timeout: 20000 };
 const DIBUJO = "Montantes y presión por planta";
 
 async function renderHs4() {

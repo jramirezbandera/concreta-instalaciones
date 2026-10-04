@@ -70,57 +70,76 @@ export interface ReglaAtributo {
  * PRIMERA regla que casa. Las citas se quedan a nivel de sección/ámbito.
  */
 export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
+  // ── SUA 5 · Alta ocupación (feature-20) ────────────────────────────────────
+  {
+    // Ámbito: graderíos para más de 3000 espectadores de pie. Un edificio de
+    // viviendas u oficinas no los tiene nunca (research/verificacion-sua2-sua5.md B6).
+    key: "sua5",
+    cuando: () => true,
+    resultado: "no_aplica",
+    nota:
+      "SUA 5 Seguridad frente al riesgo causado por situaciones de alta ocupación: " +
+      "no es de aplicación — el edificio no contiene graderíos de estadios, " +
+      "pabellones polideportivos, centros de reunión u otros edificios de uso " +
+      "cultural previstos para más de 3000 espectadores de pie (SUA 5 ap. 1 pto 1).",
+    cita: "DB-SUA 5, ámbito de aplicación",
+  },
   // ── SUA 6 · Piscinas ───────────────────────────────────────────────────────
+  // Verificado en feature-20 (research/verificacion-sua6-sua8.md, R1 y R2): el
+  // ap. 2 (pozos y depósitos) no se limita a las piscinas, así que el párrafo
+  // declara también que no los hay.
   {
     key: "sua6",
     cuando: (a) => !a.tienePiscina,
     resultado: "no_aplica",
     nota:
       "SUA 6 Seguridad frente al riesgo de ahogamiento: no es de aplicación — " +
-      "el edificio no dispone de piscina de uso colectivo (el ámbito de la " +
-      "Sección SUA 6 se limita a las piscinas de uso colectivo).",
+      "el edificio no dispone de piscina de uso colectivo (SUA 6 ap. 1) ni de " +
+      "pozos, depósitos o conducciones abiertas accesibles a personas que " +
+      "presenten riesgo de ahogamiento (SUA 6 ap. 2).",
     cita: "DB-SUA 6, ámbito de aplicación",
   },
   {
     // Solo se evalúa cuando la anterior no casa (⇒ tienePiscina): el ámbito de
     // SUA 6 deja fuera las piscinas de las viviendas unifamiliares, igual que
-    // el de SUA 7 deja fuera sus aparcamientos. Sin esta regla, marcar
-    // "Piscina" en una unifamiliar exigía justificar una sección que no le es
-    // de aplicación.
+    // el de SUA 7 deja fuera sus garajes. Sin esta regla, marcar "Piscina" en
+    // una unifamiliar exigía justificar una sección que no le es de aplicación.
     key: "sua6",
     cuando: (a) => a.esUnifamiliar,
     resultado: "no_aplica",
     nota:
       "SUA 6 Seguridad frente al riesgo de ahogamiento: no es de aplicación — " +
-      "la piscina pertenece a una vivienda unifamiliar y no es de uso colectivo " +
-      "(el ámbito de la Sección SUA 6 se limita a las piscinas de uso colectivo " +
-      "y deja fuera las de las viviendas unifamiliares).",
+      "la piscina es de una vivienda unifamiliar, excluida expresamente del " +
+      "ámbito de la Sección (SUA 6 ap. 1 pto 1), y no hay pozos, depósitos o " +
+      "conducciones abiertas accesibles con riesgo de ahogamiento (ap. 2). La " +
+      "piscina queda sujeta a su reglamentación sanitaria específica.",
     cita: "DB-SUA 6, ámbito de aplicación",
   },
   // ── SUA 7 · Aparcamientos ──────────────────────────────────────────────────
+  // Verificado en feature-20 (research/verificacion-sua6-sua8.md, R4 y R5).
   {
     key: "sua7",
     cuando: (a) => !a.tieneGaraje,
     resultado: "no_aplica",
     nota:
       "SUA 7 Seguridad frente al riesgo causado por vehículos en movimiento: " +
-      "no es de aplicación — el edificio no dispone de garaje ni de zona de " +
-      "aparcamiento (el ámbito de la Sección SUA 7 se limita a las zonas de " +
-      "uso Aparcamiento y a las vías de circulación de vehículos existentes " +
-      "en los edificios).",
+      "no es de aplicación — el edificio no tiene zonas de uso Aparcamiento ni " +
+      "vías de circulación de vehículos, interiores o exteriores adscritas a él " +
+      "(SUA 7 ap. 1).",
     cita: "DB-SUA 7, ámbito de aplicación",
   },
   {
     // Solo se evalúa cuando la anterior no casa (⇒ tieneGaraje): el ámbito de
-    // SUA 7 excluye los aparcamientos de las viviendas unifamiliares.
+    // SUA 7 excluye los garajes de las viviendas unifamiliares.
     key: "sua7",
     cuando: (a) => a.esUnifamiliar,
     resultado: "no_aplica",
     nota:
       "SUA 7 Seguridad frente al riesgo causado por vehículos en movimiento: " +
-      "no es de aplicación — el garaje pertenece a una vivienda unifamiliar " +
-      "(el ámbito de la Sección SUA 7 excluye los aparcamientos de las " +
-      "viviendas unifamiliares).",
+      "no es de aplicación — el garaje es de una vivienda unifamiliar, que no " +
+      "es uso Aparcamiento cualquiera que sea su superficie (SUA 7 ap. 1: «lo " +
+      "que excluye a los garajes de una vivienda unifamiliar»; DB-SUA Anejo A, " +
+      "«Uso Aparcamiento»).",
     cita: "DB-SUA 7, ámbito de aplicación",
   },
   // ── DB-HS 3 · Calidad del aire interior (feature-12) ───────────────────────
