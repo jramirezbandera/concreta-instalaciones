@@ -237,7 +237,9 @@ function viviendaDe(j: JustificacionHs3, t: TipoVentilacion, prefijo: string): P
           : { x1: cx, y1: P.Y_FONDO - 12, x2: cx, y2: P.Y_BAJA + 8 },
       );
     } else {
-      extracciones.push({ x: r.x + r.w - 20, y: r.y + 6, elementoId: r.elementoId! });
+      // En un cuarto estrecho el nombre llega a la esquina: la rejilla baja a la
+      // altura del «sale», que es corto.
+      extracciones.push({ x: r.x + r.w - 20, y: r.y + (r.w < 100 ? 24 : 6), elementoId: r.elementoId! });
       flechas.push(
         r.arriba
           ? { x1: cx, y1: yPasillo - 7, x2: cx, y2: P.Y_PASILLO - 14 }

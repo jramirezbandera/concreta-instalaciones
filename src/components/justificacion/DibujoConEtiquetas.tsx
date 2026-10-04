@@ -45,6 +45,40 @@ const PUNTO: Record<EstadoPresentacion, string> = {
   fu: "bg-text-disabled",
 };
 
+// Medidas del chip [px] (h-[26px], px-[7px], punto 6 + hueco 5, mono 12 px ≈ 7,25 px/carácter).
+const CHIP_ALTO = 26;
+const CHIP_FIJO = 2 * 7 + 6 + 5 + 2;
+const CHIP_CARACTER = 7.25;
+const HOLGURA = 4;
+/** Saltos verticales que se prueban, en alturas de chip, cuando dos se pisan. */
+const SALTOS = [0, 1, -1, 2, -2];
+
+/**
+ * Centro de cada chip [px]. Las anclas vienen del dibujo, pero los chips miden
+ * lo mismo a cualquier escala: con el dibujo estrecho, dos anclas vecinas se
+ * pisan. En orden, cada chip que choca con uno ya colocado se escalona arriba o
+ * abajo; si no cabe en ningún salto, se queda en su ancla.
+ */
+function colocar(etiquetas: EtiquetaDibujo[], ancho: number, alto: number, viewW: number, viewH: number) {
+  const puestas: { x: number; y: number; w: number }[] = [];
+  return etiquetas.map((e) => {
+    const x = (e.x / viewW) * ancho;
+    const y0 = (e.y / viewH) * alto;
+    const w = e.texto.length * CHIP_CARACTER + CHIP_FIJO;
+    const choca = (y: number) =>
+      puestas.some(
+        (p) =>
+          Math.abs(p.x - x) < (p.w + w) / 2 + HOLGURA && Math.abs(p.y - y) < CHIP_ALTO + HOLGURA,
+      );
+    const salto = SALTOS.map((k) => y0 + k * (CHIP_ALTO + HOLGURA)).find(
+      (y) => y - CHIP_ALTO / 2 >= 0 && y + CHIP_ALTO / 2 <= alto && !choca(y),
+    );
+    const y = salto ?? y0;
+    puestas.push({ x, y, w });
+    return { x, y };
+  });
+}
+
 interface DibujoConEtiquetasProps {
   /** Tamaño al que se pinta el SVG [px]. */
   ancho: number;
@@ -68,11 +102,12 @@ export function DibujoConEtiquetas({
   seleccion,
   onSelect,
 }: DibujoConEtiquetasProps): JSX.Element {
+  const sitios = colocar(etiquetas, ancho, alto, viewW, viewH);
   return (
     <div className="relative" style={{ width: ancho, height: alto }}>
       {svg}
       <ul aria-label="Cifras del dibujo">
-        {etiquetas.map((e) => {
+        {etiquetas.map((e, i) => {
           const on = e.elementoId === seleccion;
           return (
             <li key={e.key}>
@@ -81,7 +116,7 @@ export function DibujoConEtiquetas({
                 onClick={() => onSelect(e.elementoId)}
                 aria-pressed={on}
                 aria-label={`${e.nombre}: ${e.texto}, ${TEXTO_ESTADO[e.estado]}`}
-                style={{ left: `${(e.x / viewW) * 100}%`, top: `${(e.y / viewH) * 100}%` }}
+                style={{ left: sitios[i].x, top: sitios[i].y }}
                 className={[
                   "absolute inline-flex h-[26px] -translate-x-1/2 -translate-y-1/2 items-center gap-[5px] rounded border px-[7px] font-mono text-[12px] font-medium whitespace-nowrap transition-colors",
                   on

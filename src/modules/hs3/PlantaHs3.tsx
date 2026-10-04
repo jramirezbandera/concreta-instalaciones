@@ -127,35 +127,26 @@ interface PartesProps<T> {
 
 function Vivienda({ s, P, uid, borde, pulsable, tinte, sel }: PartesProps<PlantaVivienda>): JSX.Element {
   const L = PLANTA;
+  const fondoDe = (r: PlantaVivienda["recintos"][number]) =>
+    r.elementoId !== null && r.elementoId === sel ? tinte(P.accent, 12) : r.humedo ? tinte(P.accent, 4) : P.fondo;
   return (
     <g>
       {/* Recintos */}
       {s.recintos.map((r) => {
         const b = borde(r.elementoId);
-        const activo = r.elementoId !== null && r.elementoId === sel;
         return pulsable(
           `r-${r.localId ?? "entrada"}`,
           r.elementoId,
-          <>
-            <rect
-              x={r.x}
-              y={r.y}
-              width={r.w}
-              height={r.h}
-              fill={activo ? tinte(P.accent, 12) : r.humedo ? tinte(P.accent, 4) : P.fondo}
-              stroke={b.stroke}
-              strokeWidth={b.w}
-              strokeDasharray={b.dash}
-            />
-            <text x={r.x + 10} y={r.y + 20} fontSize={r.w < 100 ? 10.5 : 12} fontFamily={FUENTE_SANS} fill={P.texto2}>
-              {r.nombre}
-            </text>
-            {r.sub && (
-              <text x={r.x + 10} y={r.y + 34} fontSize={9.5} fontFamily={FUENTE_SANS} fill={P.texto3}>
-                {r.w < 100 ? r.sub.replace("sale por rejilla", "sale") : r.sub}
-              </text>
-            )}
-          </>,
+          <rect
+            x={r.x}
+            y={r.y}
+            width={r.w}
+            height={r.h}
+            fill={fondoDe(r)}
+            stroke={b.stroke}
+            strokeWidth={b.w}
+            strokeDasharray={b.dash}
+          />,
         );
       })}
       {/* Pasillo y fachada */}
@@ -199,6 +190,26 @@ function Vivienda({ s, P, uid, borde, pulsable, tinte, sel }: PartesProps<Planta
           <line key={`f-${i}`} x1={f.x1} y1={f.y1} x2={f.x2} y2={f.y2} />
         ))}
       </g>
+
+      {/* Rótulos de los recintos, sobre las flechas: un halo del color del
+          fondo corta la flecha que baja del aireador por detrás del nombre. */}
+      {s.recintos.map((r) => {
+        const halo = { stroke: fondoDe(r), strokeWidth: 4, strokeLinejoin: "round" as const, paintOrder: "stroke" };
+        return pulsable(
+          `rt-${r.localId ?? "entrada"}`,
+          r.elementoId,
+          <>
+            <text x={r.x + 10} y={r.y + 20} fontSize={r.w < 100 ? 10.5 : 12} fontFamily={FUENTE_SANS} fill={P.texto2} {...halo}>
+              {r.nombre}
+            </text>
+            {r.sub && (
+              <text x={r.x + 10} y={r.y + 34} fontSize={9.5} fontFamily={FUENTE_SANS} fill={P.texto3} {...halo}>
+                {r.w < 100 ? r.sub.replace("sale por rejilla", "sale") : r.sub}
+              </text>
+            )}
+          </>,
+        );
+      })}
 
       {/* Lo que entra y lo que sale */}
       <text x={L.X0} y={L.Y_ENTRA + 12} fontSize={10} letterSpacing={1} fontFamily={FUENTE_MONO} fill={P.texto3}>
