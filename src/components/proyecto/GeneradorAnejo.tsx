@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useState, type JSX, type ReactNode } from "react";
-import { FileDown, Loader2 } from "lucide-react";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import { estadoDe } from "../../lib/proyecto/progreso";
+import { estadoEfectivo, evaluarExpediente } from "../../lib/obra/evaluar";
 import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
 import { justificacionRegistry } from "../../data/justificacionRegistry";
-import { renderAnejo } from "../../lib/pdf/anejo";
 import type { FichaData } from "../../lib/pdf/renderFicha";
 import type { PdfResult } from "../../lib/pdf/utils";
 import type { JustificacionKey, Proyecto } from "../../lib/proyecto/tipos";
 import { PdfPreviewModal } from "../ui/PdfPreviewModal";
 import { showToast } from "../ui/Toast";
+import { formatearFecha } from "../../lib/ui/fecha";
 
 // =============================================================================
 // GeneradorAnejo (feature-8 §D) — el momento del producto: UN PDF con portada,
-// índice, las fichas de lo trabajado, los no-aplicables con su párrafo y cita,
-// las externas con su referencia y los pendientes listados con honestidad.
+// índice, las fichas de lo que se calcula (aunque no se haya abierto el módulo,
+// feature-16), los no-aplicables con su párrafo y cita, las externas con su
+// referencia y los pendientes listados con honestidad. Lo dispara quien lo
+// monta (en La obra, el «PDF» de las fichas): este componente pone los clones
+// ocultos y la previsualización.
 //
 // CÓMO FUNCIONA (y por qué en dos fases): `renderAnejo` rasteriza cada diagrama
 // leyéndolo DEL DOM por su id (`embedSvgAsImage` → canvas), así que los clones
@@ -25,8 +28,8 @@ import { showToast } from "../ui/Toast";
 //
 // HONESTIDAD: si un módulo falla al calcular (inputs de una versión anterior,
 // datos incoherentes) su ficha se omite y queda listada como pendiente en el
-// anejo — el documento nunca revienta. Los motores se importan de forma
-// DINÁMICA para no engordar el bundle del dashboard.
+// anejo — el documento nunca revienta. Las fichas, los dibujos y jsPDF se
+// importan de forma DINÁMICA para no engordar el bundle de La obra.
 // =============================================================================
 
 /** Módulo listo para el anejo: su ficha y el clon oculto de su diagrama. */
@@ -207,18 +210,12 @@ const ADAPTADORES: Partial<Record<JustificacionKey, Adaptador>> = {
   },
 };
 
-/** "22 ago 2026" — misma fecha corta es-ES que usan las fichas sueltas. */
-function formatearFecha(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-ES", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(d);
+interface GeneradorAnejoProps {
+  /** El control que lo dispara (un botón o un enlace), con su estado. */
+  children: (p: { generar: () => void; ocupado: boolean }) => ReactNode;
 }
 
-export function GeneradorAnejo(): JSX.Element {
+export function GeneradorAnejo({ children }: GeneradorAnejoProps): JSX.Element {
   const { proyecto, derivados } = useProyecto();
   const [fase, setFase] = useState<"idle" | "calculando" | "rasterizando">("idle");
   const [preparados, setPreparados] = useState<ModuloPreparado[]>([]);
@@ -240,17 +237,19 @@ export function GeneradorAnejo(): JSX.Element {
     };
 
     const listos: ModuloPreparado[] = [];
+    const evaluacion = evaluarExpediente(proyecto);
     for (const entry of justificacionRegistry) {
       if (entry.dev) continue;
       const key = entry.key as JustificacionKey;
       const adaptador = ADAPTADORES[key];
-      const inputs = proyecto.justificaciones[key]?.inputs;
-      // Solo entran las que el usuario ha trabajado (con inputs guardados) y
-      // cuya aplicabilidad las hace exigibles; el resto va al anejo como
-      // no-aplica / externa / pendiente, sin ficha.
-      if (!adaptador || !inputs) continue;
-      const estado = estadoDe(proyecto, key);
-      if (estado.aplicabilidad === "no_aplica" || estado.aplicabilidad === "externo") continue;
+      // Entran todas las que se calculan (feature-16), aunque no se hayan
+      // abierto: con las entradas que el módulo compondría al abrirse. Las no
+      // aplicables, las externas y las que no tienen nada que justificar van al
+      // anejo sin ficha.
+      const ev = evaluacion.porClave[key];
+      if (!adaptador || !ev || !["cumple", "revisar", "no_cumple"].includes(ev.estado)) continue;
+      const inputs = estadoEfectivo(proyecto, key);
+      if (!inputs) continue;
       try {
         const { data, nodo } = await adaptador(
           inputs,
@@ -305,6 +304,8 @@ export function GeneradorAnejo(): JSX.Element {
                 key: e.key as JustificacionKey,
                 estado: estadoDe(proyecto, e.key as JustificacionKey),
               }));
+            // jsPDF se carga aquí, bajo demanda: no entra en el bundle de La obra.
+            const { renderAnejo } = await import("../../lib/pdf/anejo");
             const resultado = await renderAnejo({
               proyecto,
               derivados,
@@ -339,22 +340,7 @@ export function GeneradorAnejo(): JSX.Element {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => void handleGenerar()}
-        disabled={ocupado}
-        className="bg-btn-primary-bg text-btn-primary-fg hover:bg-btn-primary-hover focus-visible:outline-accent mt-3.5 flex w-full items-center justify-center gap-1.5 rounded px-3 py-2 text-[13px] font-medium transition-colors focus-visible:outline-2 disabled:cursor-wait disabled:opacity-70"
-      >
-        {ocupado ? (
-          <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-        ) : (
-          <FileDown size={14} aria-hidden="true" />
-        )}
-        {ocupado ? "Generando anejo…" : "Generar anejo CTE (PDF)"}
-      </button>
-      <p className="text-text-disabled mt-1.5 text-center text-[11px]">
-        Portada, índice, fichas y apartados no aplicables con su párrafo
-      </p>
+      {children({ generar: () => void handleGenerar(), ocupado })}
 
       {/* Clones ocultos de los diagramas: deben estar en el DOM para el raster. */}
       {preparados.length > 0 && (

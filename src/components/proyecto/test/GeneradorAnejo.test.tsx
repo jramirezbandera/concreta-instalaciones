@@ -4,14 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { ProyectoProvider } from "../../../lib/proyecto/ProyectoContext";
 import { crearProyectoDemo } from "../../../lib/proyecto/demo";
-import { TarjetaAnejo } from "../TarjetaAnejo";
+import { LoQueSeEntrega } from "../../obra/LoQueSeEntrega";
 
 // =============================================================================
 // GeneradorAnejo (feature-8 §D) — el momento del producto, extremo a extremo:
-// pulsar "Generar anejo CTE (PDF)" en el dashboard del proyecto Demo debe
-// calcular TODOS los módulos con inputs guardados (import dinámico de motor +
-// ficha + SVG), montar los clones ocultos de los diagramas y componer un único
-// PDF vía `renderAnejo`.
+// pulsar «PDF» en «Fichas justificativas» de La obra (feature-16) con el
+// proyecto Demo debe calcular TODOS los módulos que se calculan (import
+// dinámico de motor + ficha + SVG), montar los clones ocultos de los diagramas
+// y componer un único PDF vía `renderAnejo`.
 //
 // Este test valida el CABLEADO (adaptadores, dynamic imports, dos fases de
 // render); la composición del PDF en sí tiene sus tests en
@@ -19,7 +19,7 @@ import { TarjetaAnejo } from "../TarjetaAnejo";
 // (Image+canvas): `renderFicha` cae a su placeholder, que es justo el
 // comportamiento degradado que se quiere ejercitar.
 //
-// Se monta solo <TarjetaAnejo /> dentro de un MemoryRouter + ProyectoProvider
+// Se monta solo <LoQueSeEntrega /> dentro de un MemoryRouter + ProyectoProvider
 // (sin persistir): no hace falta el router de la app, así que no consume uno de
 // los ~3 routers de módulo-nivel que tolera un jsdom.
 // =============================================================================
@@ -38,12 +38,11 @@ vi.mock("../../../lib/pdf/anejo", async (importOriginal) => {
   };
 });
 
-function renderTarjeta() {
-  const proyecto = crearProyectoDemo("2026-08-23T00:00:00.000Z");
+function renderTarjeta(proyecto = crearProyectoDemo("2026-08-23T00:00:00.000Z")) {
   return render(
     <MemoryRouter>
       <ProyectoProvider proyectoInicial={proyecto} persistir={false}>
-        <TarjetaAnejo />
+        <LoQueSeEntrega />
       </ProyectoProvider>
     </MemoryRouter>,
   );
@@ -59,17 +58,16 @@ afterEach(() => {
 });
 
 describe("GeneradorAnejo · anejo del expediente (feature-8 §D)", () => {
-  it("el botón del dashboard ya no está deshabilitado (el momento del producto es real)", () => {
+  it("el PDF de las fichas está disponible con el Demo", () => {
     renderTarjeta();
-    const boton = screen.getByRole("button", { name: /Generar anejo CTE/i });
-    expect(boton).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Fichas justificativas en PDF" })).toBeEnabled();
   });
 
   it("genera el anejo del Demo con las fichas de los módulos calculados", async () => {
     const user = userEvent.setup();
     renderTarjeta();
 
-    await user.click(screen.getByRole("button", { name: /Generar anejo CTE/i }));
+    await user.click(screen.getByRole("button", { name: "Fichas justificativas en PDF" }));
 
     // La composición es asíncrona (imports dinámicos de los 5 motores + doble
     // rAF antes de rasterizar): se espera a que renderAnejo reciba su entrada.
@@ -79,7 +77,7 @@ describe("GeneradorAnejo · anejo del expediente (feature-8 §D)", () => {
       typeof import("../../../lib/pdf/anejo").renderAnejo
     >[0];
 
-    // El Demo siembra los 5 módulos shipped con inputs → 5 fichas.
+    // Los 5 módulos publicados se calculan → 5 fichas.
     expect(entrada.fichas.map((f) => f.key).sort()).toEqual(["he1", "hs3", "hs4", "hs5", "hs6"]);
     // Cada ficha llega identificada con el proyecto (cabecera del documento).
     for (const { data } of entrada.fichas) {
@@ -95,5 +93,16 @@ describe("GeneradorAnejo · anejo del expediente (feature-8 §D)", () => {
     await waitFor(() => expect(screen.getByTitle("PDF preview")).toBeInTheDocument(), {
       timeout: 15000,
     });
+  }, 30000);
+
+  it("los módulos que no se han abierto también tienen su ficha (feature-16)", async () => {
+    const user = userEvent.setup();
+    renderTarjeta({ ...crearProyectoDemo("2026-08-23T00:00:00.000Z"), justificaciones: {} });
+    await user.click(screen.getByRole("button", { name: "Fichas justificativas en PDF" }));
+    await waitFor(() => expect(renderAnejoSpy).toHaveBeenCalledTimes(1), { timeout: 15000 });
+    const entrada = renderAnejoSpy.mock.calls[0][0] as Parameters<
+      typeof import("../../../lib/pdf/anejo").renderAnejo
+    >[0];
+    expect(entrada.fichas.map((f) => f.key).sort()).toEqual(["he1", "hs3", "hs4", "hs5", "hs6"]);
   }, 30000);
 });

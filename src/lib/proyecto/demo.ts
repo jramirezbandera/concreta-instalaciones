@@ -5,35 +5,27 @@
 // Determinista por contrato: cero Date.now/Math.random — `nowIso` llega como
 // parámetro. Coherencia POR CONSTRUCCIÓN: los `inputs` sembrados de cada
 // justificación materializan a mano los campos heredados del contexto (zona
-// térmica HS3, zona climática HE1, presión de acometida…) y el
-// `resultadoCache` se calcula REALMENTE ejecutando el motor sobre esos mismos
-// inputs — lo que el usuario abre coincide siempre con lo cacheado.
+// térmica HS3, zona climática HE1, presión de acometida…). El estado de cada
+// justificación no se guarda: se calcula (feature-16, `lib/obra/evaluar.ts`).
 // =============================================================================
 
 import { hs3EstadoDefaults, type Hs3Estado } from "../../modules/hs3/estado";
-import { justificarHs3 } from "../../modules/hs3/justificacion";
 import { hs4EstadoDefaults, type Hs4Estado } from "../../modules/hs4/estado";
-import { justificarHs4 } from "../../modules/hs4/justificacion";
 import { hs5EstadoDefaults, type Hs5Estado } from "../../modules/hs5/estado";
-import { justificarHs5 } from "../../modules/hs5/justificacion";
 import { hs6EstadoDefaults, type Hs6Estado } from "../../modules/hs6/estado";
-import { justificarHs6 } from "../../modules/hs6/justificacion";
 import { he1EstadoDefaults, type He1Estado } from "../../modules/he1/estado";
-import { justificarHe1 } from "../../modules/he1/justificacion";
 import type { ZonaClimatica } from "../../modules/he1/tablas";
 import {
   LETRAS_INVIERNO,
   zonaClimaticaDe,
   zonaTermicaHS3De,
 } from "../../data/zonasClimaticasHE";
-import { veredictoConRevision } from "../cte/estados";
 import { edificioDeCaso } from "../edificio/casos";
 import { resumenEdificio } from "../edificio/derivar";
 import type {
   DatosGenerales,
   JustificacionEnProyecto,
   Proyecto,
-  Veredicto,
 } from "./tipos";
 
 /** Id FIJO del proyecto Demo (clave estable en el índice de proyectos). */
@@ -79,16 +71,15 @@ const DATOS_GENERALES_DEMO: DatosGenerales = {
 // -----------------------------------------------------------------------------
 
 /**
- * Empaqueta unos inputs de módulo + su veredicto REAL como estado persistido de
- * la justificación. Los inputs viajan como copia superficial tipada
- * `Record<string, unknown>` (la forma opaca que persiste el proyecto); las
- * estructuras internas ya son copias frescas (structuredClone en el caller).
+ * Empaqueta unos inputs de módulo como estado persistido de la justificación.
+ * Los inputs viajan como copia superficial tipada `Record<string, unknown>` (la
+ * forma opaca que persiste el proyecto); las estructuras internas ya son
+ * copias frescas (structuredClone en el caller).
  */
-function justificacionDemo(inputs: object, veredicto: Veredicto): JustificacionEnProyecto {
+function justificacionDemo(inputs: object): JustificacionEnProyecto {
   return {
     inputs: { ...inputs } as Record<string, unknown>,
     schemaVersion: "1",
-    resultadoCache: { veredicto },
   };
 }
 
@@ -135,10 +126,8 @@ export function crearProyectoDemo(nowIso: string): Proyecto {
   // los defaults, que deben permanecer inmutables).
   // HS3 sale de El edificio (feature-15), con la zona térmica heredada.
   const hs3Inputs: Hs3Estado = structuredClone({ ...hs3EstadoDefaults, zonaTermica: zt.zona });
-  const hs3 = justificarHs3(hs3Inputs, edificio);
   // HS4 sale de El edificio (feature-15); la presión es el dato de la obra.
   const hs4Inputs: Hs4Estado = structuredClone({ ...hs4EstadoDefaults });
-  const hs4 = justificarHs4(hs4Inputs, edificio, { presionAcometida_kPa: dg.presionAcometida_kPa });
   // HS5 sale de El edificio (feature-14) con las decisiones habituales.
   const hs5Inputs: Hs5Estado = structuredClone({
     ...hs5EstadoDefaults,
@@ -146,30 +135,19 @@ export function crearProyectoDemo(nowIso: string): Proyecto {
     numPlantas: resumen.plantasSobreRasante,
     cubiertaTransitable: resumen.cubiertaTransitable,
   });
-  const hs5 = justificarHs5(hs5Inputs, edificio, {
-    pluviometria: dg.pluviometria,
-    cotaAlcantarillado_m: dg.cotaAlcantarillado_m,
-  });
-  // Cumple con avisos sin revisar → «warn», como lo cachea la pantalla.
-  const hs5Veredicto: Veredicto = veredictoConRevision(hs5.veredicto, hs5.avisos.length);
   // HS6 sale de El edificio (feature-15); la zona y el municipio, de la obra.
   const hs6Inputs: Hs6Estado = structuredClone({
     ...hs6EstadoDefaults,
     municipio: dg.municipio,
     zona: dg.zonaRadon,
   });
-  const hs6 = justificarHs6(hs6Inputs, edificio);
   // HE1 sale de El edificio (feature-15); la zona, de la obra, y el clima de
   // enero, de la tabla C.1 del DA DB-HE/2 por la provincia y la altitud.
   const he1Inputs: He1Estado = structuredClone({
     ...he1EstadoDefaults,
     zonaClimatica: letraInviernoDe(zc.zona),
   });
-  const he1 = justificarHe1(he1Inputs, edificio, { provincia: dg.provincia, altitud_m: dg.altitud_m, municipio: dg.municipio });
 
-  // Cache de veredictos calculado DE VERDAD en construcción. Con esta
-  // materialización los cinco salen "ok"/"warn" (HS3 da "warn" en zona Z:
-  // avisos reales del motor, no se falsea el cache).
   return {
     id: DEMO_ID,
     nombre: DEMO_NOMBRE,
@@ -178,11 +156,11 @@ export function crearProyectoDemo(nowIso: string): Proyecto {
     datosGenerales: { ...dg },
     edificio,
     justificaciones: {
-      hs3: justificacionDemo(hs3Inputs, veredictoConRevision(hs3.veredicto, hs3.avisos.length)),
-      hs4: justificacionDemo(hs4Inputs, veredictoConRevision(hs4.veredicto, hs4.avisos.length)),
-      hs5: justificacionDemo(hs5Inputs, hs5Veredicto),
-      hs6: justificacionDemo(hs6Inputs, veredictoConRevision(hs6.veredicto, hs6.avisos.length)),
-      he1: justificacionDemo(he1Inputs, veredictoConRevision(he1.veredicto, he1.avisos.length)),
+      hs3: justificacionDemo(hs3Inputs),
+      hs4: justificacionDemo(hs4Inputs),
+      hs5: justificacionDemo(hs5Inputs),
+      hs6: justificacionDemo(hs6Inputs),
+      he1: justificacionDemo(he1Inputs),
     },
   };
 }

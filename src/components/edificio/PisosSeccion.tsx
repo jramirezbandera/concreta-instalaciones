@@ -41,7 +41,8 @@ export function PisosSeccion({
   const yR = s.yRasante;
   const altoTerreno = alto - yR;
   return (
-    <g>
+    // `data-capa`: en el DXF de los esquemas, esto va a la capa del edificio (feature-16).
+    <g data-capa="edificio">
       <defs>
         <pattern id={`${uid}-tierra`} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <line x1="0" y1="0" x2="0" y2="7" stroke={P.earth} strokeWidth="1.2" />

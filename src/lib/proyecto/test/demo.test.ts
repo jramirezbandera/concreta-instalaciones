@@ -13,6 +13,7 @@ import { justificarHe1 } from "../../../modules/he1/justificacion";
 import type { He1Estado } from "../../../modules/he1/estado";
 import { zonaClimaticaDe, zonaTermicaHS3De } from "../../../data/zonasClimaticasHE";
 import type { JustificacionKey } from "../tipos";
+import { estadoDe } from "../progreso";
 import { edificioDeCaso } from "../../edificio/casos";
 import { resumenEdificio } from "../../edificio/derivar";
 
@@ -20,10 +21,9 @@ import { resumenEdificio } from "../../edificio/derivar";
 // crearProyectoDemo — feature-6 T2.6. Tres invariantes:
 //   1) DETERMINISMO TOTAL: mismo nowIso → proyectos deep-equal (nada de
 //      Date.now/Math.random escondidos).
-//   2) COHERENCIA POR CONSTRUCCIÓN: el veredicto cacheado de cada justificación
-//      coincide con re-ejecutar SU motor sobre SUS inputs sembrados.
-//   3) EL DEMO SE VE BIEN: los 5 veredictos son "ok" o "warn" (verde/ámbar) —
-//      el cache nunca se falsea, se ajustan los inputs si hiciera falta.
+//   2) COHERENCIA: el veredicto que calcula el expediente (feature-16) coincide
+//      con re-ejecutar el motor de cada módulo sobre sus inputs sembrados.
+//   3) EL DEMO SE VE BIEN: los 5 veredictos son "ok" o "warn" (verde/ámbar).
 // =============================================================================
 
 const NOW = "2026-08-22T10:00:00.000Z";
@@ -56,18 +56,18 @@ describe("crearProyectoDemo — determinismo", () => {
   });
 });
 
-describe("crearProyectoDemo — coherencia cache ↔ motor (por construcción)", () => {
+describe("crearProyectoDemo — el estado calculado coincide con el motor (feature-16)", () => {
   const p = crearProyectoDemo(NOW);
 
-  it("hs3: el veredicto cacheado coincide con re-justificar desde El edificio (feature-15)", () => {
+  it("hs3: el veredicto calculado coincide con re-justificar desde El edificio (feature-15)", () => {
     const j = p.justificaciones.hs3!;
     const r = justificarHs3(j.inputs as unknown as Hs3Estado, p.edificio);
     expect(r.veredicto).toBe("ok");
     expect(r.avisos).toEqual([]);
-    expect(j.resultadoCache!.veredicto).toBe("ok");
+    expect(estadoDe(p, "hs3").veredicto).toBe("ok");
   });
 
-  it("hs4: el veredicto cacheado coincide con re-justificar desde El edificio (feature-15)", () => {
+  it("hs4: el veredicto calculado coincide con re-justificar desde El edificio (feature-15)", () => {
     const j = p.justificaciones.hs4!;
     const estado = j.inputs as unknown as Hs4Estado;
     expect(estado.red).toBe("edificio");
@@ -75,10 +75,10 @@ describe("crearProyectoDemo — coherencia cache ↔ motor (por construcción)",
     // Cumple, con la presión de la red sin confirmar → «warn».
     expect(r.veredicto).toBe("ok");
     expect(r.avisos.map((a) => a.id)).toEqual(["presion-red-supuesta"]);
-    expect(j.resultadoCache!.veredicto).toBe("warn");
+    expect(estadoDe(p, "hs4").veredicto).toBe("warn");
   });
 
-  it("hs5: el veredicto cacheado coincide con re-justificar desde El edificio (feature-14)", () => {
+  it("hs5: el veredicto calculado coincide con re-justificar desde El edificio (feature-14)", () => {
     const j = p.justificaciones.hs5!;
     const estado = j.inputs as unknown as Hs5Estado;
     expect(estado.red).toBe("edificio");
@@ -89,32 +89,31 @@ describe("crearProyectoDemo — coherencia cache ↔ motor (por construcción)",
     // Cumple, con avisos sin revisar (garaje por bombeo y lluvia supuesta) → «warn».
     expect(r.veredicto).toBe("ok");
     expect(r.avisos.map((a) => a.id)).toEqual(["garaje-s1-bombeo", "pluviometria-supuesta"]);
-    expect(j.resultadoCache!.veredicto).toBe("warn");
+    expect(estadoDe(p, "hs5").veredicto).toBe("warn");
   });
 
-  it("hs6: el veredicto cacheado coincide con re-justificar desde El edificio (feature-15)", () => {
+  it("hs6: el veredicto calculado coincide con re-justificar desde El edificio (feature-15)", () => {
     const j = p.justificaciones.hs6!;
     const r = justificarHs6(j.inputs as unknown as Hs6Estado, p.edificio);
     // Cumple, con el núcleo que baja al garaje sin revisar → «warn».
     expect(r.veredicto).toBe("ok");
     expect(r.avisos.map((a) => a.id)).toEqual(["nucleo-garaje"]);
-    expect(j.resultadoCache!.veredicto).toBe("warn");
+    expect(estadoDe(p, "hs6").veredicto).toBe("warn");
   });
 
-  it("he1: el veredicto cacheado coincide con re-justificar desde El edificio (feature-15)", () => {
+  it("he1: el veredicto calculado coincide con re-justificar desde El edificio (feature-15)", () => {
     const j = p.justificaciones.he1!;
     const dg = p.datosGenerales;
     const r = justificarHe1(j.inputs as unknown as He1Estado, p.edificio, { provincia: dg.provincia, altitud_m: dg.altitud_m, municipio: dg.municipio });
     // Cumple sin nada por revisar: la envolvente propuesta y el clima de Cáceres.
     expect(r.veredicto).toBe("ok");
     expect(r.avisos).toEqual([]);
-    expect(j.resultadoCache!.veredicto).toBe("ok");
+    expect(estadoDe(p, "he1").veredicto).toBe("ok");
   });
 
-  it("los 5 veredictos cacheados son 'ok' o 'warn' (el Demo se ve en verde/ámbar)", () => {
+  it("los 5 veredictos calculados son 'ok' o 'warn' (el Demo se ve en verde/ámbar)", () => {
     for (const clave of CLAVES_DEMO) {
-      const j = p.justificaciones[clave]!;
-      expect(["ok", "warn"], `veredicto de ${clave}`).toContain(j.resultadoCache!.veredicto);
+      expect(["ok", "warn"], `veredicto de ${clave}`).toContain(estadoDe(p, clave).veredicto);
     }
   });
 

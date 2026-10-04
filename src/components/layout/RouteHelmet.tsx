@@ -31,10 +31,12 @@ function resolver(pathname: string): { title: string; description: string } {
     const m = /^\/p\/[^/]+(?:\/(.*))?$/.exec(pathname);
     if (m !== null) {
       const resto = m[1] ?? "";
-      if (resto === "") return { title: `Expediente · ${SUFIJO}`, description: DESC_GENERICA };
+      if (resto === "") return { title: `La obra · ${SUFIJO}`, description: DESC_GENERICA };
       if (resto === "datos") {
         return { title: `Datos del proyecto · ${SUFIJO}`, description: DESC_GENERICA };
       }
+      if (resto === "edificio") return { title: `El edificio · ${SUFIJO}`, description: DESC_GENERICA };
+      if (resto === "memoria") return { title: `Memoria CTE · ${SUFIJO}`, description: DESC_GENERICA };
       subruta = resto;
     }
   }

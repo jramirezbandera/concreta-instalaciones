@@ -136,7 +136,7 @@ describe("justificacionesPorGrupo", () => {
       expect(g.entradas.length).toBeGreaterThan(0);
       expect(g.entradas.every((j) => j.shipped)).toBe(true);
     }
-    // Los grupos sin entradas shipped (SI, SUA, HR, Complementarias, Externas)
+    // Los grupos sin entradas shipped (SI, SUA, HR, Electricidad, Externas)
     // no aparecen; los que quedan mantienen el orden de declaración.
     expect(grupos.map((g) => g.grupo)).toEqual([
       "Salubridad (DB-HS)",

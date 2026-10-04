@@ -19,10 +19,8 @@ import type {
   JustificacionKey,
   Edificio,
   Proyecto,
-  ResultadoCache,
 } from "./tipos";
-import { derivarContexto } from "./derivar";
-import { resumenEdificio } from "../edificio/derivar";
+import { contextoDe } from "./derivar";
 import { guardarProyecto } from "./storage";
 
 // =============================================================================
@@ -36,10 +34,9 @@ import { guardarProyecto } from "./storage";
 //
 // CRITERIO `modificado`: solo lo tocan las mutaciones que reciben `nowIso`
 // (ediciones del usuario: datos generales, inputs de módulo). Las escrituras
-// derivadas o de bookkeeping (`actualizarResultado`, `setOverridesContexto`,
-// `forzarAplicabilidad`, `setRefExterna`) NO reciben instante y CONSERVAN el
-// `modificado` existente: el cache de un veredicto o un flag de override no son
-// "el usuario modificó el proyecto a las X". Aquí sigue sin haber `Date.now` —
+// de bookkeeping (`setOverridesContexto`, `forzarAplicabilidad`,
+// `setRefExterna`) NO reciben instante y CONSERVAN el `modificado` existente:
+// un flag de override no es "el usuario modificó el proyecto a las X". Aquí sigue sin haber `Date.now` —
 // todo instante llega inyectado desde la UI (contrato del motor/persistencia).
 //
 // FLUSH GARANTIZADO (corrige el hueco del difunto hook legacy por módulo,
@@ -52,40 +49,14 @@ import { guardarProyecto } from "./storage";
 /** Retardo del debounce de persistencia [ms] — mismo valor que `useJustificacionState`. */
 const DEBOUNCE_MS = 300;
 
-/**
- * Fallback ESTABLE de `derivados` si la provincia no derivara (no debería
- * ocurrir: el formulario de datos generales valida contra PROVINCIAS, y
- * `derivarContexto` ya satura el caso Ceuta/Melilla > 800 m). Valores del lado
- * seguro/frecuente con la procedencia declarando el origen anómalo, para que si
- * algún día se cuela una provincia libre el error sea visible y trazable en la
- * barra de contexto en vez de un crash. Constante de módulo → identidad estable
- * entre renders (no rompe memos aguas abajo).
- */
-const CLIMA_FALLBACK: Omit<ContextoDerivado, "edificio"> = {
-  zonaClimatica: {
-    valor: "D3",
-    procedencia: "provincia no reconocida — revisar Datos generales (fallback de la herramienta)",
-  },
-  zonaTermicaHS3: {
-    valor: "Y",
-    procedencia: "provincia no reconocida — revisar Datos generales (fallback de la herramienta)",
-  },
-  alturaEvacuacion_m: {
-    valor: 0,
-    procedencia: "provincia no reconocida — revisar Datos generales (fallback de la herramienta)",
-  },
-};
-
 export interface ProyectoContextValue {
   proyecto: Proyecto;
-  /** Contexto derivado de la obra y del edificio (memoizado); ver `CLIMA_FALLBACK`. */
+  /** Contexto derivado de la obra y del edificio (memoizado); ver `contextoDe`. */
   derivados: ContextoDerivado;
   actualizarDatosGenerales(dg: DatosGenerales, nowIso: string): void;
   /** Renombra el expediente (edición del usuario → toca `modificado`). */
   renombrarProyecto(nombre: string, nowIso: string): void;
   actualizarInputs(key: JustificacionKey, inputs: Record<string, unknown>, nowIso: string): void;
-  /** Cache del veredicto — coalesce en el mismo tick de persist que los inputs (un solo timer). */
-  actualizarResultado(key: JustificacionKey, cache: ResultadoCache): void;
   setOverridesContexto(key: JustificacionKey, campos: string[]): void;
   /** El edificio entero (feature-12). Edición del usuario → toca `modificado`. */
   actualizarEdificio(edificio: Edificio, nowIso: string): void;
@@ -182,11 +153,7 @@ export function ProyectoProvider(props: {
   // Derivados memoizados de los datos generales (la referencia solo cambia si
   // cambia `datosGenerales`, que las mutaciones reemplazan de forma inmutable).
   const derivados = useMemo<ContextoDerivado>(
-    () =>
-      derivarContexto(proyecto.datosGenerales, proyecto.edificio) ?? {
-        ...CLIMA_FALLBACK,
-        edificio: resumenEdificio(proyecto.edificio),
-      },
+    () => contextoDe(proyecto.datosGenerales, proyecto.edificio),
     [proyecto.datosGenerales, proyecto.edificio],
   );
 
@@ -204,10 +171,6 @@ export function ProyectoProvider(props: {
     },
     [],
   );
-
-  const actualizarResultado = useCallback((key: JustificacionKey, cache: ResultadoCache) => {
-    setProyecto((prev) => conJustificacion(prev, key, { resultadoCache: cache }));
-  }, []);
 
   const setOverridesContexto = useCallback((key: JustificacionKey, campos: string[]) => {
     // Lista vacía = sin overrides → se elimina el campo (JSON persistido limpio).
@@ -253,7 +216,6 @@ export function ProyectoProvider(props: {
       actualizarDatosGenerales,
       renombrarProyecto,
       actualizarInputs,
-      actualizarResultado,
       setOverridesContexto,
       actualizarEdificio,
       forzarAplicabilidad,
@@ -266,7 +228,6 @@ export function ProyectoProvider(props: {
       actualizarDatosGenerales,
       renombrarProyecto,
       actualizarInputs,
-      actualizarResultado,
       setOverridesContexto,
       actualizarEdificio,
       forzarAplicabilidad,

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useId, useState } from "react";
+import { useContext, useId, useState } from "react";
 import type { JSX, ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { Topbar } from "../layout/Topbar";
@@ -365,20 +365,6 @@ export function ModuleLayout({
     onVista?.(v);
   };
   const tabsId = useId();
-
-  // Persiste el último veredicto en el proyecto. Solo con proyecto activo y
-  // nunca para la entrada de desarrollo "smoke".
-  const actualizarResultado = ctx?.actualizarResultado;
-  useEffect(() => {
-    if (!resultado || justificacionKey === "smoke" || !actualizarResultado)
-      return;
-    actualizarResultado(justificacionKey, {
-      veredicto: resultado.veredicto,
-      resumen: resultado.metricas
-        ? `${resultado.sujeto} — ${resultado.metricas}`
-        : resultado.sujeto,
-    });
-  }, [resultado, justificacionKey, actualizarResultado]);
 
   const codigo = entry?.codigo ?? justificacionKey;
   const titulo = entry?.label ?? justificacionKey;

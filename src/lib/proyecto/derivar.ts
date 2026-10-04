@@ -57,3 +57,31 @@ export function derivarContexto(
     edificio: res,
   };
 }
+
+const PROC_FALLBACK = "provincia no reconocida — revisar Datos generales (fallback de la herramienta)";
+
+/**
+ * Fallback ESTABLE de los derivados si la provincia no derivara (no debería
+ * ocurrir: el formulario de datos generales valida contra PROVINCIAS, y
+ * `derivarContexto` ya satura el caso Ceuta/Melilla > 800 m). Valores del lado
+ * seguro/frecuente con la procedencia declarando el origen anómalo, para que si
+ * algún día se cuela una provincia libre el error sea visible y trazable en vez
+ * de un crash.
+ */
+const CLIMA_FALLBACK: Omit<ContextoDerivado, "edificio"> = {
+  zonaClimatica: { valor: "D3", procedencia: PROC_FALLBACK },
+  zonaTermicaHS3: { valor: "Y", procedencia: PROC_FALLBACK },
+  alturaEvacuacion_m: { valor: 0, procedencia: PROC_FALLBACK },
+};
+
+/**
+ * El contexto derivado SIEMPRE: `derivarContexto` o, si la provincia no se
+ * reconoce, el fallback con lo que sale del edificio. Lo comparten el provider
+ * y la evaluación del expediente (feature-16).
+ */
+export function contextoDe(
+  dg: Pick<DatosGenerales, "provincia" | "altitud_m">,
+  edificio: Edificio,
+): ContextoDerivado {
+  return derivarContexto(dg, edificio) ?? { ...CLIMA_FALLBACK, edificio: resumenEdificio(edificio) };
+}

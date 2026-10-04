@@ -261,6 +261,20 @@ export const justificacionRegistry: JustificacionEntry[] = [
     icon: Thermometer,
     schemaVersion: "1",
   },
+  // Se justifica con HULC, pero va con el resto del DB-HE (maqueta v4 de La obra).
+  {
+    key: "he0he1_global",
+    // «HE0» a secas, como en la maqueta: el título y el documento ya dicen que
+    // también cubre el coeficiente global del HE1.
+    codigo: "HE0",
+    label: "Verificación energética global",
+    grupo: "Ahorro de energía (DB-HE)",
+    db: "DB-HE0 / DB-HE1",
+    edicionDB: "DB-HE 2019 (consolidado 2022)",
+    formato: "externo",
+    shipped: false,
+    externo: { destino: "HULC" },
+  },
   {
     key: "he4",
     codigo: "HE4",
@@ -281,29 +295,18 @@ export const justificacionRegistry: JustificacionEntry[] = [
     formato: "checker",
     shipped: false,
   },
-  // ── Complementarias ────────────────────────────────────────────────────────
+  // ── Electricidad (REBT) ────────────────────────────────────────────────────
   {
     key: "rebt",
     codigo: "REBT",
     label: "Grado de electrificación y previsión de cargas",
-    grupo: "Complementarias",
+    grupo: "Electricidad (REBT)",
     db: "REBT ITC-BT-10",
     edicionDB: "REBT (RD 842/2002) ITC-BT-10",
     formato: "checker",
     shipped: false,
   },
-  // ── Externas (se resuelven fuera de la app; el dashboard referencia el doc) ─
-  {
-    key: "he0he1_global",
-    codigo: "HE0/HE1",
-    label: "Verificación energética global",
-    grupo: "Externas",
-    db: "DB-HE0 / DB-HE1",
-    edicionDB: "DB-HE 2019 (consolidado 2022)",
-    formato: "externo",
-    shipped: false,
-    externo: { destino: "HULC" },
-  },
+  // ── Externas (se resuelven fuera de la app; La obra referencia el documento) ─
   {
     key: "dbse",
     codigo: "DB-SE",

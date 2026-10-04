@@ -4,13 +4,15 @@ import { ChevronsUpDown, X } from "lucide-react";
 import { justificacionesPorGrupo, type JustificacionEntry } from "../../data/justificacionRegistry";
 import { ProyectoContext } from "../../lib/proyecto/ProyectoContext";
 import { estadoDe } from "../../lib/proyecto/progreso";
+import { entregables } from "../../lib/obra/entrega";
 import type { EstadoJustificacion, JustificacionKey, Proyecto } from "../../lib/proyecto/tipos";
 import { ENGINE_VERSION } from "../../lib/version";
 
 // =============================================================================
 // Sidebar v4 (REDISENO-V4 §3.3). La barra lateral enseña TODO el expediente:
 //
-//   - «Proyecto»: La obra (dashboard) y El edificio.
+//   - «Proyecto»: La obra, El edificio y la Memoria CTE con sus apartados
+//     listos (feature-16).
 //   - Todas las justificaciones del registry agrupadas por DB, con su código y
 //     un glifo de estado a la derecha: ✓ cumple · ! por revisar · ✕ no cumple ·
 //     «pronto» si aún no existe · ↗ si se justifica fuera. Las no publicadas
@@ -135,6 +137,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   // Tolerante a null: la Sidebar también se monta en /_smoke, sin provider.
   const ctx = useContext(ProyectoContext);
   const proyecto = ctx?.proyecto ?? null;
+  const memoria = proyecto !== null ? entregables(proyecto).memoria : null;
 
   const grupos = justificacionesPorGrupo()
     .map((g) => ({
@@ -188,6 +191,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </NavLink>
             <NavLink to={`/p/${proyecto.id}/edificio`} onClick={onClose} className={navClass}>
               El edificio
+            </NavLink>
+            <NavLink to={`/p/${proyecto.id}/memoria`} onClick={onClose} className={navClass}>
+              <span className="min-w-0 flex-1 truncate">Memoria CTE</span>
+              <span
+                className="text-text-disabled ml-auto font-mono text-[10.5px]"
+                title={`${memoria!.listos} de ${memoria!.total} apartados listos`}
+              >
+                {memoria!.listos}/{memoria!.total}
+              </span>
             </NavLink>
           </div>
         )}

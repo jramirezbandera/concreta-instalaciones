@@ -137,9 +137,6 @@ export interface ContextoDerivado {
 // ESTADO POR JUSTIFICACIÓN DENTRO DEL PROYECTO
 // -----------------------------------------------------------------------------
 
-/** Último resultado conocido del motor sobre los inputs guardados (cache para el dashboard). */
-export interface ResultadoCache { veredicto: Veredicto; resumen?: string }
-
 /**
  * Lo que el proyecto persiste de cada justificación. Los inputs de módulo pasan a vivir
  * AQUÍ (no en la clave suelta legacy por módulo, feature-6 §B).
@@ -149,8 +146,6 @@ export interface JustificacionEnProyecto {
   inputs?: Record<string, unknown>;
   /** Versión de schema de los inputs del módulo (patrón `getModuleSchemaVersion`). */
   schemaVersion?: string;
-  /** Cache del último veredicto — alimenta el chip de progreso sin re-ejecutar el motor. */
-  resultadoCache?: ResultadoCache;
   /** Campos del contexto heredado con override local declarado (viajan a la ficha como excepción). */
   overridesContexto?: string[];
   /** Aplicabilidad FORZADA por el proyectista (prevalece sobre `aplicabilidadBase`). */

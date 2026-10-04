@@ -1,9 +1,9 @@
 # Rediseño v4 — plan de implementación
 
-> Estado: **fases 0 a 5 hechas** · 2026-10-04 (fase 1 en [feature-11.md](feature-11.md),
-> fase 2 en [feature-12.md](feature-12.md), fase 3 en [feature-13.md](feature-13.md),
-> fase 4 en [feature-14.md](feature-14.md), fase 5 en [feature-15.md](feature-15.md)).
-> Siguiente: fase 6 (La obra).
+> Estado: **fases 0 a 6 hechas: plan completo** · 2026-10-04 (fase 1 en
+> [feature-11.md](feature-11.md), fase 2 en [feature-12.md](feature-12.md), fase 3 en
+> [feature-13.md](feature-13.md), fase 4 en [feature-14.md](feature-14.md), fase 5 en
+> [feature-15.md](feature-15.md), fase 6 en [feature-16.md](feature-16.md)).
 > Origen: maquetas validadas por el usuario
 > (https://claude.ai/artifact/HS4vCeqgyM7Xozjzj9dnQg, versión 11).
 > Relación con [UX-RECONCEPT.md](UX-RECONCEPT.md): lo amplía y **reabre tres de sus decisiones
@@ -218,7 +218,7 @@ snapshots de ficha sin cambios no intencionados y capturas de pantalla para revi
 | **3 · Cuadro de superficies** ✅ | Port de la capa IA (lo de una lectura de una pasada; el chat no), adaptador `edificio` (la IA transcribe y clasifica filas; `montar.ts` suma, saca los tipos y agrupa plantas), tabla de propuesta con el edificio al lado, trazabilidad hasta la portada del anejo. | Hecho: 657 tests en verde; lectura real con Gemini de un PDF, un plano A1 y una captura, con el edificio esperado. Desviaciones en feature-13. |
 | **4 · HS5 patrón** ✅ | Contrato de §3.2 completo en HS5. **Pluviales** con las tablas 4.6–4.9 y B.1; la intensidad es un dato de la obra, porque no hay relación oficial por municipio. Red deducida de El edificio, con cuatro decisiones. Previsión del local y garaje con bombeo. Sección con etiquetas, franja, lista, memoria redactada, avisos revisables y «Ajustar a mano». | Hecho: 715 tests en verde; los cuatro casos como en la maqueta, con el motor detrás. Desviaciones en feature-14. |
 | **5 · HS4, HS3, HS6, HE1** ✅ | Mismo contrato, módulo a módulo (detalle en §5). Cada motor corregido por su verificación normativa (`research/verificacion-*-v4.md`); justificación desde El edificio con decisiones, dibujo con etiquetas, franja, lista, memoria, avisos revisables, incumplimientos con su arreglo, ficha, Demo y anejo. Motor 0.2.0. | Hecho: 776 tests en verde; desviaciones (Uf del PVC, HE1 con ec. 10, aislante del forjado bajo el forjado, equilibrado «se reparte» en HS3, Cáceres en zona II por comprobar) en feature-15. |
-| **6 · La obra** | «Lo que se justifica» con estados y «Antes de entregar» (avisos y no-cumples agregados); entregables. | Del edificio al anejo sin salir del flujo. |
+| **6 · La obra** ✅ | «Lo que se justifica» con estados y «Antes de entregar» (avisos y no-cumples agregados); entregables: memoria CTE (página propia, Word y PDF), fichas (el anejo) y esquemas de saneamiento y fontanería en DXF. El estado de cada justificación se calcula del expediente: se retira el caché de veredictos. | Hecho: 831 tests en verde; la barra lateral cambia al cambiar El edificio sin abrir el módulo; el Word abierto en Word y el DXF auditado. Desviaciones en feature-16. |
 
 **Orden.** Las fases 1 y 2 se pueden solapar: la 1 no toca datos y la 2 no toca módulos. La 3
 va justo después de la 2 porque necesita el schema estable. Dentro de la 5, cada módulo es

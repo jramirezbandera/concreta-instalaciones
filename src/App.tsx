@@ -7,7 +7,8 @@ import { RouteProgressBar } from "./components/layout/RouteProgressBar";
 import { ChunkErrorElement } from "./components/layout/ChunkErrorElement";
 import { ThemeProvider } from "./lib/theme/ThemeProvider";
 import { InicioPage } from "./pages/InicioPage";
-import { DashboardPage } from "./pages/DashboardPage";
+import { ObraPage } from "./pages/ObraPage";
+import { MemoriaPage } from "./pages/MemoriaPage";
 import { FormDatosGeneralesPage } from "./pages/FormDatosGeneralesPage";
 import { EdificioPage } from "./pages/EdificioPage";
 import { ProyectoLayout } from "./pages/ProyectoLayout";
@@ -65,9 +66,10 @@ const router = createHashRouter([
         path: "p/:id",
         element: <ProyectoLayout />,
         children: [
-          { index: true, element: <DashboardPage /> },
+          { index: true, element: <ObraPage /> },
           { path: "datos", element: <FormDatosGeneralesPage modo="editar" /> },
           { path: "edificio", element: <EdificioPage /> },
+          { path: "memoria", element: <MemoriaPage /> },
           {
             path: "hs/ventilacion",
             lazy: lazyComponent(() => import("./modules/hs3/ui"), "Hs3Module"),

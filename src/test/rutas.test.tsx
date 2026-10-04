@@ -28,7 +28,7 @@ beforeEach(() => {
   window.location.hash = "";
 });
 
-describe("rutas del expediente (F4) · inicio y dashboard", () => {
+describe("rutas del expediente (F4) · inicio y La obra", () => {
   it("«/» inicializa el storage (siembra Demo) y lista los proyectos", async () => {
     const { findByText } = await renderApp("#/");
     // La página de inicio siembra el proyecto Demo en el primer arranque.
@@ -36,12 +36,12 @@ describe("rutas del expediente (F4) · inicio y dashboard", () => {
     expect(await findByText("Nuevo proyecto")).toBeInTheDocument();
   });
 
-  it("«/p/demo» monta el dashboard del expediente dentro del provider", async () => {
+  it("«/p/demo» monta La obra dentro del provider", async () => {
     inicializarStorage("2026-08-23T00:00:00.000Z");
     const { findByText, findAllByText } = await renderApp(`#/p/${DEMO_ID}`);
-    expect(await findByText("Generar anejo CTE (PDF)")).toBeInTheDocument();
-    // El Demo viene sembrado con cálculos: debe haber justificaciones en verde.
-    // «HS5» sale también en la barra lateral; aquí interesa la del dashboard.
+    expect(await findByText("Fichas justificativas")).toBeInTheDocument();
+    expect(await findByText("Antes de entregar")).toBeInTheDocument();
+    // «HS5» sale también en la barra lateral; aquí interesa la de La obra.
     const hs5 = await findAllByText("HS5");
     expect(hs5.some((el) => el.closest("nav") === null)).toBe(true);
   });

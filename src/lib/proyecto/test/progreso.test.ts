@@ -1,25 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { progresoDe, estadoDe, resumenProyecto } from "../progreso";
-import type {
-  DatosGenerales,
-  JustificacionEnProyecto,
-  JustificacionKey,
-  Proyecto,
-} from "../tipos";
+import { estadoDe, resumenProyecto } from "../progreso";
+import type { DatosGenerales, JustificacionKey, Proyecto } from "../tipos";
 import { justificacionRegistry } from "../../../data/justificacionRegistry";
 import { edificioDeCaso } from "../../edificio/casos";
+import { evaluarExpediente } from "../../obra/evaluar";
 
 // =============================================================================
 // progreso.ts — progreso DERIVADO, nunca marcado a mano (feature-6 §A, §3).
-// Matriz completa inputs×veredicto, propagación del veredicto crudo en
-// estadoDe y recuento del expediente en resumenProyecto.
+// Desde feature-16 se calcula con el motor de cada módulo sobre el expediente:
+// sin caché, así que cambia en cuanto cambia El edificio o la obra.
 // =============================================================================
 
-// ── Fixtures ────────────────────────────────────────────────────────────────
-
-/** Datos generales de obra nueva con TODOS los atributos activos: sin reglas
- *  de atributos que desactiven nada, la base deja todo `aplica` salvo las
- *  externas (feature-6 §A). */
+/** Obra nueva con piscina: ninguna regla de atributos desactiva nada. */
 const datosObraNueva: DatosGenerales = {
   municipio: "Cáceres",
   provincia: "Cáceres",
@@ -27,6 +19,8 @@ const datosObraNueva: DatosGenerales = {
   intervencion: "obra_nueva",
   tienePiscina: true,
   zonaRadon: "I",
+  presionAcometida_kPa: 300,
+  cotaAlcantarillado_m: -4,
 };
 
 function proyecto(
@@ -45,73 +39,35 @@ function proyecto(
   };
 }
 
-const conInputs = (extra: Partial<JustificacionEnProyecto> = {}): JustificacionEnProyecto => ({
-  inputs: { campo: 1 },
-  ...extra,
-});
+/** Las cinco publicadas. */
+const PUBLICADAS: JustificacionKey[] = ["hs3", "hs4", "hs5", "hs6", "he1"];
 
-// ── progresoDe: matriz completa inputs × veredicto ──────────────────────────
-
-describe("progresoDe — matriz inputs×veredicto", () => {
-  it("undefined (clave ausente en el proyecto) → sin_iniciar", () => {
-    expect(progresoDe(undefined)).toBe("sin_iniciar");
+describe("estadoDe — calculado con el motor del módulo", () => {
+  it("una justificación aún no publicada queda sin iniciar y sin veredicto", () => {
+    const e = estadoDe(proyecto(), "hs1");
+    expect(e).toMatchObject({ aplicabilidad: "aplica", forzada: false, progreso: "sin_iniciar" });
+    expect(e.veredicto).toBeUndefined();
   });
 
-  it("entrada sin inputs → sin_iniciar", () => {
-    expect(progresoDe({})).toBe("sin_iniciar");
-    expect(progresoDe({ schemaVersion: "1" })).toBe("sin_iniciar");
+  it("las publicadas se calculan aunque no se hayan abierto (sin entradas guardadas)", () => {
+    const p = proyecto();
+    for (const k of PUBLICADAS) {
+      const e = estadoDe(p, k);
+      expect(["cumple", "no_cumple"], k).toContain(e.progreso);
+      expect(e.veredicto, k).toBe(e.progreso === "cumple" ? (e.veredicto === "warn" ? "warn" : "ok") : "fail");
+    }
   });
 
-  it("inputs objeto vacío → sin_iniciar (vacío = nada guardado)", () => {
-    expect(progresoDe({ inputs: {} })).toBe("sin_iniciar");
-  });
+  it("cumple con avisos sin revisar → «warn»; revisados todos → «ok»", () => {
+    const sinPresion = { ...datosObraNueva, presionAcometida_kPa: undefined };
+    const p = proyecto({}, sinPresion);
+    const ev = evaluarExpediente(p).porClave.hs4!;
+    expect(ev.avisos.length).toBeGreaterThan(0);
+    expect(estadoDe(p, "hs4").veredicto).toBe("warn");
 
-  it("inputs guardados sin resultadoCache → en_curso", () => {
-    expect(progresoDe(conInputs())).toBe("en_curso");
-  });
-
-  it("inputs + veredicto neutral → en_curso (el motor no concluye)", () => {
-    expect(progresoDe(conInputs({ resultadoCache: { veredicto: "neutral" } }))).toBe("en_curso");
-  });
-
-  it("inputs + veredicto ok → cumple", () => {
-    expect(progresoDe(conInputs({ resultadoCache: { veredicto: "ok" } }))).toBe("cumple");
-  });
-
-  it("inputs + veredicto warn → cumple (el matiz warn lo aporta el veredicto crudo)", () => {
-    expect(progresoDe(conInputs({ resultadoCache: { veredicto: "warn" } }))).toBe("cumple");
-  });
-
-  it("inputs + veredicto fail → no_cumple", () => {
-    expect(progresoDe(conInputs({ resultadoCache: { veredicto: "fail" } }))).toBe("no_cumple");
-  });
-});
-
-// ── estadoDe: aplicabilidad × progreso + veredicto crudo ────────────────────
-
-describe("estadoDe — combina aplicabilidad, progreso y veredicto crudo", () => {
-  it("propaga el veredicto crudo cuando el progreso es concluyente (ok/warn/fail)", () => {
-    const p = proyecto({
-      hs5: conInputs({ resultadoCache: { veredicto: "ok" } }),
-      hs3: conInputs({ resultadoCache: { veredicto: "warn" } }),
-      hs4: conInputs({ resultadoCache: { veredicto: "fail" } }),
-    });
-    expect(estadoDe(p, "hs5")).toMatchObject({ progreso: "cumple", veredicto: "ok" });
-    expect(estadoDe(p, "hs3")).toMatchObject({ progreso: "cumple", veredicto: "warn" });
-    expect(estadoDe(p, "hs4")).toMatchObject({ progreso: "no_cumple", veredicto: "fail" });
-  });
-
-  it("sin veredicto concluyente no expone veredicto (sin_iniciar, en_curso, neutral)", () => {
-    const p = proyecto({
-      hs6: conInputs(),
-      he1: conInputs({ resultadoCache: { veredicto: "neutral" } }),
-    });
-    expect(estadoDe(p, "hs5").progreso).toBe("sin_iniciar");
-    expect(estadoDe(p, "hs5").veredicto).toBeUndefined();
-    expect(estadoDe(p, "hs6").progreso).toBe("en_curso");
-    expect(estadoDe(p, "hs6").veredicto).toBeUndefined();
-    expect(estadoDe(p, "he1").progreso).toBe("en_curso");
-    expect(estadoDe(p, "he1").veredicto).toBeUndefined();
+    const revisados = ev.calculado!.avisos.map((a) => a.id);
+    const q = proyecto({ hs4: { revisados } }, sinPresion);
+    expect(estadoDe(q, "hs4").veredicto).toBe("ok");
   });
 
   it("obra nueva con todos los atributos: hs5 aplica sin forzar", () => {
@@ -122,9 +78,7 @@ describe("estadoDe — combina aplicabilidad, progreso y veredicto crudo", () =>
 
   it("propaga la aplicabilidad forzada por el proyectista, con su nota", () => {
     const p = proyecto({
-      hr: {
-        aplicabilidadForzada: { valor: "no_aplica", nota: "Justificado por el acústico externo" },
-      },
+      hr: { aplicabilidadForzada: { valor: "no_aplica", nota: "Justificado por el acústico externo" } },
     });
     const e = estadoDe(p, "hr");
     expect(e.aplicabilidad).toBe("no_aplica");
@@ -132,21 +86,22 @@ describe("estadoDe — combina aplicabilidad, progreso y veredicto crudo", () =>
     expect(e.nota).toBe("Justificado por el acústico externo");
   });
 
-  it("aplicabilidad y progreso son ortogonales: una forzada no_aplica conserva su progreso derivado", () => {
-    const p = proyecto({
-      hs6: conInputs({
-        resultadoCache: { veredicto: "ok" },
-        aplicabilidadForzada: { valor: "no_aplica" },
-      }),
-    });
+  it("una publicada forzada a «no aplica» no se calcula", () => {
+    const p = proyecto({ hs6: { aplicabilidadForzada: { valor: "no_aplica" } } });
     const e = estadoDe(p, "hs6");
     expect(e.aplicabilidad).toBe("no_aplica");
-    expect(e.progreso).toBe("cumple");
-    expect(e.veredicto).toBe("ok");
+    expect(e.progreso).toBe("sin_iniciar");
+    expect(e.veredicto).toBeUndefined();
+    expect(evaluarExpediente(p).porClave.hs6!.calculado).toBeUndefined();
+  });
+
+  it("cambia en cuanto cambia la obra, sin abrir el módulo", () => {
+    const baja = proyecto({}, { ...datosObraNueva, presionAcometida_kPa: 60 });
+    const alta = proyecto({}, { ...datosObraNueva, presionAcometida_kPa: 400 });
+    expect(estadoDe(baja, "hs4").progreso).toBe("no_cumple");
+    expect(estadoDe(alta, "hs4").progreso).toBe("cumple");
   });
 });
-
-// ── resumenProyecto: recuento sobre proyecto sintético ──────────────────────
 
 describe("resumenProyecto — recuento del expediente", () => {
   /** Nº de claves reales del expediente (registry sin entradas dev). */
@@ -156,79 +111,46 @@ describe("resumenProyecto — recuento del expediente", () => {
     expect(TOTAL).toBe(25);
   });
 
-  it("proyecto vacío en obra nueva: 2 externas de base, el resto aplicables sin_iniciar", () => {
+  it("proyecto sin abrir nada: las cinco publicadas calculadas, el resto sin iniciar", () => {
     const r = resumenProyecto(proyecto());
     // he0he1_global (HULC) y dbse (Concreta estructura) son externas de base.
     expect(r.externas).toBe(2);
     expect(r.noAplica).toBe(0);
     expect(r.aplicables).toBe(TOTAL - 2);
-    expect(r.cumplen).toBe(0);
-    expect(r.noCumplen).toBe(0);
+    expect(r.cumplen + r.noCumplen).toBe(5);
     expect(r.enCurso).toBe(0);
-    expect(r.sinIniciar).toBe(TOTAL - 2);
+    expect(r.sinIniciar).toBe(TOTAL - 2 - 5);
   });
 
-  it("mezcla conocida: cuentas exactas por estado", () => {
+  it("no_aplica y externo forzados no cuentan como aplicables", () => {
     const p = proyecto({
-      hs5: conInputs({ resultadoCache: { veredicto: "ok" } }), // cumple
-      hs3: conInputs({ resultadoCache: { veredicto: "warn" } }), // cumple (warn)
-      hs4: conInputs({ resultadoCache: { veredicto: "fail" } }), // no_cumple
-      hs6: conInputs(), // en_curso (sin cache)
-      he1: conInputs({ resultadoCache: { veredicto: "neutral" } }), // en_curso
       hr: { aplicabilidadForzada: { valor: "no_aplica", nota: "n/a" } },
+      hs5: { aplicabilidadForzada: { valor: "no_aplica" } },
       he4: { aplicabilidadForzada: { valor: "externo" }, refExterna: "EXP-123" },
     });
     const r = resumenProyecto(p);
-    expect(r.noAplica).toBe(1); // hr forzada
+    expect(r.noAplica).toBe(2);
     expect(r.externas).toBe(3); // he0he1_global + dbse (base) + he4 forzada
-    expect(r.aplicables).toBe(TOTAL - 4); // 25 − 1 no_aplica − 3 externas
-    expect(r.cumplen).toBe(2);
-    expect(r.noCumplen).toBe(1);
-    expect(r.enCurso).toBe(2);
-    expect(r.sinIniciar).toBe(TOTAL - 4 - 5); // aplicables − 5 con progreso
+    expect(r.aplicables).toBe(TOTAL - 5);
+    expect(r.cumplen + r.noCumplen).toBe(4); // hs5 ya no se calcula
     // Invariante: el desglose de progreso suma exactamente las aplicables.
     expect(r.cumplen + r.noCumplen + r.enCurso + r.sinIniciar).toBe(r.aplicables);
   });
-
-  it("no_aplica y externo NO cuentan como aplicables aunque tengan inputs y veredicto", () => {
-    const p = proyecto({
-      sua6: conInputs({
-        resultadoCache: { veredicto: "ok" },
-        aplicabilidadForzada: { valor: "no_aplica" },
-      }),
-      rebt: conInputs({
-        resultadoCache: { veredicto: "fail" },
-        aplicabilidadForzada: { valor: "externo" },
-      }),
-    });
-    const r = resumenProyecto(p);
-    expect(r.noAplica).toBe(1);
-    expect(r.externas).toBe(3); // 2 de base + rebt forzada
-    expect(r.aplicables).toBe(TOTAL - 4);
-    // Sus veredictos no se cuelan en el desglose de aplicables.
-    expect(r.cumplen).toBe(0);
-    expect(r.noCumplen).toBe(0);
-  });
 });
-
-// ── Determinismo ────────────────────────────────────────────────────────────
 
 describe("determinismo — funciones puras", () => {
   it("mismas entradas ⇒ mismas salidas, sin mutar el proyecto", () => {
-    const p = proyecto({
-      hs5: conInputs({ resultadoCache: { veredicto: "warn" } }),
-      hs4: conInputs({ resultadoCache: { veredicto: "fail" } }),
-      hr: { aplicabilidadForzada: { valor: "no_aplica" } },
-    });
+    const p = proyecto({ hr: { aplicabilidadForzada: { valor: "no_aplica" } } });
     const antes = JSON.stringify(p);
-
     const claves: JustificacionKey[] = ["hs5", "hs4", "hs6", "hr", "dbse"];
-    for (const k of claves) {
-      expect(estadoDe(p, k)).toEqual(estadoDe(p, k));
-    }
-    expect(progresoDe(p.justificaciones.hs5)).toBe(progresoDe(p.justificaciones.hs5));
+    for (const k of claves) expect(estadoDe(p, k)).toEqual(estadoDe(p, k));
     expect(resumenProyecto(p)).toEqual(resumenProyecto(p));
-
     expect(JSON.stringify(p)).toBe(antes);
+  });
+
+  it("la evaluación se memoriza por objeto de proyecto", () => {
+    const p = proyecto();
+    expect(evaluarExpediente(p)).toBe(evaluarExpediente(p));
+    expect(evaluarExpediente({ ...p })).not.toBe(evaluarExpediente(p));
   });
 });

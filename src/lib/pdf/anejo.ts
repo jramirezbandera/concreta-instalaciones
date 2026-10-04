@@ -56,7 +56,7 @@ export interface EntradaAnejo {
   fecha: string;
   /** Estado computado por justificación (aplicabilidad×progreso), en el orden del registry. */
   estados: { key: JustificacionKey; estado: EstadoJustificacion }[];
-  /** Fichas listas de las justificaciones aplicables CON inputs (ya con proyecto/fecha/observaciones). */
+  /** Fichas listas de las justificaciones que se calculan (ya con proyecto/fecha/observaciones). */
   fichas: { key: JustificacionKey; data: FichaData }[];
 }
 
