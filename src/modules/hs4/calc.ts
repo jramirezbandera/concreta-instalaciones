@@ -140,7 +140,9 @@ export type TipoTramoHS4 =
 
 /**
  * Criterio de simultaneidad K elegido (ENTRADA).
- *  - "une149201": K = 1/√(n−1)  (UNE 149201 — CRITERIO EXTERNO, no exigencia CTE).
+ *  - "une149201": K = 1/√(n−1)  (método tradicional — criterio de proyecto, no
+ *    exigencia CTE). El valor conserva su nombre histórico por compatibilidad con
+ *    los expedientes guardados; su atribución a UNE 149201 se retiró (feature-15).
  *  - "sin_simultaneidad": K = 1 (suma directa de caudales instantáneos).
  */
 export type CriterioK = "une149201" | "sin_simultaneidad";
@@ -224,8 +226,27 @@ export interface ResultadoAparatoHS4 {
   esFluxorOCalentador: boolean;
   /** Presión mínima exigida en el punto de consumo [kPa] (100 / 150). */
   presionMinExigida_kPa: number;
+  /**
+   * Presión que llega al punto de consumo [kPa]: la residual de su derivación
+   * (feature-15). Con un tramo inexistente, la de la acometida.
+   */
+  presionResidual_kPa: number;
+  /** Altura del punto sobre la acometida [m]: suma de las subidas de su recorrido. */
+  altura_m: number;
+  /** Lo que se pierde de la acometida al punto [kPa], por concepto (feature-15). */
+  perdidas: PerdidasRecorrido;
   cumple: boolean;
   estado: Veredicto;
+}
+
+/** Pérdidas de un recorrido, por concepto [kPa]. */
+export interface PerdidasRecorrido {
+  /** Por la altura que sube (ρ·g·Δh). */
+  altura_kPa: number;
+  /** Por rozamiento en las tuberías (longitudinales). */
+  rozamiento_kPa: number;
+  /** Localizadas: codos, tes, llaves y contador (fracción de las longitudinales). */
+  localizadas_kPa: number;
 }
 
 /** Resultado por tramo dimensionado: alimenta el SVG (árbol) y la ficha. */
@@ -262,6 +283,8 @@ export interface ResultadoTramoHS4 {
   velocidad_m_s: number | null;
   /** Pérdida de carga del tramo (longitudinal + localizada + cota) [kPa]. */
   perdida_kPa: number;
+  /** La misma pérdida, por concepto (feature-15). */
+  perdidas: PerdidasRecorrido;
   /** Presión residual a la salida (aguas arriba) de este tramo [kPa]. */
   presionResidual_kPa: number;
   /** `true` si el tramo pertenece al recorrido crítico (lo pinta el SVG en rojo). */
@@ -293,11 +316,11 @@ export interface HS4Result {
   /** Criterio de simultaneidad usado. */
   criterioK: CriterioK;
   /**
-   * `true` si K se ha calculado por la fórmula UNE 149201 (1/√(n−1)). DEJA
+   * `true` si K se ha calculado por la fórmula 1/√(n−1) (método tradicional). DEJA
    * CONSTANCIA de que K es CRITERIO EXTERNO, NO exigencia del DB-HS4.
    */
   kEsCriterioExterno: boolean;
-  /** Norma de procedencia del criterio K (p.ej. "UNE 149201"); `null` si K=1. */
+  /** Procedencia del criterio K («método tradicional»); `null` si K=1. */
   normaCriterioK: string | null;
   /** Presión disponible en la acometida [kPa]. */
   presionAcometida_kPa: number;
@@ -317,10 +340,17 @@ export interface HS4Result {
   puntoCriticoId: string | null;
   /**
    * `true` si CUALQUIER punto de consumo presenta déficit (presión residual <
-   * su mínima exigida) ⇒ se requiere grupo de presión (ap. 4.5). No depende solo
+   * su mínima exigida) ⇒ se requiere grupo de presión (ap. 4.2.2 pto 1 b). No depende solo
    * del punto reportado como crítico (OV-4).
    */
   grupoPresionNecesario: boolean;
+  /**
+   * Presión de partida con la que el punto más exigente llega JUSTO a su mínimo
+   * [kPa] (feature-15): invertir el punto crítico. Las pérdidas no dependen de la
+   * presión de partida, así que es máx(mínima exigida + pérdidas) de cada punto.
+   * `null` sin aparatos.
+   */
+  presionNecesaria_kPa: number | null;
   /** Peor veredicto de las verificaciones (presión, velocidad, dimensionado). */
   veredictoGlobal: Veredicto;
   /** Avisos de rango/normativos (mensajes en español, sin Zod). */
@@ -557,6 +587,10 @@ export function calcHS4(inp: HS4Inputs): HS4Result {
       diametroMinDerivacion_mm,
       esFluxorOCalentador: esFluxor,
       presionMinExigida_kPa: pMin,
+      // Se completan en el paso 6, con el recorrido ya calculado.
+      presionResidual_kPa: inp.presionAcometida_kPa,
+      altura_m: 0,
+      perdidas: { altura_kPa: 0, rozamiento_kPa: 0, localizadas_kPa: 0 },
       cumple,
       estado,
     });
@@ -596,8 +630,8 @@ export function calcHS4(inp: HS4Inputs): HS4Result {
   const kEsCriterioExterno = inp.criterioK === "une149201";
   if (kEsCriterioExterno) {
     warnings.push(
-      `Coeficiente de simultaneidad K = 1/√(n−1): CRITERIO EXTERNO (${normaK ?? "UNE 149201"}), ` +
-        `NO exigencia del DB-HS4 (el DB remite a "un criterio adecuado").`,
+      `Coeficiente de simultaneidad K = 1/√(n−1): criterio de proyecto (${normaK ?? "método tradicional"}), ` +
+        `NO exigencia del DB-HS4 (el DB remite a "un criterio adecuado", ap. 4.2.1 pto 2 b).`,
     );
   }
 
@@ -700,8 +734,8 @@ export function calcHS4(inp: HS4Inputs): HS4Result {
           : `por debajo del mínimo ${rango.min_m_s} m/s`;
         motivoVel += ` · v=${velocidad_m_s.toFixed(2)} m/s fuera del rango [${rango.min_m_s}, ${rango.max_m_s}] (${material})`;
         warnings.push(
-          `Velocidad ${velocidad_m_s.toFixed(2)} m/s fuera del rango recomendado DB-HS4 ap. 4.2 d) ` +
-            `(tramo "${id}", ${material}: ${limite}); buena práctica, no exigencia prestacional del CTE.` +
+          `Velocidad ${velocidad_m_s.toFixed(2)} m/s fuera del intervalo de cálculo DB-HS4 ap. 4.2.1 pto 2 d) ` +
+            `(tramo "${id}", ${material}: ${limite}); paso de dimensionado, no exigencia de cumplimiento.` +
             (sobre && velocidad_m_s >= 2 ? " Considerar antivibratorios (v ≥ 2 m/s)." : ""),
         );
       } else {
@@ -716,6 +750,11 @@ export function calcHS4(inp: HS4Inputs): HS4Result {
     const perdidaLocalizada_kPa = perdidaLongitudinal_kPa * fraccionLocalizadas;
     const perdidaCota_kPa = altura_m > 0 ? altura_m * KPA_POR_METRO_ALTURA : 0;
     const perdida_kPa = perdidaLongitudinal_kPa + perdidaLocalizada_kPa + perdidaCota_kPa;
+    const perdidas: PerdidasRecorrido = {
+      altura_kPa: perdidaCota_kPa,
+      rozamiento_kPa: perdidaLongitudinal_kPa,
+      localizadas_kPa: perdidaLocalizada_kPa,
+    };
 
     const motivo =
       `${citaMin} · Q_cálc=${caudalCalculo_dm3_s.toFixed(3)} dm³/s ` +
@@ -746,6 +785,7 @@ export function calcHS4(inp: HS4Inputs): HS4Result {
       diametroMinPorAguasArriba_mm,
       velocidad_m_s,
       perdida_kPa,
+      perdidas,
       // Presión residual se calcula en el paso 5 (recorrido raíz → hojas).
       presionResidual_kPa: 0,
       esCritico: false,
@@ -797,10 +837,34 @@ export function calcHS4(inp: HS4Inputs): HS4Result {
   const aparatoPorId = new Map<string, ResultadoAparatoHS4>();
   for (const ra of porAparato) aparatoPorId.set(ra.id, ra);
 
+  let presionNecesaria_kPa: number | null = null;
   for (const ra of porAparato) {
     const r = resultadoPorId.get(ra.tramoId);
     const presion = r ? r.presionResidual_kPa : inp.presionAcometida_kPa;
     const margen = presion - ra.presionMinExigida_kPa; // déficit si < 0
+
+    // Recorrido del punto a la acometida: pérdidas por concepto y altura.
+    const perdidas: PerdidasRecorrido = { altura_kPa: 0, rozamiento_kPa: 0, localizadas_kPa: 0 };
+    let altura_m = 0;
+    {
+      let cur: string | null = r ? r.id : null;
+      const visto = new Set<string>();
+      while (cur !== null && !visto.has(cur)) {
+        visto.add(cur);
+        const rt = resultadoPorId.get(cur);
+        if (!rt) break;
+        perdidas.altura_kPa += rt.perdidas.altura_kPa;
+        perdidas.rozamiento_kPa += rt.perdidas.rozamiento_kPa;
+        perdidas.localizadas_kPa += rt.perdidas.localizadas_kPa;
+        if (rt.altura_m > 0) altura_m += rt.altura_m;
+        cur = rt.parentId;
+      }
+    }
+    ra.presionResidual_kPa = presion;
+    ra.perdidas = perdidas;
+    ra.altura_m = altura_m;
+    const necesaria = ra.presionMinExigida_kPa + (inp.presionAcometida_kPa - presion);
+    if (presionNecesaria_kPa === null || necesaria > presionNecesaria_kPa) presionNecesaria_kPa = necesaria;
 
     // El punto más desfavorable = MENOR margen (déficit más negativo). Empates:
     // gana el primero en el orden de entrada (determinista).
@@ -857,14 +921,14 @@ export function calcHS4(inp: HS4Inputs): HS4Result {
   // 8. Grupo de presión (OV-4): necesario si CUALQUIER punto de consumo tiene
   //    déficit (presión residual < su mínima exigida), no solo el "crítico"
   //    reportado. El veredicto global ya marca fail por aparato; aquí se asegura
-  //    la coherencia del flag con todos los puntos (ap. 4.5).
+  //    la coherencia del flag con todos los puntos (ap. 4.2.2 pto 1 b).
   // ===========================================================================
   const grupoPresionNecesario = hayDeficit;
   if (grupoPresionNecesario && puntoCriticoId !== null) {
     const apCrit = aparatoPorId.get(puntoCriticoId);
     const minExigida = apCrit?.presionMinExigida_kPa ?? PRESIONES.datos.presionMinGrifosComunes_kPa;
     warnings.push(
-      `Grupo de presión NECESARIO (ap. 4.5): el punto de peor margen "${puntoCriticoId}" ` +
+      `Grupo de presión NECESARIO (ap. 4.2.2 pto 1 b): el punto de peor margen "${puntoCriticoId}" ` +
         `(${presionCritica_kPa.toFixed(1)} kPa) no alcanza su mínima exigida ${minExigida} kPa ` +
         `(o algún otro punto de consumo presenta déficit).`,
     );
@@ -896,6 +960,7 @@ export function calcHS4(inp: HS4Inputs): HS4Result {
     presionCritica_kPa,
     puntoCriticoId,
     grupoPresionNecesario,
+    presionNecesaria_kPa,
     veredictoGlobal,
     warnings,
   };
@@ -914,7 +979,7 @@ function resolverFraccionLocalizadas(inp: HS4Inputs, warnings: string[]): number
   if (!Number.isFinite(f) || f < 0) {
     warnings.push(
       `Fracción de pérdidas localizadas inválida (${String(f)}): se usa el valor medio ` +
-        `${(medio * 100).toFixed(0)} % (buena práctica 20–30 %, no DB).`,
+        `${(medio * 100).toFixed(0)} % (20–30 % de las longitudinales, ap. 4.2.2 pto 1 a).`,
     );
     return medio;
   }

@@ -89,7 +89,7 @@ function describir(result: HS4Result): string {
   const cumplen = result.porTramo.filter((t) => t.cumple).length;
   const criticos = result.porTramo.filter((t) => t.esCritico).length;
   const grupoTxt = result.grupoPresionNecesario
-    ? "Requiere grupo de presión (ap. 4.5)."
+    ? "Requiere grupo de presión (ap. 4.2.2 pto 1 b)."
     : "No requiere grupo de presión.";
   const puntoTxt =
     result.puntoCriticoId == null

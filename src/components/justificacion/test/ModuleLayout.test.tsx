@@ -121,3 +121,87 @@ describe("ajustar · el dibujo cabe entero en su lienzo", () => {
     expect(ajustar(0, 100, { ancho: 500, alto: 500 })).toEqual({ width: 240, height: 240 });
   });
 });
+
+describe("ModuleLayout · v4 (feature-14)", () => {
+  it("la frase redactada sustituye a sujeto y métricas", () => {
+    montar({
+      resultado: { veredicto: "ok", sujeto: "Red de evacuación", metricas: "135 UD", frase: "Cuatro bajantes de residuales." },
+    });
+    expect(screen.getByText("Cuatro bajantes de residuales.")).toBeInTheDocument();
+    expect(screen.queryByText(/Red de evacuación/)).not.toBeInTheDocument();
+  });
+
+  it("los avisos con identidad se ven en el dibujo y se revisan; los revisados no cuentan", async () => {
+    const user = userEvent.setup();
+    const vistos: string[] = [];
+    const revisados: boolean[] = [];
+    const { rerender } = montar({
+      avisos: [
+        {
+          id: "a",
+          titulo: "El garaje queda por debajo.",
+          detalle: "Bombeo.",
+          revisado: false,
+          onVer: () => vistos.push("a"),
+          onRevisar: (b) => revisados.push(b),
+        },
+        { id: "b", titulo: "Ya revisado.", detalle: "", revisado: true, onRevisar: (b) => revisados.push(b) },
+      ],
+      totalComprobaciones: 12,
+    });
+    expect(screen.getByText("1 cosa por revisar")).toBeInTheDocument();
+    const region = screen.getByRole("region", { name: "Avisos" });
+    await user.click(within(region).getByRole("button", { name: "Ver en el dibujo" }));
+    await user.click(within(region).getByRole("button", { name: "Marcar como revisado" }));
+    await user.click(within(region).getByRole("button", { name: "Deshacer" }));
+    expect(vistos).toEqual(["a"]);
+    expect(revisados).toEqual([true, false]);
+    expect(region).toHaveTextContent("Revisado");
+
+    rerender(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ModuleLayout
+            justificacionKey="smoke"
+            resultado={{ veredicto: "ok", sujeto: "x" }}
+            avisos={[{ id: "a", titulo: "El garaje queda por debajo.", detalle: "", revisado: true }]}
+            totalComprobaciones={12}
+            dibujo={{ titulo: "Esquema", lienzo: <svg aria-label="Dibujo" /> }}
+            comprobaciones={<p />}
+          />
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+    expect(screen.getByText("12 comprobaciones · todo revisado")).toBeInTheDocument();
+  });
+
+  it("«Qué entra» sustituye a «Del proyecto» y la columna puede seguir en Comprobaciones", async () => {
+    const user = userEvent.setup();
+    montar({ queEntra: <p>Qué entra del edificio</p>, comprobacionesConColumna: true });
+    expect(screen.getByText("Qué entra del edificio")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Comprobaciones" }));
+    expect(screen.getByText("Qué entra del edificio")).toBeInTheDocument();
+    expect(screen.getByText("Entradas del módulo")).toBeInTheDocument();
+  });
+
+  it("la memoria en texto, con sus cifras y «Copiar texto»", async () => {
+    const user = userEvent.setup();
+    montar({
+      memoria: {
+        texto: {
+          titulo: "Evacuación de aguas",
+          norma: "DB-HS 5",
+          parrafos: [["El colector es de ", { v: "Ø110 mm" }, "."]],
+          tabla: { cabecera: ["Elemento", "Ø"], filas: [["Colector", "110"]] },
+          fuente: "DB-HS · HS 5",
+        },
+        textoPlano: "Evacuación de aguas",
+      },
+    });
+    await user.click(screen.getByRole("tab", { name: "Memoria" }));
+    const memoria = screen.getByRole("region", { name: "Memoria" });
+    expect(memoria).toHaveTextContent("El colector es de Ø110 mm.");
+    expect(within(memoria).getByRole("table")).toHaveTextContent("Colector");
+    expect(within(memoria).getByRole("button", { name: "Copiar texto" })).toBeInTheDocument();
+  });
+});

@@ -9,6 +9,8 @@ import type {
   JustificacionKey,
   Proyecto,
 } from "../../proyecto/tipos";
+import { edificioDeCaso } from "../../edificio/casos";
+import { resumenEdificio } from "../../edificio/derivar";
 
 // =============================================================================
 // renderAnejo (feature-8 §D) — composición del anejo del proyecto en jsdom.
@@ -45,23 +47,18 @@ const datosGenerales: DatosGenerales = {
   municipio: "Málaga",
   provincia: "Málaga",
   altitud_m: 10,
-  uso: "vivienda_unifamiliar",
   intervencion: "obra_nueva",
-  plantasSobreRasante: 2,
-  plantasBajoRasante: 0,
-  tipoCubierta: "inclinada",
-  numViviendas: 1,
-  tieneGaraje: false,
-  tieneTrasteros: false,
   tienePiscina: false,
-  tieneLocalPB: false,
   zonaRadon: "I",
 };
+
+const edificio = edificioDeCaso("unifamiliar");
 
 const derivados: ContextoDerivado = {
   zonaClimatica: { valor: "A3", procedencia: "DB-HE Anejo B, Tabla a-Anejo B" },
   zonaTermicaHS3: { valor: "W", procedencia: "DB-HS3, Tabla 4.4" },
-  alturaEvacuacion_m: { valor: 3, procedencia: "Estimación 3 m/planta (revisable)" },
+  alturaEvacuacion_m: { valor: 2.8, procedencia: "cotas de El edificio" },
+  edificio: resumenEdificio(edificio),
 };
 
 const proyecto: Proyecto = {
@@ -70,6 +67,7 @@ const proyecto: Proyecto = {
   creado: "2026-01-01T00:00:00.000Z",
   modificado: "2026-02-01T00:00:00.000Z",
   datosGenerales,
+  edificio,
   justificaciones: {
     // Externa CON referencia aportada (la otra, dbse, queda sin referencia).
     he0he1_global: { refExterna: "Expediente HULC 2026-001" },

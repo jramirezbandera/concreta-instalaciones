@@ -22,6 +22,7 @@ import {
   claseTiroDe,
   COCCION_MIN,
   NO_OCUPACION_MIN,
+  SECCION_CONDUCTO_MECANICA,
   SECCION_CONDUCTO_TABLA_4_2,
   type CategoriaDormitorios,
   type ClaseTiro,
@@ -126,7 +127,17 @@ export interface HS3Inputs {
   modoConducto?: ModoConducto;
   /** Red de conductos colectivos (modo avanzado). Ignorada en modo rápido. */
   redColectivos?: Colectivo[];
+  /**
+   * Sistema de ventilación de la vivienda (feature-15, ap. 3.1.1). Decide cómo
+   * se dimensiona el conducto: la HÍBRIDA por las Tablas 4.2 a 4.4 y la
+   * MECÁNICA por la fórmula 4.1, S ≥ 2,5·qvt (ap. 4.2.2). Sin él, híbrida, como
+   * hasta ahora.
+   */
+  sistema?: SistemaVentilacion;
 }
+
+/** Sistema general de ventilación de la vivienda: híbrido o mecánico (no natural). */
+export type SistemaVentilacion = "hibrida" | "mecanica";
 
 // -----------------------------------------------------------------------------
 // FORMA DEL RESULTADO
@@ -146,8 +157,16 @@ export interface ResultadoEstancia {
   caudalRequerido_l_s: number;
   cumple: boolean;
   estado: Veredicto;
-  /** Área efectiva de la abertura (Tabla 4.1) sobre el caudal REQUERIDO [cm²]. */
+  /**
+   * Área efectiva de la abertura (Tabla 4.1) [cm²]: 4 por el MAYOR del caudal
+   * mínimo exigido y el que se adopta (qva o qve, con el equilibrado).
+   */
   areaAbertura_cm2: number;
+  /**
+   * Área de la abertura de paso de la puerta del local [cm²]: máx(70, 8·qvp),
+   * con qvp el caudal que pasa por ella, el del propio local (feature-15).
+   */
+  areaPaso_cm2: number;
   tipoAbertura: TipoAbertura;
   /** Para zonas de cocción: extracción independiente ≥ 50 l/s. */
   esCoccion: boolean;
@@ -159,8 +178,13 @@ export interface ResultadoEstancia {
 
 /** Sub-resultado del dimensionado del conducto de extracción (Tablas 4.2/4.3). */
 export interface ResultadoConducto {
-  /** Caudal total de extracción de la vivienda (suma de húmedos) [l/s]. */
+  /** Caudal total de extracción de la vivienda, ya equilibrado [l/s]. */
   qvt_l_s: number;
+  /**
+   * Cómo se dimensiona (feature-15): por las Tablas 4.2/4.3 (híbrida) o por la
+   * fórmula 4.1 del ap. 4.2.2 (mecánica). En mecánica la clase de tiro no cuenta.
+   */
+  metodo: "tablas_4_2_4_3" | "formula_4_1";
   /** Clase de tiro (Tabla 4.3, verificada) según nº de plantas y zona. */
   claseTiro: ClaseTiro;
   /** Sección mínima exigida (Tabla 4.2) [cm²]. */
@@ -203,7 +227,7 @@ export interface HS3Result {
   estadoHumedosTotal: Veredicto;
 
   // Aberturas de paso (mínimo 70 cm²) ---------------------------------------
-  /** Área de abertura de paso por estancia seca (máx(70, 8·qvp)) [cm²]. */
+  /** La mayor de las aberturas de paso de las puertas, máx(70, 8·qvp) [cm²]. */
   areaPaso_cm2: number;
 
   // Conducto de extracción (informativo, bajo gate de la 4.3) ---------------
@@ -423,15 +447,16 @@ export function calcHS3(inp: HS3Inputs): HS3Result {
     const cumple = q >= caudalRequerido_l_s;
     const estado: Veredicto = cumple ? "ok" : "fail";
 
-    // --- aberturas (Tabla 4.1) sobre el caudal REQUERIDO --------------------
-    // DECISIÓN DE DISEÑO: se dimensiona con el caudal REQUERIDO (mínimo
-    // normativo), no con el propuesto, porque el área efectiva de la abertura
-    // se calcula a partir de "qv, el caudal de ventilación mínimo exigido del
-    // local" (literal Tabla 4.1 / ap. 4). El propuesto solo se usa para el
-    // veredicto de cumplimiento, no para dimensionar geometría.
+    // --- aberturas (Tabla 4.1, ap. 4.1) --------------------------------------
+    // Admisión 4·qva y extracción 4·qve cuando los caudales se han equilibrado,
+    // y nunca por debajo de 4·qv: se toma el MAYOR del mínimo exigido y del que
+    // se adopta (verificación de feature-15, bloque 5). El paso de la puerta del
+    // local lleva el mismo caudal: máx(70, 8·qvp).
     const tipoAbertura: TipoAbertura = humedo ? "extraccion" : "admision";
     const coef = humedo ? t41.extraccion_coef : t41.admision_coef;
-    const areaAbertura_cm2 = coef * caudalRequerido_l_s;
+    const qAbertura = Math.max(caudalRequerido_l_s, q);
+    const areaAbertura_cm2 = coef * qAbertura;
+    const areaPasoLocal_cm2 = Math.max(t41.pasoMin_cm2, t41.paso_coef * qAbertura);
 
     // --- cocción (extracción independiente ≥ 50 l/s) ------------------------
     // Usa su PROPIO caudal (caudalCoccion_l_s), INDEPENDIENTE del general: el
@@ -474,6 +499,7 @@ export function calcHS3(inp: HS3Inputs): HS3Result {
       cumple,
       estado,
       areaAbertura_cm2,
+      areaPaso_cm2: areaPasoLocal_cm2,
       tipoAbertura,
       esCoccion: !!e.esCoccion,
       caudalCoccion_l_s,
@@ -507,21 +533,22 @@ export function calcHS3(inp: HS3Inputs): HS3Result {
   }
 
   // --- Aberturas de paso (Tabla 4.1: máx(70, 8·qvp)) -----------------------
-  // El caudal de paso qvp se toma del mayor de admisión/extracción equilibrado
-  // (caudal que atraviesa las puertas entre zona seca y húmeda).
-  const areaPaso_cm2 = Math.max(
-    t41.pasoMin_cm2,
-    t41.paso_coef * caudalEquilibrado_l_s,
-  );
+  // Por puerta, con el caudal del local al que sirve (feature-15: antes se
+  // tomaba 8 × el caudal total de la vivienda, que el DB no pide). Aquí, la
+  // mayor de todas.
+  const areaPaso_cm2 = porEstancia.reduce<number>((m, e) => Math.max(m, e.areaPaso_cm2), t41.pasoMin_cm2);
 
   // --- Conducto de extracción (SIMPLIFICADO, Tablas 4.2/4.3 verificadas) ---
   // Se calcula siempre (modo rápido). El modo avanzado lo conserva pero la UI
   // muestra la red; no degrada el veredicto (es dimensionado).
+  // El conducto lleva la extracción YA equilibrada: si entra más de lo que sale,
+  // la extracción sube hasta igualarla (feature-15).
   const conducto = calcularConducto(
-    totalExtraccion_l_s,
+    caudalEquilibrado_l_s,
     inp.numPlantasConducto,
     inp.zonaTermica,
     warnings,
+    inp.sistema ?? "hibrida",
   );
 
   // --- Modo red (avanzado): dimensionado de la red colectiva multiplanta -----
@@ -634,9 +661,25 @@ function calcularConducto(
   numPlantasConducto: number,
   zonaTermica: ZonaTermica,
   warnings: string[],
+  sistema: SistemaVentilacion = "hibrida",
 ): ResultadoConducto {
   // Clase de tiro de la Tabla 4.3 (verificada) según nº de plantas y zona.
   const claseTiro: ClaseTiro = claseTiroDe(numPlantasConducto, zonaTermica);
+
+  // Mecánica: fórmula 4.1 (conducto contiguo a un local habitable), sin tablas.
+  if (sistema === "mecanica") {
+    const s = SECCION_CONDUCTO_MECANICA.datos.contiguoHabitable_cm2_por_l_s * qvt_l_s;
+    return {
+      qvt_l_s,
+      metodo: "formula_4_1",
+      claseTiro,
+      seccionRequerida_cm2: s,
+      conductos: [{ n: 1, seccion_cm2: s }],
+      conductoVerificado: true,
+      estado: "neutral",
+      aviso: `Sección mínima exigida con ventilación mecánica: S ≥ 2,5·qvt (ap. 4.2.2, fórmula 4.1).`,
+    };
+  }
 
   if (numPlantasConducto < 1) {
     warnings.push(
@@ -659,6 +702,7 @@ function calcularConducto(
 
   return {
     qvt_l_s,
+    metodo: "tablas_4_2_4_3",
     claseTiro,
     seccionRequerida_cm2: celda.area_cm2,
     conductos: celda.conductos.map((cc) => ({ ...cc })),

@@ -47,8 +47,11 @@ import {
 // "en umbral" / "fuera de umbral" sin hardcodear cifras dispersas.
 // -----------------------------------------------------------------------------
 
-const PB = parametrosBarrera(); // coefDifusionMax_m2_s, espesorMin_mm
-const PE = parametrosEspacioContencion(); // areaAberturasMin_cm2_ml, alturaMinCamara_mm, …
+const PB = parametrosBarrera(); // coefDifusionLimite_m2_s (estricto <), espesorMin_mm
+const PE = parametrosEspacioContencion(); // areaAberturasMin_cm2_ml, …
+// La altura de la cámara ya no se comprueba en obra nueva (feature-15: los 5 cm del
+// ap. 3.2 pto 6 son de edificios existentes). Se sigue aportando como dato.
+const ALTURA_CAMARA_REF_mm = 50;
 
 // -----------------------------------------------------------------------------
 // CONSTRUCTORES DE SOLUCIONES VÁLIDAS / INVÁLIDAS (legibles, reutilizables).
@@ -63,7 +66,7 @@ function barreraValida(id = "barrera-ok"): SolucionBarreraInput {
     continuidadSellada: true,
     penetracionesSelladas: true,
     puertasEstancas: true,
-    coefDifusion_m2_s: PB.coefDifusionMax_m2_s / 2, // holgadamente ≤ umbral
+    coefDifusion_m2_s: PB.coefDifusionLimite_m2_s / 2, // holgadamente ≤ umbral
     espesor_mm: PB.espesorMin_mm + 0.5, // holgadamente ≥ mínimo
   };
 }
@@ -78,7 +81,7 @@ function contencionNaturalValida(id = "camara-ok"): SolucionEspacioContencionInp
     perimetro_m,
     // Margen sobre el criterio 10 cm²/ml · perímetro.
     areaAberturas_cm2: PE.areaAberturasMin_cm2_ml * perimetro_m + 100,
-    alturaCamara_mm: PE.alturaMinCamara_mm + 30,
+    alturaCamara_mm: ALTURA_CAMARA_REF_mm + 30,
   };
 }
 
@@ -172,7 +175,7 @@ describe("calcHS6 — snapshots (SPEC §5)", () => {
           penetracionesSelladas: true,
           puertasEstancas: true,
           // Fuera de umbral por ambos lados: coef > máx y espesor < mínimo.
-          coefDifusion_m2_s: PB.coefDifusionMax_m2_s * 10,
+          coefDifusion_m2_s: PB.coefDifusionLimite_m2_s * 10,
           espesor_mm: PB.espesorMin_mm / 2,
         },
         contencionNaturalValida("camara-adicional"),
@@ -202,7 +205,7 @@ describe("calcHS6 — snapshots (SPEC §5)", () => {
           perimetro_m,
           // Por debajo del criterio geométrico exigido.
           areaAberturas_cm2: PE.areaAberturasMin_cm2_ml * perimetro_m - 50,
-          alturaCamara_mm: PE.alturaMinCamara_mm + 20,
+          alturaCamara_mm: ALTURA_CAMARA_REF_mm + 20,
         },
       ],
     };
@@ -315,8 +318,8 @@ const arbBool = fc.boolean();
 
 /** Coef. de difusión a ambos lados del umbral (válidos e inválidos). */
 const arbCoef: fc.Arbitrary<number> = fc.double({
-  min: PB.coefDifusionMax_m2_s / 100,
-  max: PB.coefDifusionMax_m2_s * 100,
+  min: PB.coefDifusionLimite_m2_s / 100,
+  max: PB.coefDifusionLimite_m2_s * 100,
   noNaN: true,
   noDefaultInfinity: true,
 });
@@ -348,7 +351,7 @@ const arbArea: fc.Arbitrary<number> = fc.double({
 /** Altura de cámara plausible [mm], a ambos lados del mínimo. */
 const arbAltura: fc.Arbitrary<number> = fc.double({
   min: 0,
-  max: PE.alturaMinCamara_mm * 4,
+  max: ALTURA_CAMARA_REF_mm * 4,
   noNaN: true,
   noDefaultInfinity: true,
 });
@@ -514,7 +517,7 @@ describe("calcHS6 — invariantes (property-based)", () => {
           ...s,
           // Siempre ≥ criterio (área = exigida + extra ≥ 0).
           areaAberturas_cm2: PE.areaAberturasMin_cm2_ml * s.perimetro_m + extra,
-          alturaCamara_mm: PE.alturaMinCamara_mm + 10,
+          alturaCamara_mm: ALTURA_CAMARA_REF_mm + 10,
         })),
       ),
       // Despresurización completa (válida, sin warn).

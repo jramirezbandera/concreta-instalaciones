@@ -1,7 +1,9 @@
 # Rediseño v4 — plan de implementación
 
-> Estado: **fases 0 y 1 hechas** · 2026-10-03 (fase 1 en [feature-11.md](feature-11.md)).
-> Siguiente: fase 2, El edificio.
+> Estado: **fases 0 a 5 hechas** · 2026-10-04 (fase 1 en [feature-11.md](feature-11.md),
+> fase 2 en [feature-12.md](feature-12.md), fase 3 en [feature-13.md](feature-13.md),
+> fase 4 en [feature-14.md](feature-14.md), fase 5 en [feature-15.md](feature-15.md)).
+> Siguiente: fase 6 (La obra).
 > Origen: maquetas validadas por el usuario
 > (https://claude.ai/artifact/HS4vCeqgyM7Xozjzj9dnQg, versión 11).
 > Relación con [UX-RECONCEPT.md](UX-RECONCEPT.md): lo amplía y **reabre tres de sus decisiones
@@ -212,10 +214,10 @@ snapshots de ficha sin cambios no intencionados y capturas de pantalla para revi
 |---|---|---|
 | **0 · Decisiones y arreglo urgente** ✅ | §7 respondido. UX-RECONCEPT §13 marcado (decisiones 2, 3, 7 y 12 sustituidas). Docs de UMD corregidos (`IDR-INSTALACIONES.md`, `research/normativa-he1-transmitancia.md`). **HS5:** ningún tramo queda por debajo del desagüe de sus aparatos (inodoro Ø100 → Ø110) y `capacidad_ud` pasa a ser la del Ø final; con test unitario y de propiedades. Las correcciones de `hs6/tablas.ts` se dejan para HS6 en la fase 5: piden verificar contra el PDF. | Hecho: 514 tests en verde; solo cambian los 3 snapshots de HS5, como se esperaba. |
 | **1 · Chasis** ✅ | Tokens de Concreta y Ónice; barra lateral completa con estados; barra superior como ruta; `ModuleLayout` (cabecera con veredicto y frase, pestañas, avisos a lo ancho), `DelProyecto`, `LienzoAjustado`, `FranjaDetalle`, `ListaElementos`, `FilaResumen` y `VistaMemoria`. Los 5 módulos montados **sin tocar motores**: lo suelto y lo heredado a la izquierda, el dibujo grande, y el outliner en Comprobaciones a todo el ancho. `QueEntra`, `Decision` y `DibujoConEtiquetas` se aplazan a las fases 2 y 4, cuando tengan datos (ver feature-11 «Decisiones»). | Hecho: 527 tests en verde; ningún test de motor ni snapshot de ficha cambia; capturas en claro, Ónice y móvil. |
-| **2 · El edificio** | Modelo `Edificio` (schema 2, sin migrador), derivaciones, pantalla con la sección como editor, editor a la izquierda, unidades que se repiten, 4 casos de partida. Generadores `viviendaTipo.ts` → `generadores/` leyendo zonas. | La demo se crea desde «Plurifamiliar con locales»; un `.json` v1 se rechaza con mensaje claro. |
-| **3 · Cuadro de superficies** | Port de la capa IA, adaptador `edificio`, tabla de propuesta, trazabilidad en ficha. | Desde un PDF o imagen real de un cuadro de superficies, el edificio queda cargado tras revisar. |
-| **4 · HS5 patrón** | Contrato de §3.2 completo en HS5; **pluviales** (tablas 4.6–4.9 + apéndice B por municipio INE); corrección del Ø mínimo por aparato; previsión del local; garaje con bombeo; anclas, etiquetas, franja, lista y memoria. | HS5 como en la maqueta, con el motor detrás. |
-| **5 · HS4, HS3, HS6, HE1** | Mismo contrato, módulo a módulo (detalle en §5). | Los cinco como en la maqueta. |
+| **2 · El edificio** ✅ | Modelo `Edificio` (schema 2, sin migrador), derivaciones, pantalla con la sección como editor, editor a la izquierda, unidades que se repiten, 4 casos de partida. Generadores `viviendaTipo.ts` → `generadores/` leyendo zonas. | Hecho: 575 tests en verde; la demo sale de «Plurifamiliar con locales» y un `.json` v1 se rechaza con mensaje claro. Desviaciones en feature-12. |
+| **3 · Cuadro de superficies** ✅ | Port de la capa IA (lo de una lectura de una pasada; el chat no), adaptador `edificio` (la IA transcribe y clasifica filas; `montar.ts` suma, saca los tipos y agrupa plantas), tabla de propuesta con el edificio al lado, trazabilidad hasta la portada del anejo. | Hecho: 657 tests en verde; lectura real con Gemini de un PDF, un plano A1 y una captura, con el edificio esperado. Desviaciones en feature-13. |
+| **4 · HS5 patrón** ✅ | Contrato de §3.2 completo en HS5. **Pluviales** con las tablas 4.6–4.9 y B.1; la intensidad es un dato de la obra, porque no hay relación oficial por municipio. Red deducida de El edificio, con cuatro decisiones. Previsión del local y garaje con bombeo. Sección con etiquetas, franja, lista, memoria redactada, avisos revisables y «Ajustar a mano». | Hecho: 715 tests en verde; los cuatro casos como en la maqueta, con el motor detrás. Desviaciones en feature-14. |
+| **5 · HS4, HS3, HS6, HE1** ✅ | Mismo contrato, módulo a módulo (detalle en §5). Cada motor corregido por su verificación normativa (`research/verificacion-*-v4.md`); justificación desde El edificio con decisiones, dibujo con etiquetas, franja, lista, memoria, avisos revisables, incumplimientos con su arreglo, ficha, Demo y anejo. Motor 0.2.0. | Hecho: 776 tests en verde; desviaciones (Uf del PVC, HE1 con ec. 10, aislante del forjado bajo el forjado, equilibrado «se reparte» en HS3, Cáceres en zona II por comprobar) en feature-15. |
 | **6 · La obra** | «Lo que se justifica» con estados y «Antes de entregar» (avisos y no-cumples agregados); entregables. | Del edificio al anejo sin salir del flujo. |
 
 **Orden.** Las fases 1 y 2 se pueden solapar: la 1 no toca datos y la 2 no toca módulos. La 3

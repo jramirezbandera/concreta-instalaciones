@@ -9,6 +9,7 @@ import { ThemeProvider } from "./lib/theme/ThemeProvider";
 import { InicioPage } from "./pages/InicioPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { FormDatosGeneralesPage } from "./pages/FormDatosGeneralesPage";
+import { EdificioPage } from "./pages/EdificioPage";
 import { ProyectoLayout } from "./pages/ProyectoLayout";
 import { RedirectLegacy } from "./pages/RedirectLegacy";
 
@@ -66,6 +67,7 @@ const router = createHashRouter([
         children: [
           { index: true, element: <DashboardPage /> },
           { path: "datos", element: <FormDatosGeneralesPage modo="editar" /> },
+          { path: "edificio", element: <EdificioPage /> },
           {
             path: "hs/ventilacion",
             lazy: lazyComponent(() => import("./modules/hs3/ui"), "Hs3Module"),

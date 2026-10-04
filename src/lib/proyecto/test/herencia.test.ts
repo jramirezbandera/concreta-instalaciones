@@ -6,7 +6,9 @@ import {
   mergeInputsHeredados,
   notasExcepcionesLocales,
 } from "../herencia";
-import type { ContextoDerivado, DatosGenerales } from "../tipos";
+import type { ContextoDerivado, DatosGenerales, ResumenEdificio } from "../tipos";
+import { edificioDeCaso } from "../../edificio/casos";
+import { resumenEdificio } from "../../edificio/derivar";
 
 // =============================================================================
 // herencia — feature-6 T2.5. Tests en dos capas (cf. derivar.test.ts):
@@ -25,26 +27,34 @@ function dgDe(extra?: Partial<DatosGenerales>): DatosGenerales {
     municipio: "Cáceres",
     provincia: "Cáceres",
     altitud_m: 459,
-    uso: "vivienda_unifamiliar",
     intervencion: "obra_nueva",
-    plantasSobreRasante: 4,
-    plantasBajoRasante: 0,
-    tipoCubierta: "plana_transitable",
-    numViviendas: 1,
-    tieneGaraje: false,
-    tieneTrasteros: false,
     tienePiscina: false,
-    tieneLocalPB: false,
     zonaRadon: "I",
     ...extra,
   };
 }
 
-function ctxDe(zonaClimatica = "C4", zonaTermica: "W" | "X" | "Y" | "Z" = "Z"): ContextoDerivado {
+/** Resumen de edificio de prueba: 4 plantas sobre rasante, cubierta transitable, con viviendas. */
+function edificioDe(extra?: Partial<ResumenEdificio>): ResumenEdificio {
+  return {
+    ...resumenEdificio(edificioDeCaso("plurifamiliar")),
+    plantasSobreRasante: 4,
+    cubiertaTransitable: true,
+    tipoCubierta: "plana_transitable",
+    ...extra,
+  };
+}
+
+function ctxDe(
+  zonaClimatica = "C4",
+  zonaTermica: "W" | "X" | "Y" | "Z" = "Z",
+  edificio: ResumenEdificio = edificioDe(),
+): ContextoDerivado {
   return {
     zonaClimatica: { valor: zonaClimatica, procedencia: "test" },
     zonaTermicaHS3: { valor: zonaTermica, procedencia: "test" },
     alturaEvacuacion_m: { valor: 9, procedencia: "test" },
+    edificio,
   };
 }
 
@@ -75,21 +85,20 @@ describe("heredadosDe — mapa por módulo", () => {
     expect(heredadosDe("hs3", dgDe(), ctxDe("C4", "Y"))).toEqual({ zonaTermica: "Y" });
   });
 
-  it('hs5: uso = "privado" para AMBOS usos de vivienda (mapeo constante hoy)', () => {
-    for (const uso of ["vivienda_unifamiliar", "vivienda_colectiva"] as const) {
-      expect(heredadosDe("hs5", dgDe({ uso }), ctxDe()).uso).toBe("privado");
-    }
+  it('hs5: uso "privado" si el edificio tiene viviendas y "publico" si no (oficinas)', () => {
+    expect(heredadosDe("hs5", dgDe(), ctxDe()).uso).toBe("privado");
+    const oficinas = resumenEdificio(edificioDeCaso("oficinas"));
+    expect(heredadosDe("hs5", dgDe(), ctxDe("C4", "Z", oficinas)).uso).toBe("publico");
   });
 
-  it("hs5: numPlantas ← plantasSobreRasante y cubiertaTransitable ← tipoCubierta", () => {
-    expect(heredadosDe("hs5", dgDe({ plantasSobreRasante: 6 }), ctxDe())).toEqual({
+  it("hs5: numPlantas y cubiertaTransitable salen de El edificio", () => {
+    expect(heredadosDe("hs5", dgDe(), ctxDe("C4", "Z", edificioDe({ plantasSobreRasante: 6 })))).toEqual({
       uso: "privado",
       numPlantas: 6,
       cubiertaTransitable: true, // plana_transitable
     });
-    for (const tipoCubierta of ["plana_no_transitable", "inclinada"] as const) {
-      expect(heredadosDe("hs5", dgDe({ tipoCubierta }), ctxDe()).cubiertaTransitable).toBe(false);
-    }
+    const sinTransitar = edificioDe({ cubiertaTransitable: false, tipoCubierta: "inclinada" });
+    expect(heredadosDe("hs5", dgDe(), ctxDe("C4", "Z", sinTransitar)).cubiertaTransitable).toBe(false);
   });
 
   it("hs4: presión informada ⇒ se hereda con su valor", () => {
@@ -309,7 +318,7 @@ describe("notasExcepcionesLocales", () => {
   it("genera la frase esperada para un override numérico que difiere", () => {
     const notas = notasExcepcionesLocales({
       key: "hs5",
-      dg: dgDe({ plantasSobreRasante: 4 }),
+      dg: dgDe(),
       d: ctxDe(),
       state: { uso: "privado", numPlantas: 5, cubiertaTransitable: true },
       overrides: ["numPlantas"],
@@ -333,7 +342,7 @@ describe("notasExcepcionesLocales", () => {
     expect(
       notasExcepcionesLocales({
         key: "hs5",
-        dg: dgDe({ plantasSobreRasante: 4 }),
+        dg: dgDe(),
         d: ctxDe(),
         state: { uso: "privado", numPlantas: 4, cubiertaTransitable: true },
         overrides: ["numPlantas"],
@@ -369,7 +378,7 @@ describe("notasExcepcionesLocales", () => {
     expect(
       notasExcepcionesLocales({
         key: "hs5",
-        dg: dgDe({ tipoCubierta: "plana_transitable" }),
+        dg: dgDe(),
         d: ctxDe(),
         state: { uso: "privado", numPlantas: 4, cubiertaTransitable: false },
         overrides: ["cubiertaTransitable"],
@@ -380,7 +389,7 @@ describe("notasExcepcionesLocales", () => {
   it("varios overrides ⇒ notas en el orden de declaración del mapa (determinista)", () => {
     const args = {
       key: "hs5" as const,
-      dg: dgDe({ plantasSobreRasante: 4, tipoCubierta: "plana_transitable" as const }),
+      dg: dgDe(),
       d: ctxDe(),
       state: { uso: "privado", numPlantas: 5, cubiertaTransitable: false },
       overrides: ["cubiertaTransitable", "numPlantas"], // orden inverso al mapa a propósito

@@ -1,18 +1,19 @@
 // =============================================================================
-// FormDatosGeneralesPage — feature-6 T3.6: formulario de DATOS GENERALES del
-// expediente (UX-RECONCEPT §2.3), en dos modos:
+// FormDatosGeneralesPage — feature-6 T3.6, feature-12: formulario de los DATOS
+// DE LA OBRA (emplazamiento, intervención, suministro). Lo que describe el
+// edificio (plantas, usos, viviendas…) se edita en El edificio. Dos modos:
 //
 //   - `crear`:  standalone (SIN ProyectoProvider). Parte de defaults, exige
-//               nombre, y al enviar crea el proyecto (crearProyecto), lo fija
-//               como activo (setProyectoActivo) y navega a `/p/${id}`.
+//               nombre y un caso de partida para el edificio; al enviar crea
+//               el proyecto, lo fija como activo y abre El edificio.
 //   - `editar`: DENTRO del provider. Inicializa de `proyecto.datosGenerales`,
 //               y al guardar llama `actualizarDatosGenerales(dg, nowIso)` y
 //               navega a `..` (el dashboard del proyecto).
 //
 // El panel lateral de DERIVADOS recalcula en vivo `derivarContexto` al cambiar
-// provincia/altitud/plantas, mostrando cada valor con su PROCEDENCIA (la
-// trazabilidad empieza aquí, no en la ficha). Validación inline en español con
-// resumen de errores; el submit se deshabilita mientras haya alguno.
+// provincia/altitud, mostrando cada valor con su PROCEDENCIA (la trazabilidad
+// empieza aquí, no en la ficha). Validación inline en español con resumen de
+// errores; el submit se deshabilita mientras haya alguno.
 //
 // Reutiliza el lenguaje de formulario del repo (CollapsibleSection + Field /
 // NumberInput / SelectInput de components/ui) — no inventa inputs propios.
@@ -25,28 +26,19 @@ import { useNavigate } from "react-router";
 import { CollapsibleSection } from "../components/ui/CollapsibleSection";
 import { Field, InputLabel, NumberInput, SelectInput } from "../components/ui/InputLabel";
 import { SelectorMunicipio } from "../components/proyecto/SelectorMunicipio";
-import { EditorAlturasPlantas } from "../components/proyecto/EditorAlturasPlantas";
 import { PROVINCIAS, altitudCapitalDe, limiteTramoCercano } from "../data/zonasClimaticasHE";
-import { derivarContexto, reconciliarAlturas } from "../lib/proyecto/derivar";
+import { derivarContexto } from "../lib/proyecto/derivar";
+import { CASOS_EDIFICIO, edificioDeCaso, type CasoEdificio } from "../lib/edificio/casos";
 import { ProyectoContext } from "../lib/proyecto/ProyectoContext";
 import { crearProyecto, setProyectoActivo } from "../lib/proyecto/storage";
-import type {
-  DatosGenerales,
-  Intervencion,
-  TipoCubierta,
-  Uso,
-  ZonaRadon,
-} from "../lib/proyecto/tipos";
+import type { DatosGenerales, Intervencion, ZonaRadon } from "../lib/proyecto/tipos";
+import { intensidadDe } from "../modules/hs5/pluviales";
+import { ISOYETAS, type Isoyeta, type ZonaPluviometrica } from "../modules/hs5/tablas";
 
 // -----------------------------------------------------------------------------
 // Opciones de los selects (a nivel de módulo: identidad estable entre renders).
 // Etiquetas legibles en español; los values son los unions de tipos.ts.
 // -----------------------------------------------------------------------------
-
-const USO_OPTIONS: { value: Uso; label: string }[] = [
-  { value: "vivienda_unifamiliar", label: "Vivienda unifamiliar" },
-  { value: "vivienda_colectiva", label: "Vivienda colectiva" },
-];
 
 const INTERVENCION_OPTIONS: { value: Intervencion; label: string }[] = [
   { value: "obra_nueva", label: "Obra nueva" },
@@ -55,17 +47,23 @@ const INTERVENCION_OPTIONS: { value: Intervencion; label: string }[] = [
   { value: "cambio_uso", label: "Cambio de uso" },
 ];
 
-const CUBIERTA_OPTIONS: { value: TipoCubierta; label: string }[] = [
-  { value: "plana_transitable", label: "Plana transitable" },
-  { value: "plana_no_transitable", label: "Plana no transitable" },
-  { value: "inclinada", label: "Inclinada" },
-];
-
 const ZONA_RADON_OPTIONS: { value: ZonaRadon; label: string }[] = [
   { value: "I", label: "Zona I" },
   { value: "II", label: "Zona II" },
   { value: "sin_exigencia", label: "Sin exigencia" },
 ];
+
+/** "" = no indicada (HS5 supone 100 mm/h y lo avisa). */
+const ZONA_PLUVIOMETRICA_OPTIONS: { value: "" | ZonaPluviometrica; label: string }[] = [
+  { value: "", label: "— No indicada —" },
+  { value: "A", label: "Zona A" },
+  { value: "B", label: "Zona B" },
+];
+
+const ISOYETA_OPTIONS: { value: string; label: string }[] = ISOYETAS.map((i) => ({
+  value: String(i),
+  label: `Isoyeta ${i}`,
+}));
 
 /** "" = sin seleccionar (opción placeholder) + las 52 provincias del Anejo B. */
 const PROVINCIA_OPTIONS: { value: string; label: string }[] = [
@@ -73,22 +71,14 @@ const PROVINCIA_OPTIONS: { value: string; label: string }[] = [
   ...PROVINCIAS.map((prov) => ({ value: prov, label: prov })),
 ];
 
-/** Defaults del modo crear (mismos placeholders razonables que la migración legacy). */
+/** Defaults del modo crear. */
 function datosGeneralesIniciales(): DatosGenerales {
   return {
     municipio: "",
     provincia: "",
     altitud_m: 0,
-    uso: "vivienda_colectiva",
     intervencion: "obra_nueva",
-    plantasSobreRasante: 1,
-    plantasBajoRasante: 0,
-    tipoCubierta: "plana_no_transitable",
-    numViviendas: 1,
-    tieneGaraje: false,
-    tieneTrasteros: false,
     tienePiscina: false,
-    tieneLocalPB: false,
     zonaRadon: "I",
   };
 }
@@ -109,42 +99,18 @@ function validar(dg: DatosGenerales, nombre: string): string[] {
     errores.push("La altitud debe estar entre 0 y 3500 m.");
   }
   if (
-    !Number.isInteger(dg.plantasSobreRasante) ||
-    dg.plantasSobreRasante < 1 ||
-    dg.plantasSobreRasante > 30
-  ) {
-    errores.push("Las plantas sobre rasante deben estar entre 1 y 30.");
-  }
-  if (
-    !Number.isInteger(dg.plantasBajoRasante) ||
-    dg.plantasBajoRasante < 0 ||
-    dg.plantasBajoRasante > 5
-  ) {
-    errores.push("Las plantas bajo rasante deben estar entre 0 y 5.");
-  }
-  if (!Number.isInteger(dg.numViviendas) || dg.numViviendas < 1) {
-    errores.push("El número de viviendas debe ser al menos 1.");
-  }
-  // Alturas por planta (feature-10): solo se juzgan las que CUENTAN (dentro de
-  // los contadores actuales — las recortadas por vista no molestan al guardar).
-  if (dg.alturasPlantas_m !== undefined) {
-    const enJuego = [
-      ...dg.alturasPlantas_m.sobre.slice(0, Math.max(0, dg.plantasSobreRasante)),
-      ...dg.alturasPlantas_m.bajo.slice(0, Math.max(0, dg.plantasBajoRasante)),
-    ];
-    if (enJuego.some((h) => !Number.isFinite(h))) {
-      errores.push("Faltan alturas de planta por rellenar.");
-    } else if (enJuego.some((h) => h < 2 || h > 10)) {
-      errores.push("Las alturas de planta deben estar entre 2 y 10 m.");
-    }
-  }
-  if (
     dg.presionAcometida_kPa !== undefined &&
     (!Number.isFinite(dg.presionAcometida_kPa) ||
       dg.presionAcometida_kPa < 100 ||
       dg.presionAcometida_kPa > 1200)
   ) {
     errores.push("La presión de acometida, si se informa, debe estar entre 100 y 1200 kPa.");
+  }
+  if (
+    dg.cotaAlcantarillado_m !== undefined &&
+    (!Number.isFinite(dg.cotaAlcantarillado_m) || dg.cotaAlcantarillado_m < -20 || dg.cotaAlcantarillado_m > 5)
+  ) {
+    errores.push("La cota del alcantarillado, si se informa, debe estar entre −20 y +5 m.");
   }
   return errores;
 }
@@ -231,6 +197,12 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
   const [nombre, setNombre] = useState<string>(() =>
     modo === "editar" && ctx !== null ? ctx.proyecto.nombre : "",
   );
+  // Caso de partida del edificio (solo al crear): luego se edita en El edificio.
+  const [caso, setCaso] = useState<CasoEdificio>("plurifamiliar");
+  const edificio = useMemo(
+    () => (modo === "editar" && ctx !== null ? ctx.proyecto.edificio : edificioDeCaso(caso)),
+    [modo, ctx, caso],
+  );
   // Borrador textual de la presión: "" = no informada (undefined en el modelo).
   // Un NumberInput no vale aquí: Number("") === 0 y perderíamos el estado "vacío".
   const [presionTxt, setPresionTxt] = useState<string>(() => {
@@ -270,6 +242,27 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
     setDg((prev) => ({ ...prev, [k]: v }));
   }
 
+  // Borrador textual de la cota del alcantarillado (mismo motivo que la presión).
+  const [cotaTxt, setCotaTxt] = useState<string>(() => {
+    const c = modo === "editar" && ctx !== null ? ctx.proyecto.datosGenerales.cotaAlcantarillado_m : undefined;
+    return c === undefined ? "" : String(c);
+  });
+
+  function onCotaChange(txt: string): void {
+    setCotaTxt(txt);
+    const n = Number(txt.replace(",", ".").replace("−", "-"));
+    set("cotaAlcantarillado_m", txt.trim() === "" || !Number.isFinite(n) ? undefined : n);
+  }
+
+  function onZonaPluviometrica(v: "" | ZonaPluviometrica): void {
+    set("pluviometria", v === "" ? undefined : { zona: v, isoyeta: dg.pluviometria?.isoyeta ?? 30 });
+  }
+
+  function onIsoyeta(v: string): void {
+    if (!dg.pluviometria) return;
+    set("pluviometria", { ...dg.pluviometria, isoyeta: Number(v) as Isoyeta });
+  }
+
   function onPresionChange(txt: string): void {
     setPresionTxt(txt);
     const n = Number(txt);
@@ -285,46 +278,26 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
     [dg.provincia, dg.altitud_m],
   );
 
-  // Derivados en vivo: se recalculan al cambiar provincia / altitud / plantas
-  // / alturas por planta (feature-10).
+  // Derivados en vivo: se recalculan al cambiar provincia / altitud (y, al
+  // crear, el caso de partida, que fija la altura de evacuación).
   const derivados = useMemo(
-    () =>
-      derivarContexto({
-        provincia: dg.provincia,
-        altitud_m: dg.altitud_m,
-        plantasSobreRasante: dg.plantasSobreRasante,
-        alturasPlantas_m: dg.alturasPlantas_m,
-      }),
-    [dg.provincia, dg.altitud_m, dg.plantasSobreRasante, dg.alturasPlantas_m],
+    () => derivarContexto({ provincia: dg.provincia, altitud_m: dg.altitud_m }, edificio),
+    [dg.provincia, dg.altitud_m, edificio],
   );
 
   function onSubmit(e: FormEvent<HTMLFormElement>): void {
     e.preventDefault();
     if (errores.length > 0) return;
-    // Alturas por planta: se persisten con las longitudes casadas con los
-    // contadores (mientras se edita se toleran desfases para no perder valores
-    // al bajar y volver a subir el nº de plantas; al JSON van limpias).
-    const dgFinal: DatosGenerales =
-      dg.alturasPlantas_m === undefined
-        ? dg
-        : {
-            ...dg,
-            alturasPlantas_m: reconciliarAlturas(
-              dg.alturasPlantas_m,
-              dg.plantasSobreRasante,
-              dg.plantasBajoRasante,
-            ),
-          };
     const nowIso = new Date().toISOString();
     if (modo === "crear") {
-      const p = crearProyecto(nombre.trim(), dgFinal, nowIso);
+      const p = crearProyecto(nombre.trim(), dg, edificio, nowIso);
       setProyectoActivo(p.id);
-      void navigate(`/p/${p.id}`);
+      void navigate(`/p/${p.id}/edificio`);
     } else {
       // ctx no es null aquí (guard de arriba); el narrow no sobrevive al closure.
       const nombreLimpio = nombre.trim();
       if (nombreLimpio !== ctx!.proyecto.nombre) ctx!.renombrarProyecto(nombreLimpio, nowIso);
-      ctx!.actualizarDatosGenerales(dgFinal, nowIso);
+      ctx!.actualizarDatosGenerales(dg, nowIso);
       void navigate("..");
     }
   }
@@ -338,11 +311,12 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
       >
         <div className="min-w-0 flex-1">
           <h1 className="text-text-primary mb-1 text-lg font-semibold">
-            {modo === "crear" ? "Nuevo proyecto" : "Datos generales"}
+            {modo === "crear" ? "Nuevo proyecto" : "Datos de la obra"}
           </h1>
           <p className="text-text-disabled mb-4 text-[12px] leading-snug">
-            Los datos generales del expediente se rellenan una vez y de ellos se deriva el contexto
-            que heredan todas las justificaciones.
+            Emplazamiento, intervención y suministro: se rellenan una vez y de ellos se deriva el
+            contexto que heredan todas las justificaciones. El edificio se describe en su propia
+            pantalla.
           </p>
 
           <CollapsibleSection label="Identificación">
@@ -464,18 +438,44 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
             )}
           </CollapsibleSection>
 
-          <CollapsibleSection label="Uso e intervención" refNorma="CTE Parte I art. 2">
-            <Field id="dg-uso" label="Uso del edificio">
-              <SelectInput<Uso>
-                id="dg-uso"
-                value={dg.uso}
-                options={USO_OPTIONS}
-                onChange={(v) => set("uso", v)}
-              />
-            </Field>
-            <p className="text-text-disabled mb-1 text-[11px] leading-snug">
-              Otros usos: fuera del alcance de Concreta.
-            </p>
+          {modo === "crear" && (
+            <CollapsibleSection label="El edificio">
+              <fieldset className="py-1">
+                <legend className="text-text-secondary mb-1.5 text-[12px]">
+                  Partir de un caso
+                </legend>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {CASOS_EDIFICIO.map((c) => (
+                    <label
+                      key={c.key}
+                      className={[
+                        "flex cursor-pointer items-center gap-2 rounded border px-2.5 py-2 text-[13px] transition-colors",
+                        caso === c.key
+                          ? "border-accent bg-tint-accent text-text-primary"
+                          : "border-border-main text-text-secondary hover:border-text-disabled",
+                      ].join(" ")}
+                    >
+                      <input
+                        type="radio"
+                        name="dg-caso"
+                        value={c.key}
+                        checked={caso === c.key}
+                        onChange={() => setCaso(c.key)}
+                        className="accent-accent"
+                      />
+                      {c.etiqueta}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <p className="text-text-disabled mb-1 text-[11px] leading-snug">
+                Al crear el proyecto se abre El edificio con este caso: plantas, zonas y
+                viviendas tipo se ajustan allí.
+              </p>
+            </CollapsibleSection>
+          )}
+
+          <CollapsibleSection label="Intervención" refNorma="CTE Parte I art. 2">
             <Field id="dg-intervencion" label="Tipo de intervención">
               <SelectInput<Intervencion>
                 id="dg-intervencion"
@@ -484,86 +484,6 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
                 onChange={(v) => set("intervencion", v)}
               />
             </Field>
-          </CollapsibleSection>
-
-          <CollapsibleSection label="Geometría">
-            <Field
-              id="dg-plantas-sobre"
-              label="Plantas sobre rasante"
-              help="De aquí se deriva la altura de evacuación, que discrimina exigencias de SI/SUA: 3 m/planta estimados, salvo que definas las alturas reales más abajo."
-              warning={avisoDe(errores, "sobre rasante")}
-            >
-              <NumberInput
-                id="dg-plantas-sobre"
-                value={dg.plantasSobreRasante}
-                min={1}
-                max={30}
-                onChange={(v) => set("plantasSobreRasante", v)}
-              />
-            </Field>
-            <Field
-              id="dg-plantas-bajo"
-              label="Plantas bajo rasante"
-              warning={avisoDe(errores, "bajo rasante")}
-            >
-              <NumberInput
-                id="dg-plantas-bajo"
-                value={dg.plantasBajoRasante}
-                min={0}
-                max={5}
-                onChange={(v) => set("plantasBajoRasante", v)}
-              />
-            </Field>
-            <EditorAlturasPlantas
-              plantasSobre={dg.plantasSobreRasante}
-              plantasBajo={dg.plantasBajoRasante}
-              alturas={dg.alturasPlantas_m}
-              onChange={(v) => set("alturasPlantas_m", v)}
-              warning={avisoDe(errores, "alturas")}
-            />
-            <Field
-              id="dg-cubierta"
-              label="Tipo de cubierta"
-              help="Geometría gruesa de la cubierta — discrimina exigencias de HS1/HS5/SUA."
-            >
-              <SelectInput<TipoCubierta>
-                id="dg-cubierta"
-                value={dg.tipoCubierta}
-                options={CUBIERTA_OPTIONS}
-                onChange={(v) => set("tipoCubierta", v)}
-              />
-            </Field>
-          </CollapsibleSection>
-
-          <CollapsibleSection label="Programa">
-            <Field
-              id="dg-viviendas"
-              label="Número de viviendas"
-              warning={avisoDe(errores, "viviendas")}
-            >
-              <NumberInput
-                id="dg-viviendas"
-                value={dg.numViviendas}
-                min={1}
-                onChange={(v) => set("numViviendas", v)}
-              />
-            </Field>
-            <CheckRow
-              id="dg-garaje"
-              label="Garaje"
-              help="Márcalo si hay garaje o zona de aparcamiento, AUNQUE sea privado de una unifamiliar. Describes el edificio, no la aplicabilidad: en unifamiliar SUA7 sigue saliendo «no aplica», pero por su ámbito real y no por «no hay garaje» — y ese párrafo se imprime tal cual en el anejo. Pendiente: la ventilación del garaje (HS3) todavía no se dimensiona aquí."
-              refText="DB-SUA 7 ámbito · DB-HS3 Tabla 2.2"
-              checked={dg.tieneGaraje}
-              onChange={(v) => set("tieneGaraje", v)}
-            />
-            <CheckRow
-              id="dg-trasteros"
-              label="Trasteros"
-              help="Márcalo si hay trastero como LOCAL independiente: en sótano, anexo al garaje o en zona común. Un armario o un cuarto dentro de la vivienda no cuenta — ese aire ya lo cubre la ventilación general de la vivienda. Pendiente: hoy solo consta en los datos del expediente; la ventilación de trasteros (0,7 l/s por m² útil) todavía no se dimensiona aquí."
-              refText="DB-HS3 Tabla 2.2"
-              checked={dg.tieneTrasteros}
-              onChange={(v) => set("tieneTrasteros", v)}
-            />
             <CheckRow
               id="dg-piscina"
               label="Piscina"
@@ -572,16 +492,9 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
               checked={dg.tienePiscina}
               onChange={(v) => set("tienePiscina", v)}
             />
-            <CheckRow
-              id="dg-local-pb"
-              label="Local en planta baja"
-              help="Márcalo si el edificio incluye un local comercial o de otro uso en planta baja, aunque se entregue en bruto. El edificio pasa a ser de uso mixto: las redes de HS4/HS5 dejan de ser solo de viviendas y cambian la compartimentación (SI) y las exigencias de ruido (HR). Pendiente: hoy solo consta en los datos del expediente; ninguna justificación lo consume todavía."
-              checked={dg.tieneLocalPB}
-              onChange={(v) => set("tieneLocalPB", v)}
-            />
           </CollapsibleSection>
 
-          <CollapsibleSection label="Emplazamiento normativo" refNorma="DB-HS6 Apéndice B">
+          <CollapsibleSection label="Emplazamiento normativo" refNorma="DB-HS6 y DB-HS5, apéndices B">
             <Field
               id="dg-zona-radon"
               label="Zona de radón"
@@ -598,9 +511,44 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
             <p className="text-text-disabled mb-1 text-[11px] leading-snug">
               Apéndice B del DB-HS6 — consúltalo para tu municipio.
             </p>
+            <Field
+              id="dg-zona-pluviometrica"
+              label="Zona pluviométrica"
+              sub="(opcional)"
+              help="Zona A o B del mapa de la Figura B.1 del DB-HS5. Es una ENTRADA MANUAL: el DB solo da el mapa. Sin ella, HS5 calcula los pluviales con 100 mm/h y lo avisa."
+              refText="DB-HS5 Apéndice B, Figura B.1"
+            >
+              <SelectInput<"" | ZonaPluviometrica>
+                id="dg-zona-pluviometrica"
+                value={dg.pluviometria?.zona ?? ""}
+                options={ZONA_PLUVIOMETRICA_OPTIONS}
+                onChange={onZonaPluviometrica}
+              />
+            </Field>
+            {dg.pluviometria && (
+              <Field
+                id="dg-isoyeta"
+                label="Isoyeta"
+                help="La isoyeta del mapa de la Figura B.1 que pasa por el municipio."
+                refText="DB-HS5 Apéndice B, Tabla B.1"
+              >
+                <SelectInput<string>
+                  id="dg-isoyeta"
+                  value={String(dg.pluviometria.isoyeta)}
+                  options={ISOYETA_OPTIONS}
+                  onChange={onIsoyeta}
+                />
+              </Field>
+            )}
+            {dg.pluviometria && (
+              <p className="text-text-disabled mb-1 text-[11px] leading-snug">
+                Intensidad pluviométrica: {intensidadDe(dg.pluviometria.zona, dg.pluviometria.isoyeta)} mm/h
+                (Tabla B.1).
+              </p>
+            )}
           </CollapsibleSection>
 
-          <CollapsibleSection label="Suministro" defaultOpen={false}>
+          <CollapsibleSection label="Suministro y saneamiento" defaultOpen={false}>
             <Field
               id="dg-presion"
               label="Presión de acometida"
@@ -617,6 +565,24 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
                 max={1200}
                 value={presionTxt}
                 onChange={(e) => onPresionChange(e.target.value)}
+                placeholder="—"
+                className={`${INPUT_CLS} text-right tabular-nums`}
+              />
+            </Field>
+            <Field
+              id="dg-cota-alcantarillado"
+              label="Cota del alcantarillado"
+              sub="(opcional)"
+              unit="m"
+              help="Cota de la red de alcantarillado en el punto de acometida, respecto a la rasante (negativa si está por debajo, p. ej. −1,20). Decide si un sótano evacua por bombeo. Si se deja vacía, HS5 supone que los sótanos quedan por debajo y lo avisa."
+              warning={avisoDe(errores, "alcantarillado")}
+            >
+              <input
+                id="dg-cota-alcantarillado"
+                type="text"
+                inputMode="decimal"
+                value={cotaTxt}
+                onChange={(e) => onCotaChange(e.target.value)}
                 placeholder="—"
                 className={`${INPUT_CLS} text-right tabular-nums`}
               />

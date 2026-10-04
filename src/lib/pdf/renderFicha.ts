@@ -84,6 +84,11 @@ export interface FichaData {
   /** Observaciones (texto libre, una entrada por párrafo). */
   observaciones?: string[];
   /**
+   * Memoria redactada (feature-14), un párrafo por entrada. Opcional: si está,
+   * abre la ficha, justo después de la cabecera.
+   */
+  memoria?: string[];
+  /**
    * Datos para incrustar el diagrama SVG (opcional). `elementId` apunta al
    * clon oculto del SVG en modo 'pdf' del módulo. `nativeW/H` = viewBox del SVG.
    */
@@ -149,6 +154,24 @@ export async function renderFichaEnDoc(doc: jsPDF, data: FichaData): Promise<voi
     M,
   );
   let y = contentY;
+
+  // ── 1b. Memoria redactada (opcional, feature-14) ─────────────────────────
+  if (data.memoria?.length) {
+    y = sectionTitle(doc, "MEMORIA", y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setGray(doc, 30);
+    for (const parrafo of data.memoria) {
+      const lines = doc.splitTextToSize(pdfStr(parrafo), CW) as string[];
+      for (const ln of lines) {
+        y = ensureSpace(doc, y, 4.2, M);
+        doc.text(ln, M, y);
+        y += 4.2;
+      }
+      y += 2;
+    }
+    y += 2;
+  }
 
   // ── 2. Normativa de referencia (con edición) ─────────────────────────────
   y = sectionTitle(doc, "NORMATIVA DE REFERENCIA", y);

@@ -26,6 +26,7 @@ import {
   BAJANTES_TABLA_4_4,
   capacidadAPendiente,
   COLECTORES_TABLA_4_5,
+  DIAMETROS_VENT_4_10,
   RAMALES_COLECTORES_TABLA_4_3,
   seleccionarDiametroPorPendiente,
   SIFONES,
@@ -68,6 +69,12 @@ export interface AparatoInput {
   /** Id del tramo (normalmente un `ramal`) al que descarga el aparato. */
   tramoId: string;
   /**
+   * Uso de la Tabla 4.1 de ESTE aparato (feature-14): los aseos de unas
+   * oficinas son de uso público aunque el edificio tenga viviendas. Sin él,
+   * el uso de la red (`HS5Inputs.uso`).
+   */
+  uso?: UsoAparato;
+  /**
    * Longitud de la derivación individual [m]. El Ø de la Tabla 4.1 es válido
    * para ≤ 1,5 m; por encima el motor emite una bandera de aviso (no bloquea).
    */
@@ -95,6 +102,20 @@ export interface TramoInput {
    * supera el umbral del DB (> 5 m).
    */
   longitud_m?: number;
+  /**
+   * Altura de ESTA bajante en plantas (Tabla 4.4, columnas «hasta 3 / más de 3
+   * plantas»), feature-14. Las bajantes de un edificio no tienen por qué servir
+   * todas las plantas. Sin él, `HS5Inputs.numPlantas`. Solo en `bajante`.
+   */
+  plantas?: number;
+  /**
+   * Plantas que ATRAVIESA la bajante hasta el colector (≥ `plantas`). El DB no
+   * define la «altura de bajante» de la Tabla 4.4: si las plantas servidas y las
+   * atravesadas caen a lados distintos del umbral de 3, se entra con las dos
+   * columnas y se toma lo más desfavorable (criterio, verificación de
+   * feature-14 §D1). Sin él, las servidas.
+   */
+  plantasAtravesadas?: number;
 }
 
 export interface HS5Inputs {
@@ -104,6 +125,11 @@ export interface HS5Inputs {
   numPlantas: number;
   /** Cubierta transitable (afecta a la prolongación de la ventilación primaria). */
   cubiertaTransitable: boolean;
+  /**
+   * El proyectista dispone ventilación secundaria aunque no sea obligatoria
+   * (feature-14). Con 7 plantas o más lo es siempre.
+   */
+  ventilacionSecundaria?: boolean;
   /** Aparatos sanitarios y el tramo al que descarga cada uno. */
   aparatos: AparatoInput[];
   /** Tramos de la red con sus conexiones padre/hijo (grafo = árbol). */
@@ -140,6 +166,48 @@ export interface ResultadoTramo {
   estado: Veredicto;
   /** Motivo/justificación de la base de cálculo (cita de tabla). */
   motivo: string;
+  // ── Explicación en datos (contrato de REDISENO-V4 §3.2, feature-14) ────────
+  /** Ø que da la tabla por unidades, antes de los mínimos de aguas arriba. */
+  diametroPorCapacidad_mm: number | null;
+  /** Qué sube el Ø por encima del de la tabla (`null` si no se sube). */
+  elevadoPor: ElevacionDiametro | null;
+  /** Ø tabulado inmediatamente menor que el final, con lo que admitiría. */
+  alternativa: { diametro_mm: number; capacidad_ud: number | null } | null;
+  /** Solo en bajantes: las dos comprobaciones de la Tabla 4.4. */
+  bajante: DetalleBajante | null;
+}
+
+/**
+ * Por qué un tramo tiene más Ø del que pide la tabla:
+ *   - `aparato`: le vierte directamente un aparato con ese desagüe (Tabla 4.1);
+ *   - `aguas_arriba`: un tramo que le vierte es mayor. Si ese tramo, a su vez,
+ *     lo tiene por un aparato, `aparato` dice cuál (el inodoro que sube el
+ *     ramal sube también la bajante).
+ */
+export type ElevacionDiametro =
+  | { causa: "aparato"; aparato: TipoAparato; diametroMin_mm: number }
+  | { causa: "aguas_arriba"; tramos: string[]; diametroMin_mm: number; aparato: TipoAparato | null };
+
+/**
+ * Columna de la Tabla 4.4 con que se dimensiona una bajante: «hasta 3» o «más
+ * de 3 plantas» o, si su altura es ambigua, la envolvente de las dos.
+ */
+export type ColumnaTabla44 = "hasta3" | "mas3" | "envolvente";
+
+/** Las dos comprobaciones de una bajante (Tabla 4.4). */
+export interface DetalleBajante {
+  /** Plantas que desaguan en la bajante. */
+  plantas: number;
+  /** Plantas que atraviesa hasta el colector. */
+  plantasAtravesadas: number;
+  /** Columna con que se ha entrado en la tabla. */
+  columna: ColumnaTabla44;
+  /** UD del ramal más cargado que acomete a la bajante. */
+  udMaxRamal: number;
+  /** Ø por las UD totales y su capacidad. */
+  porTotal: { diametro_mm: number; capacidad_ud: number } | null;
+  /** Ø por las UD del ramal más cargado y su capacidad de ramal. */
+  porRamal: { diametro_mm: number; capacidad_ud: number } | null;
 }
 
 /** Resultado por aparato (Tabla 4.1): UD y Ø mín. del sifón/derivación. */
@@ -176,6 +244,12 @@ export interface ResultadoVentilacion {
     modo: ModoVentSecundaria;
     /** Ø de la columna de ventilación dimensionado [mm] (`null` si no requerida). */
     diametroColumna_mm: number | null;
+    /**
+     * Longitud de la columna con que se ha entrado en la Tabla 4.10 [m]: la
+     * altura de las plantas a 3 m cada una (criterio, el motor no conoce el
+     * trazado). `null` si no se ha usado la tabla.
+     */
+    longitudSupuesta_m: number | null;
     estado: Veredicto;
     aviso: string;
   };
@@ -248,6 +322,13 @@ export function udDeAparato(tipo: TipoAparato, uso: UsoAparato): number | null {
   return uso === "privado" ? fila.ud_privado : fila.ud_publico;
 }
 
+/**
+ * Altura por planta con que se estima la longitud de la columna de ventilación
+ * secundaria para la Tabla 4.10 [m]. CRITERIO de predimensionado, no cifra del
+ * DB: el motor no conoce el trazado real.
+ */
+const ALTURA_PLANTA_VENT_M = 3;
+
 /** Pendiente por defecto de un tramo según su tipo. */
 function pendienteEfectiva(t: TramoInput): number {
   if (t.tipo === "bajante") return 0; // vertical
@@ -255,6 +336,79 @@ function pendienteEfectiva(t: TramoInput): number {
     return t.pendiente_pct as number;
   }
   return 2; // 2 % por defecto (ramales/colectores)
+}
+
+/** Altura de una bajante en plantas: la suya si la trae, si no la de la red (≥ 1). */
+function plantasDeTramo(t: TramoInput, numPlantas: number): number {
+  const p = t.tipo === "bajante" && t.plantas !== undefined ? t.plantas : numPlantas;
+  return Number.isFinite(p) ? Math.max(1, Math.trunc(p)) : 1;
+}
+
+/** Plantas que atraviesa una bajante (≥ las que sirve). */
+function plantasAtravesadasDe(t: TramoInput, servidas: number): number {
+  const a = t.plantasAtravesadas;
+  return a !== undefined && Number.isFinite(a) ? Math.max(servidas, Math.trunc(a)) : servidas;
+}
+
+/** Columna de la Tabla 4.4: la de su altura o, si es ambigua, la envolvente. */
+function columnaTabla44(servidas: number, atravesadas: number): ColumnaTabla44 {
+  const umbral = BAJANTES_TABLA_4_4.datos.umbralPlantas;
+  const a = servidas > umbral;
+  const b = atravesadas > umbral;
+  if (a !== b) return "envolvente";
+  return a ? "mas3" : "hasta3";
+}
+
+/** Capacidad de una fila de la Tabla 4.4 en una columna (bajante o ramal). */
+function capacidadTabla44(f: FilaBajante4_4, columna: ColumnaTabla44, modo: "bajante" | "ramal"): number {
+  const h = modo === "bajante" ? f.bajanteHasta3 : f.ramalHasta3;
+  const m = modo === "bajante" ? f.bajanteMas3 : f.ramalMas3;
+  return columna === "hasta3" ? h : columna === "mas3" ? m : Math.min(h, m);
+}
+
+/**
+ * Elevación por un tramo de aguas arriba: los hijos que alcanzan el Ø mínimo y,
+ * si alguno lo tiene a su vez por un aparato, ese aparato (el inodoro que sube
+ * el ramal es también el que sube la bajante).
+ */
+function elevacionAguasArriba(
+  hijos: readonly string[],
+  resultados: ReadonlyMap<string, ResultadoTramo>,
+  diametroMin_mm: number,
+): ElevacionDiametro {
+  const mayores = hijos
+    .map((c) => resultados.get(c))
+    .filter((r): r is ResultadoTramo => r !== undefined && r.diametro_mm === diametroMin_mm);
+  let aparato: TipoAparato | null = null;
+  for (const r of mayores) {
+    if (r.elevadoPor?.aparato) {
+      aparato = r.elevadoPor.aparato;
+      break;
+    }
+  }
+  return { causa: "aguas_arriba", tramos: mayores.map((r) => r.id), diametroMin_mm, aparato };
+}
+
+/**
+ * Ø tabulado inmediatamente menor que `diametro_mm` en la tabla del tramo, con
+ * lo que admitiría (a su pendiente o en su columna). `null` si es el menor.
+ */
+function diametroAnterior(
+  t: TramoInput,
+  diametro_mm: number,
+  pendiente_pct: number,
+  columna: ColumnaTabla44,
+): { diametro_mm: number; capacidad_ud: number | null } | null {
+  if (t.tipo === "bajante") {
+    const menores = BAJANTES_TABLA_4_4.datos.filas.filter((f) => f.diametro_mm < diametro_mm);
+    const f = menores[menores.length - 1];
+    return f ? { diametro_mm: f.diametro_mm, capacidad_ud: capacidadTabla44(f, columna, "bajante") } : null;
+  }
+  const filas =
+    t.tipo === "ramal" ? RAMALES_COLECTORES_TABLA_4_3.datos.filas : COLECTORES_TABLA_4_5.datos.filas;
+  const menores = filas.filter((f) => f.diametro_mm < diametro_mm);
+  const f = menores[menores.length - 1];
+  return f ? { diametro_mm: f.diametro_mm, capacidad_ud: capacidadAPendiente(f, pendiente_pct) } : null;
 }
 
 // -----------------------------------------------------------------------------
@@ -289,14 +443,19 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
   for (const id of tramoPorId.keys()) udPropiaTramo.set(id, 0);
   /** Mayor Ø mínimo de desagüe (Tabla 4.1) de los aparatos que vierten a cada tramo. */
   const diametroMinAparatosTramo = new Map<string, number>();
+  /** El aparato que fija ese Ø mínimo (el primero, en orden de entrada). */
+  const aparatoMinTramo = new Map<string, TipoAparato>();
+  /** UD del aparato más cargado que vierte DIRECTAMENTE a cada tramo. */
+  const udMaxAparatoTramo = new Map<string, number>();
 
   let veredictoAparatos: Veredicto = "neutral";
 
   for (const ap of inp.aparatos) {
     const fila = APARATOS_4_1[ap.tipo];
-    const udRaw = udDeAparato(ap.tipo, inp.uso);
+    const uso = ap.uso ?? inp.uso;
+    const udRaw = udDeAparato(ap.tipo, uso);
     const diametroMin_mm =
-      inp.uso === "privado" ? fila.diametroMin_mm_privado : fila.diametroMin_mm_publico;
+      uso === "privado" ? fila.diametroMin_mm_privado : fila.diametroMin_mm_publico;
 
     let cumple = true;
     let estado: Veredicto = "ok";
@@ -305,7 +464,7 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
       cumple = false;
       estado = "fail";
       warnings.push(
-        `El aparato "${ap.id}" (${ap.tipo}) no está contemplado para uso ${inp.uso} (Tabla 4.1).`,
+        `El aparato "${ap.id}" (${ap.tipo}) no está contemplado para uso ${uso} (Tabla 4.1).`,
       );
     }
     const ud = udRaw ?? 0;
@@ -329,7 +488,9 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
       udPropiaTramo.set(ap.tramoId, udPropiaTramo.get(ap.tramoId)! + ud);
       if (diametroMin_mm != null && diametroMin_mm > (diametroMinAparatosTramo.get(ap.tramoId) ?? 0)) {
         diametroMinAparatosTramo.set(ap.tramoId, diametroMin_mm);
+        aparatoMinTramo.set(ap.tramoId, ap.tipo);
       }
+      if (ud > (udMaxAparatoTramo.get(ap.tramoId) ?? 0)) udMaxAparatoTramo.set(ap.tramoId, ud);
     }
 
     veredictoAparatos = peor(veredictoAparatos, estado);
@@ -365,33 +526,43 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
     const t = tramoPorId.get(id)!;
     const ud = udAcum.get(id) ?? 0;
     const pendiente_pct = pendienteEfectiva(t);
+    const plantas = plantasDeTramo(t, inp.numPlantas);
+    const atravesadas = plantasAtravesadasDe(t, plantas);
+    const columna = columnaTabla44(plantas, atravesadas);
 
     let diametroMinPorHijos_mm = 0;
+    /** UD del ramal más cargado que acomete (solo cuenta en bajantes). */
+    let udMaxRamal = udMaxAparatoTramo.get(id) ?? 0;
     for (const c of childrenIds.get(id) ?? []) {
       const rc = resultadoPorId.get(c);
       if (rc?.diametro_mm != null) {
         diametroMinPorHijos_mm = Math.max(diametroMinPorHijos_mm, rc.diametro_mm);
       }
+      if (rc && rc.tipo !== "bajante") udMaxRamal = Math.max(udMaxRamal, rc.udAcumuladas);
     }
     const diametroMinPorAparatos_mm = diametroMinAparatosTramo.get(id) ?? 0;
     const diametroMinPorAguasArriba_mm = Math.max(diametroMinPorHijos_mm, diametroMinPorAparatos_mm);
 
-    const dim = dimensionarTramo(t, ud, pendiente_pct, inp.numPlantas, warnings);
+    const dim = dimensionarTramo(t, ud, pendiente_pct, { plantas, atravesadas, columna }, udMaxRamal, warnings);
 
     // Si la tabla da un Ø menor que el mínimo de aguas arriba, se eleva al
     // primer Ø tabulado que lo alcanza (Ø100 de un inodoro → Ø110).
     let diametro_mm = dim.diametro_mm;
     let capacidad_ud = dim.capacidad_ud;
     let motivo = dim.motivo;
+    let elevadoPor: ElevacionDiametro | null = null;
     if (diametroMinPorAguasArriba_mm > 0 && (diametro_mm == null || diametro_mm < diametroMinPorAguasArriba_mm)) {
-      const elevado = elevarADiametroTabulado(t, diametroMinPorAguasArriba_mm, pendiente_pct, inp.numPlantas);
+      const elevado = elevarADiametroTabulado(t, diametroMinPorAguasArriba_mm, pendiente_pct, columna);
+      const porAparato = diametroMinPorAparatos_mm >= diametroMinPorHijos_mm;
       if (dim.diametro_mm != null) {
         diametro_mm = elevado.diametro_mm;
         capacidad_ud = elevado.capacidad_ud;
-        motivo +=
-          diametroMinPorAparatos_mm >= diametroMinPorHijos_mm
-            ? ` · Ø elevado a ${diametro_mm} mm: le vierte un aparato con desagüe Ø${diametroMinPorAparatos_mm} (Tabla 4.1) y el Ø no disminuye en el sentido del flujo.`
-            : ` · Ø elevado a ${diametro_mm} mm por monotonía aguas abajo.`;
+        motivo += porAparato
+          ? ` · Ø elevado a ${diametro_mm} mm: le vierte un aparato con desagüe Ø${diametroMinPorAparatos_mm} (Tabla 4.1) y el Ø no disminuye en el sentido del flujo.`
+          : ` · Ø elevado a ${diametro_mm} mm por monotonía aguas abajo.`;
+        elevadoPor = porAparato
+          ? { causa: "aparato", aparato: aparatoMinTramo.get(id)!, diametroMin_mm: diametroMinPorAparatos_mm }
+          : elevacionAguasArriba(childrenIds.get(id) ?? [], resultadoPorId, diametroMinPorHijos_mm);
       } else {
         // No se pudo dimensionar por capacidad, pero al menos respeta aguas arriba.
         diametro_mm = elevado.diametro_mm;
@@ -414,6 +585,10 @@ export function calcHS5(inp: HS5Inputs): HS5Result {
       cumple: dim.cumple,
       estado,
       motivo,
+      diametroPorCapacidad_mm: dim.diametro_mm,
+      elevadoPor,
+      alternativa: diametro_mm == null ? null : diametroAnterior(t, diametro_mm, pendiente_pct, columna),
+      bajante: dim.bajante ?? null,
     });
   }
 
@@ -459,20 +634,22 @@ interface DimTramo {
   cumple: boolean;
   estado: Veredicto;
   motivo: string;
+  bajante?: DetalleBajante;
 }
 
 function dimensionarTramo(
   t: TramoInput,
   ud: number,
   pendiente_pct: number,
-  numPlantas: number,
+  altura: { plantas: number; atravesadas: number; columna: ColumnaTabla44 },
+  udMaxRamal: number,
   warnings: string[],
 ): DimTramo {
   switch (t.tipo) {
     case "ramal":
       return dimensionarRamal(t, ud, pendiente_pct, warnings);
     case "bajante":
-      return dimensionarBajante(t, ud, numPlantas, warnings);
+      return dimensionarBajante(t, ud, altura, udMaxRamal, warnings);
     case "colector":
       return dimensionarColector(t, ud, pendiente_pct, warnings);
   }
@@ -486,14 +663,12 @@ function elevarADiametroTabulado(
   t: TramoInput,
   minimo_mm: number,
   pendiente_pct: number,
-  numPlantas: number,
+  columna: ColumnaTabla44,
 ): { diametro_mm: number; capacidad_ud: number | null } {
   if (t.tipo === "bajante") {
-    const tabla = BAJANTES_TABLA_4_4.datos;
-    const mas3 = numPlantas > tabla.umbralPlantas;
-    const fila = tabla.filas.find((f) => f.diametro_mm >= minimo_mm);
+    const fila = BAJANTES_TABLA_4_4.datos.filas.find((f) => f.diametro_mm >= minimo_mm);
     if (!fila) return { diametro_mm: minimo_mm, capacidad_ud: null };
-    return { diametro_mm: fila.diametro_mm, capacidad_ud: mas3 ? fila.bajanteMas3 : fila.bajanteHasta3 };
+    return { diametro_mm: fila.diametro_mm, capacidad_ud: capacidadTabla44(fila, columna, "bajante") };
   }
   const filas =
     t.tipo === "ramal" ? RAMALES_COLECTORES_TABLA_4_3.datos.filas : COLECTORES_TABLA_4_5.datos.filas;
@@ -541,48 +716,51 @@ function dimensionarRamal(
 
 /**
  * Bajante (Tabla 4.4): el Ø es el MAYOR de los dos obtenidos por (UD total en la
- * bajante) y (UD máx en un solo ramal de planta), según el nº de plantas.
- * Aquí `ud` = UD total en la bajante; la UD máx por ramal de planta se estima
- * como el mayor de las UD acumuladas de los hijos directos (ramales de planta).
+ * bajante) y (UD máx en un solo ramal de planta), según su altura en plantas.
+ * `udMaxRamal` es la medida: las UD del ramal (o aparato) más cargado que
+ * acomete a la bajante (feature-14; antes se estimaba como UD total / plantas).
  */
 function dimensionarBajante(
   t: TramoInput,
   ud: number,
-  numPlantas: number,
+  altura: { plantas: number; atravesadas: number; columna: ColumnaTabla44 },
+  udMaxRamal: number,
   warnings: string[],
 ): DimTramo {
-  const tabla = BAJANTES_TABLA_4_4.datos;
-  const filas = tabla.filas;
-  const mas3 = numPlantas > tabla.umbralPlantas;
-
-  // UD máx en un solo ramal de planta: se reparte la UD total entre las plantas
-  // (modelo simplificado del predimensionado), acotada por la UD total. El SVG y
-  // la ficha pueden refinar con datos reales por planta más adelante.
-  const plantas = Math.max(1, Math.trunc(numPlantas));
-  const udPorRamalPlanta = ud / plantas;
+  const filas = BAJANTES_TABLA_4_4.datos.filas;
+  const { plantas, atravesadas, columna } = altura;
 
   // Ø por UD total en la bajante.
-  const porBajante = primerDiametroBajante(filas, ud, mas3, "bajante");
+  const porBajante = primerDiametroBajante(filas, ud, columna, "bajante");
   // Ø por UD máx en un ramal de planta.
-  const porRamal = primerDiametroBajante(filas, udPorRamalPlanta, mas3, "ramal");
+  const porRamal = primerDiametroBajante(filas, udMaxRamal, columna, "ramal");
+  const bajante: DetalleBajante = {
+    plantas,
+    plantasAtravesadas: atravesadas,
+    columna,
+    udMaxRamal,
+    porTotal: porBajante,
+    porRamal,
+  };
 
   if (porBajante === null || porRamal === null) {
     warnings.push(
-      `Bajante "${t.id}" con ${ud} UD (${numPlantas} plantas) excede la Tabla 4.4: no se pudo dimensionar.`,
+      `Bajante "${t.id}" con ${ud} UD (${plantas} plantas) excede la Tabla 4.4: no se pudo dimensionar.`,
     );
     return {
       diametro_mm: null,
       capacidad_ud: null,
       cumple: false,
       estado: "fail",
-      motivo: `Bajante: ${ud} UD (${numPlantas} plantas) sin Ø admisible en Tabla 4.4.`,
+      motivo: `Bajante: ${ud} UD (${plantas} plantas) sin Ø admisible en Tabla 4.4.`,
+      bajante,
     };
   }
 
   // El Ø de la bajante = el MAYOR de los dos.
   const diametro_mm = Math.max(porBajante.diametro_mm, porRamal.diametro_mm);
   const filaElegida = filas.find((f) => f.diametro_mm === diametro_mm)!;
-  const capacidad_ud = mas3 ? filaElegida.bajanteMas3 : filaElegida.bajanteHasta3;
+  const capacidad_ud = capacidadTabla44(filaElegida, columna, "bajante");
 
   return {
     diametro_mm,
@@ -591,7 +769,8 @@ function dimensionarBajante(
     estado: "ok",
     motivo:
       `Bajante (Tabla 4.4): mayor de Ø por UD total (${porBajante.diametro_mm}) y ` +
-      `Ø por UD/ramal de planta (${porRamal.diametro_mm}) con ${numPlantas} planta(s) → Ø${diametro_mm}.`,
+      `Ø por UD/ramal de planta (${porRamal.diametro_mm}) con ${plantas} planta(s) → Ø${diametro_mm}.`,
+    bajante,
   };
 }
 
@@ -599,18 +778,11 @@ function dimensionarBajante(
 function primerDiametroBajante(
   filas: readonly FilaBajante4_4[],
   ud: number,
-  mas3: boolean,
+  columna: ColumnaTabla44,
   modo: "bajante" | "ramal",
 ): { diametro_mm: number; capacidad_ud: number } | null {
   for (const f of filas) {
-    const cap =
-      modo === "bajante"
-        ? mas3
-          ? f.bajanteMas3
-          : f.bajanteHasta3
-        : mas3
-          ? f.ramalMas3
-          : f.ramalHasta3;
+    const cap = capacidadTabla44(f, columna, modo);
     if (ud <= cap) return { diametro_mm: f.diametro_mm, capacidad_ud: cap };
   }
   return null;
@@ -668,10 +840,13 @@ function dimensionarVentilacion(
   const vt = VENT_TERCIARIA.datos;
   const t411 = VENT_SECUNDARIA_CADA_PLANTA_TABLA_4_11.datos;
 
-  // Ø de la bajante de mayor diámetro (referencia para la columna de ventilación).
-  const diametroBajante_mm = porTramo
-    .filter((r) => r.tipo === "bajante" && r.diametro_mm != null)
-    .reduce((mx, r) => Math.max(mx, r.diametro_mm as number), 0);
+  // Ø de la bajante de mayor diámetro (referencia para la columna de ventilación)
+  // y las UD de la más cargada de ese Ø (escalón de la Tabla 4.10).
+  const bajantes = porTramo.filter((r) => r.tipo === "bajante" && r.diametro_mm != null);
+  const diametroBajante_mm = bajantes.reduce((mx, r) => Math.max(mx, r.diametro_mm as number), 0);
+  const udBajante = bajantes
+    .filter((r) => r.diametro_mm === diametroBajante_mm)
+    .reduce((mx, r) => Math.max(mx, r.udAcumuladas), 0);
 
   // --- Primaria -----------------------------------------------------------
   const suficienteSola = numPlantas < vp.maxPlantasSolo;
@@ -693,8 +868,9 @@ function dimensionarVentilacion(
   // --- Secundaria ---------------------------------------------------------
   let modo: ModoVentSecundaria = "no_requerida";
   let diametroColumna_mm: number | null = null;
+  let longitudSupuesta_m: number | null = null;
   let avisoSec: string;
-  if (numPlantas >= vs.minPlantasObligatoria) {
+  if (numPlantas >= vs.minPlantasObligatoria || inp.ventilacionSecundaria === true) {
     modo = numPlantas < vs.umbralCadaPlanta ? "alternas" : "cada_planta";
     if (modo === "cada_planta") {
       // Tabla 4.11: Ø columna por Ø de bajante.
@@ -705,12 +881,30 @@ function dimensionarVentilacion(
         );
       }
     } else {
-      // Plantas alternas: Ø columna ≥ ½ Ø bajante (la Tabla 4.10 verifica además
-      // la longitud efectiva; aquí se dimensiona el Ø mínimo de la columna).
-      diametroColumna_mm = Math.ceil(diametroBajante_mm * vs.fraccionMinDiametroBajante);
+      // Plantas alternas (ap. 4.4.2 ptos 4 y 5): el Ø sale de la Tabla 4.10 por
+      // Ø de bajante, escalón de UD (el primero ≥, sin interpolar) y longitud
+      // efectiva, y además debe ser ≥ ½ Ø de la bajante. Nunca ½ Ø a secas
+      // (verificación de feature-14 §E1: «Ø55» no es un Ø de la tabla).
+      longitudSupuesta_m = numPlantas * ALTURA_PLANTA_VENT_M;
+      const fila = VENT_SECUNDARIA_ALTERNAS_TABLA_4_10.datos.filas.find(
+        (f) => f.diametroBajante_mm === diametroBajante_mm && f.udEscalon >= udBajante,
+      );
+      const minimo = diametroBajante_mm * vs.fraccionMinDiametroBajante;
+      const L = longitudSupuesta_m;
+      diametroColumna_mm =
+        (fila &&
+          DIAMETROS_VENT_4_10.find(
+            (d) => d >= minimo && fila.longitudMax_m[d] !== undefined && fila.longitudMax_m[d] >= L,
+          )) ??
+        null;
+      if (diametroColumna_mm === null && diametroBajante_mm > 0) {
+        warnings.push(
+          `Ventilación secundaria (plantas alternas): bajante Ø${diametroBajante_mm} con ${udBajante} UD y ${L} m fuera de la Tabla 4.10.`,
+        );
+      }
     }
     avisoSec =
-      `Ventilación secundaria obligatoria (${numPlantas} ≥ ${vs.minPlantasObligatoria} plantas), ` +
+      `Ventilación secundaria ${numPlantas >= vs.minPlantasObligatoria ? "obligatoria" : "dispuesta por el proyectista"} (${numPlantas} ${numPlantas >= vs.minPlantasObligatoria ? "≥" : "<"} ${vs.minPlantasObligatoria} plantas), ` +
       `conexiones ${modo === "alternas" ? "en plantas alternas (Tabla 4.10)" : "en cada planta (Tabla 4.11)"}; ` +
       `Ø columna ${diametroColumna_mm ?? "?"} mm (≥ ½ Ø bajante ${diametroBajante_mm} mm).`;
   } else {
@@ -719,6 +913,7 @@ function dimensionarVentilacion(
   const secundaria = {
     modo,
     diametroColumna_mm,
+    longitudSupuesta_m,
     estado: "neutral" as Veredicto,
     aviso: avisoSec,
   };
@@ -748,7 +943,6 @@ function dimensionarVentilacion(
   // Nota: SIFONES y las tablas 4.10/4.12 quedan disponibles para verificaciones
   // de detalle (cierre hidráulico, longitud efectiva) que la UI puede activar.
   void SIFONES;
-  void VENT_SECUNDARIA_ALTERNAS_TABLA_4_10;
   void VENT_TERCIARIA_TABLA_4_12;
 
   return {

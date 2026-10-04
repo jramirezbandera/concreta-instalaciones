@@ -1,20 +1,17 @@
 import type { JSX, ReactNode } from "react";
 import { Link } from "react-router";
-import { Pencil } from "lucide-react";
+import { Building2, Pencil } from "lucide-react";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
-import type { Intervencion, Uso } from "../../lib/proyecto/tipos";
+import { etiquetaEdificio } from "../../lib/edificio/derivar";
+import type { Intervencion } from "../../lib/proyecto/tipos";
 
 // Cabecera del dashboard del expediente (feature-6 T3.5, UX-RECONCEPT §4.2):
 // nombre del proyecto + chips legibles de los atributos discriminantes + chips
-// de los DERIVADOS con su procedencia en `title` (trazabilidad §2.3). El enlace
-// "Editar datos" navega a la subruta relativa `datos` del proyecto.
+// de los DERIVADOS con su procedencia en `title` (trazabilidad §2.3). Lo que
+// describe el edificio sale de El edificio (feature-12); los enlaces llevan a los
+// datos de la obra y a El edificio.
 
 /** Etiquetas legibles de los ejes (local al componente — sin export, patrón Sidebar). */
-const USO_LABEL: Record<Uso, string> = {
-  vivienda_unifamiliar: "Vivienda unifamiliar",
-  vivienda_colectiva: "Vivienda colectiva",
-};
-
 const INTERVENCION_LABEL: Record<Intervencion, string> = {
   obra_nueva: "Obra nueva",
   reforma: "Reforma",
@@ -49,10 +46,11 @@ function ChipDerivado({ children, procedencia }: { children: ReactNode; proceden
 export function CabeceraProyecto(): JSX.Element {
   const { proyecto, derivados } = useProyecto();
   const dg = proyecto.datosGenerales;
+  const ed = derivados.edificio;
 
   const plantas =
-    `${dg.plantasSobreRasante} ${dg.plantasSobreRasante === 1 ? "planta" : "plantas"}` +
-    (dg.tieneGaraje ? " + garaje" : "");
+    `${ed.plantasSobreRasante} ${ed.plantasSobreRasante === 1 ? "planta" : "plantas"}` +
+    (ed.plantasBajoRasante > 0 ? ` + ${ed.plantasBajoRasante} bajo rasante` : "");
 
   return (
     <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
@@ -64,12 +62,14 @@ export function CabeceraProyecto(): JSX.Element {
         {/* Atributos del proyecto (los tres ejes, legibles). */}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <ChipAtributo>{dg.municipio}</ChipAtributo>
-          <ChipAtributo>{USO_LABEL[dg.uso]}</ChipAtributo>
+          <ChipAtributo>{etiquetaEdificio(ed)}</ChipAtributo>
           <ChipAtributo>{INTERVENCION_LABEL[dg.intervencion]}</ChipAtributo>
           <ChipAtributo>{plantas}</ChipAtributo>
-          <ChipAtributo>
-            {dg.numViviendas} {dg.numViviendas === 1 ? "vivienda" : "viviendas"}
-          </ChipAtributo>
+          {ed.numViviendas > 0 && (
+            <ChipAtributo>
+              {ed.numViviendas} {ed.numViviendas === 1 ? "vivienda" : "viviendas"}
+            </ChipAtributo>
+          )}
           <ChipAtributo title="Zona de radón del municipio (entrada manual, Apéndice B del DB-HS6)">
             Radón {dg.zonaRadon}
           </ChipAtributo>
@@ -89,13 +89,22 @@ export function CabeceraProyecto(): JSX.Element {
         </div>
       </div>
 
-      <Link
-        to="datos"
-        className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex shrink-0 items-center gap-1.5 rounded border px-2.5 py-1.5 text-[13px] transition-colors focus-visible:outline-2"
-      >
-        <Pencil size={14} aria-hidden="true" />
-        Editar datos
-      </Link>
+      <div className="flex shrink-0 gap-1.5">
+        <Link
+          to="edificio"
+          className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[13px] transition-colors focus-visible:outline-2"
+        >
+          <Building2 size={14} aria-hidden="true" />
+          El edificio
+        </Link>
+        <Link
+          to="datos"
+          className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-accent flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[13px] transition-colors focus-visible:outline-2"
+        >
+          <Pencil size={14} aria-hidden="true" />
+          Datos de la obra
+        </Link>
+      </div>
     </header>
   );
 }

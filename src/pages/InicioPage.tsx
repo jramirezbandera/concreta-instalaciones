@@ -12,10 +12,12 @@ import {
   importarProyecto,
   inicializarStorage,
   listarProyectos,
+  contarProyectosV1,
   setProyectoActivo,
 } from "../lib/proyecto/storage";
+import { etiquetaEdificio, resumenEdificio } from "../lib/edificio/derivar";
 import { resumenProyecto } from "../lib/proyecto/progreso";
-import type { Intervencion, Proyecto, Uso } from "../lib/proyecto/tipos";
+import type { Intervencion, Proyecto } from "../lib/proyecto/tipos";
 
 // =============================================================================
 // Página de inicio (feature-6 T3.4): lista de expedientes. Standalone — sin
@@ -23,11 +25,6 @@ import type { Intervencion, Proyecto, Uso } from "../lib/proyecto/tipos";
 // del AppShell. Toda fecha se inyecta como ISO desde aquí (la lib no llama a
 // Date.now).
 // =============================================================================
-
-const USO_LABEL: Record<Uso, string> = {
-  vivienda_unifamiliar: "Vivienda unifamiliar",
-  vivienda_colectiva: "Vivienda colectiva",
-};
 
 const INTERVENCION_LABEL: Record<Intervencion, string> = {
   obra_nueva: "Obra nueva",
@@ -81,6 +78,9 @@ export function InicioPage(): JSX.Element {
     inicializarStorage(new Date().toISOString());
     return listarProyectos();
   });
+  // Expedientes de la versión 1 que quedan en el navegador: no se abren (schema 2
+  // sin migración), pero se avisa para que nadie crea que se han perdido.
+  const [proyectosV1] = useState(() => contarProyectosV1());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refrescar = () => setProyectos(listarProyectos());
@@ -187,6 +187,19 @@ export function InicioPage(): JSX.Element {
           Proyectos
         </h1>
 
+        {proyectosV1 > 0 && (
+          <p
+            role="note"
+            className="border-border-sub bg-bg-surface text-text-secondary mb-3 rounded border px-3 py-2 text-[12.5px] leading-snug"
+          >
+            {proyectosV1 === 1
+              ? "Hay 1 expediente de la versión anterior en este navegador."
+              : `Hay ${proyectosV1} expedientes de la versión anterior en este navegador.`}{" "}
+            Esta versión describe el edificio de otra forma y empieza de cero: no se abren aquí,
+            pero siguen guardados y no se han borrado.
+          </p>
+        )}
+
         {proyectos.length === 0 ? (
           <div className="border-border-sub bg-bg-surface flex flex-col items-center gap-3 rounded border px-6 py-12 text-center">
             <FolderOpen size={28} className="text-text-disabled" aria-hidden="true" />
@@ -250,7 +263,7 @@ export function InicioPage(): JSX.Element {
                         {p.datosGenerales.municipio || "—"}
                       </td>
                       <td className="text-text-secondary px-3 py-2 whitespace-nowrap">
-                        {USO_LABEL[p.datosGenerales.uso]} ·{" "}
+                        {etiquetaEdificio(resumenEdificio(p.edificio))} ·{" "}
                         {INTERVENCION_LABEL[p.datosGenerales.intervencion]}
                       </td>
                       <td className="px-3 py-2">

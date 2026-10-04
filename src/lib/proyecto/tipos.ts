@@ -1,13 +1,20 @@
 import type { Veredicto } from "../pdf/renderFicha";
 import type { ZonaRadon } from "../../modules/hs6/tablas";
 import type { ZonaTermica } from "../../modules/hs3/tablas";
+import type { Isoyeta, ZonaPluviometrica } from "../../modules/hs5/tablas";
+import type { Edificio, TipoCubierta } from "../edificio/tipos";
+import type { ResumenEdificio } from "../edificio/derivar";
 
 // Modelo de datos del EXPEDIENTE (feature-6 §A, UX-RECONCEPT §2–§3): el producto deja de ser
 // "5 calculadoras con sidebar" y pasa a ser gestor de expedientes de justificación CTE.
 // Este archivo contiene SOLO tipos y constantes — cero lógica, cero React/DOM. Las funciones
 // puras (derivarContexto, aplicabilidadBase…) y la persistencia viven en archivos hermanos.
+//
+// Schema 2 (feature-12): el edificio deja de describirse con contadores y banderas en los
+// datos generales y pasa a tener su propio modelo (`../edificio/tipos.ts`). Sin migración:
+// los expedientes de la versión 1 no se leen.
 
-export type { Veredicto, ZonaRadon, ZonaTermica };
+export type { Edificio, ResumenEdificio, TipoCubierta, Veredicto, ZonaRadon, ZonaTermica };
 
 // -----------------------------------------------------------------------------
 // CLAVES DE JUSTIFICACIÓN
@@ -27,36 +34,14 @@ export type JustificacionKey =
   | "hr" | "he4" | "he5" | "rebt" | "he0he1_global" | "dbse";
 
 // -----------------------------------------------------------------------------
-// LOS TRES EJES DEL PROYECTO (§2): uso × intervención × atributos → checklist
+// LOS EJES DEL PROYECTO (§2): edificio × intervención × atributos → checklist
 // -----------------------------------------------------------------------------
-
-/**
- * Uso del edificio — eje estructural, no un campo más (§2.1). Solo vivienda:
- * los usos no soportados NO se ofrecen en el selector (rechazo honesto en UI).
- */
-export type Uso = "vivienda_unifamiliar" | "vivienda_colectiva";
 
 /**
  * Tipo de intervención (CTE Parte I art. 2). Obra nueva es el caso particular donde todo
  * aplica; el motor de aplicabilidad para el resto llega en Fase E (§5 del reconcept).
  */
 export type Intervencion = "obra_nueva" | "reforma" | "ampliacion" | "cambio_uso";
-
-/** Tipo de cubierta (geometría gruesa, §2.3) — discrimina exigencias de HS1/HS5/SUA. */
-export type TipoCubierta = "plana_transitable" | "plana_no_transitable" | "inclinada";
-
-/**
- * Alturas suelo-a-suelo por planta [m] (feature-10). Las longitudes deben casar
- * con `plantasSobreRasante`/`plantasBajoRasante`; el formulario las reconcilia
- * al cambiar los contadores (`reconciliarAlturas`) y la derivación tolera un
- * desfase completando con la estimación de 3 m y declarándolo en la procedencia.
- */
-export interface AlturasPlantas {
-  /** `sobre[0]` = planta baja, hacia arriba. La última incluye su altura hasta cubierta. */
-  sobre: number[];
-  /** `bajo[0]` = sótano 1, hacia abajo. */
-  bajo: number[];
-}
 
 /**
  * Aplicabilidad de una justificación al proyecto (§3): la propone `aplicabilidadBase`
@@ -77,10 +62,13 @@ export type Aplicabilidad = "aplica" | "aplica_reformado" | "aplica_flexibilidad
 export type Progreso = "sin_iniciar" | "en_curso" | "cumple" | "no_cumple";
 
 // -----------------------------------------------------------------------------
-// DATOS GENERALES (§2.3): ~12 atributos discriminantes, se rellenan una vez
+// DATOS DE LA OBRA (§2.3): lo que no es el edificio, se rellena una vez
 // -----------------------------------------------------------------------------
 
-/** Atributos discriminantes del expediente. De aquí se deriva el contexto heredado por módulos. */
+/**
+ * Datos de la obra: emplazamiento, intervención y suministro. Lo que describe el
+ * edificio (plantas, usos, viviendas, garaje…) vive en `Proyecto.edificio`.
+ */
 export interface DatosGenerales {
   municipio: string;
   /**
@@ -89,41 +77,19 @@ export interface DatosGenerales {
    * clasifican por municipio (zona de radón del DB-HS6 Apéndice B, aceleración
    * sísmica NCSE-02, pluviometría…): el nombre no sirve como clave porque
    * "Vitoria", "Vitoria-Gasteiz" y "Gasteiz" son el mismo municipio escrito de
-   * tres formas. `municipio` se conserva para MOSTRAR.
-   *
-   * Opcional: los expedientes creados antes de feature-9 no lo tienen (el
-   * schema sigue siendo "1"; el campo es aditivo). Quien lo consuma debe
-   * tratar su ausencia, no asumirlo.
+   * tres formas. `municipio` se conserva para MOSTRAR. Opcional: quien lo
+   * consuma debe tratar su ausencia.
    */
   municipioIne?: string;
   provincia: string;
   /** Altitud sobre el nivel del mar [m] — corrige la zona climática de la capital (DB-HE Anejo B). */
   altitud_m: number;
-  uso: Uso;
   intervencion: Intervencion;
-  /** Plantas sobre rasante — de aquí se deriva la altura de evacuación (SI/SUA). */
-  plantasSobreRasante: number;
-  plantasBajoRasante: number;
   /**
-   * Altura suelo-a-suelo de cada planta [m] — feature-10. `sobre[0]` es la
-   * planta baja y crece hacia arriba; `bajo[0]` es el sótano 1 y crece hacia
-   * abajo. De aquí se deriva la altura de evacuación REAL (cota del suelo de la
-   * última planta) en vez de la estimación de 3 m/planta, y en el futuro las
-   * cotas que necesitan HS4 (presión en el punto más desfavorable), HS5
-   * (bajantes) y SI (evacuación ascendente de sótanos).
-   *
-   * Opcional y ADITIVO (schema sigue en "1"): ausente ⇒ estimación 3 m/planta,
-   * que es lo que tienen todos los expedientes anteriores a esta feature.
+   * Sin piscina ⇒ SUA6 `no_aplica` con párrafo redactado y cita de ámbito. La piscina
+   * no es una zona del edificio (está en la parcela), así que sigue siendo un dato.
    */
-  alturasPlantas_m?: AlturasPlantas;
-  tipoCubierta: TipoCubierta;
-  numViviendas: number;
-  /** El garaje entra en el 80 %: arrastra HS3-garajes, SI-aparcamiento y SUA7 (§2.3). */
-  tieneGaraje: boolean;
-  tieneTrasteros: boolean;
-  /** Sin piscina ⇒ SUA6 `no_aplica` con párrafo redactado y cita de ámbito. */
   tienePiscina: boolean;
-  tieneLocalPB: boolean;
   /**
    * Zona de radón del municipio — ENTRADA MANUAL con procedencia Apéndice B del DB-HS6
    * (decisión feature-5: no se embebe el listado de municipios).
@@ -131,6 +97,18 @@ export interface DatosGenerales {
   zonaRadon: ZonaRadon;
   /** "Datos de suministro" opcional [kPa] → herencia hacia HS4 solo si está informado. */
   presionAcometida_kPa?: number;
+  /**
+   * Zona pluviométrica e isoyeta del emplazamiento, leídas por el proyectista de
+   * la Figura B.1 del DB-HS5 (apéndice B), como la zona de radón (feature-14).
+   * Sin ellas, HS5 calcula los pluviales con 100 mm/h y lo avisa.
+   */
+  pluviometria?: { zona: ZonaPluviometrica; isoyeta: Isoyeta };
+  /**
+   * Cota del alcantarillado en el punto de acometida [m] respecto a la rasante
+   * (negativa: por debajo). Decide si un sótano evacua por bombeo (HS5). Sin
+   * ella, HS5 supone que los sótanos quedan por debajo y lo avisa.
+   */
+  cotaAlcantarillado_m?: number;
 }
 
 // -----------------------------------------------------------------------------
@@ -141,16 +119,18 @@ export interface DatosGenerales {
 export interface Derivado<T> { valor: T; procedencia: string }
 
 /**
- * Contexto derivado de `DatosGenerales` que heredan los módulos (barra de contexto, §4.3).
- * Lo produce la función pura `derivarContexto(datosGenerales)` del motor.
+ * Contexto derivado de la obra y del edificio que heredan los módulos.
+ * Lo produce la función pura `derivarContexto(datosGenerales, edificio)`.
  */
 export interface ContextoDerivado {
   /** Zona climática HE (de provincia + altitud, DB-HE1 Tabla a / Anejo B). */
   zonaClimatica: Derivado<string>;
   /** Zona térmica del edificio para HS3 (Tabla 4.4 del DB-HS3). */
   zonaTermicaHS3: Derivado<ZonaTermica>;
-  /** Altura de evacuación [m] (de plantas sobre rasante) — discrimina SI/SUA. */
+  /** Altura de evacuación [m] (cota del suelo de la última planta) — discrimina SI/SUA. */
   alturaEvacuacion_m: Derivado<number>;
+  /** Lo que se deduce de El edificio (plantas, viviendas, garaje…). */
+  edificio: ResumenEdificio;
 }
 
 // -----------------------------------------------------------------------------
@@ -177,6 +157,12 @@ export interface JustificacionEnProyecto {
   aplicabilidadForzada?: { valor: Aplicabilidad; nota?: string };
   /** Referencia de documento externo (p.ej. expediente HULC) para justificaciones `externo`. */
   refExterna?: string;
+  /**
+   * Ids de los avisos que el proyectista ha marcado como revisados (feature-14,
+   * REDISENO-V4 §3.4). Un aviso revisado deja de contar como pendiente y llega a
+   * la ficha como «revisado por el proyectista».
+   */
+  revisados?: string[];
 }
 
 /**
@@ -188,12 +174,10 @@ export interface Proyecto {
   /** Fechas ISO 8601 — inyectadas desde la UI; el motor sigue sin llamar a Date.now. */
   creado: string; modificado: string;
   datosGenerales: DatosGenerales;
+  /** El edificio: plantas, zonas de uso y lo que se repite (feature-12). */
+  edificio: Edificio;
   /** Estado por justificación; ausencia de clave = sin datos guardados (`sin_iniciar`). */
   justificaciones: Partial<Record<JustificacionKey, JustificacionEnProyecto>>;
-  /** Viviendas tipo definidas (feature-8 §C). Opcional: ausente = sin definir. */
-  viviendasTipo?: ViviendaTipo[];
-  /** Reparto de viviendas por planta (solo colectiva). Ausente = unifamiliar/degenerado. */
-  repartoPlantas?: RepartoPlanta[];
 }
 
 /**
@@ -214,57 +198,21 @@ export interface EstadoJustificacion {
 }
 
 // -----------------------------------------------------------------------------
-// VIVIENDA TIPO (feature-8 §C, UX-RECONCEPT §6.2): la unidad repetitiva de la
-// colectiva. Campos ADITIVOS y OPCIONALES sobre `Proyecto` (schema "1" intacto:
-// un export antiguo sin estos campos sigue importando sin migración).
-// -----------------------------------------------------------------------------
-
-/**
- * Una vivienda tipo (T2, T3…): el programa repetitivo del que los generadores
- * de `viviendaTipo.ts` derivan las redes de HS3/HS4/HS5. Solo se cuentan los
- * cuartos VARIABLES: **cocina y salón son siempre 1 por vivienda** (no se
- * modelan como campos). La unifamiliar es el caso degenerado: una vivienda
- * tipo y sin `repartoPlantas`.
- */
-export interface ViviendaTipo {
-  /** Identificador estable (lo referencian `RepartoPlanta.viviendas[].tipoId` y los ids generados). */
-  id: string;
-  /** Nombre visible (p.ej. "T2") — viaja a los nombres generados ("P2 · T2 · Ramal baño"). */
-  nombre: string;
-  /** Nº de dormitorios (el 1º es el principal; deriva la categoría de la Tabla 2.1 de HS3). */
-  dormitorios: number;
-  /** Nº de baños completos (preset "Baño" de HS4/HS5; húmedo en HS3). */
-  banos: number;
-  /** Nº de aseos (preset "Aseo"; húmedo en HS3). */
-  aseos: number;
-}
-
-/**
- * Reparto de viviendas tipo por planta de la colectiva. `nivel` es la planta
- * FÍSICA (0 = baja, 1, 2…), coherente con `PlantaColectivo.nivel` de HS3.
- */
-export interface RepartoPlanta {
-  nivel: number;
-  /** Cuántas viviendas de cada tipo hay en esta planta. */
-  viviendas: { tipoId: string; cantidad: number }[];
-}
-
-// -----------------------------------------------------------------------------
-// CONSTANTES DE PERSISTENCIA (feature-6 §B)
+// CONSTANTES DE PERSISTENCIA (feature-6 §B, feature-12 §B)
 // -----------------------------------------------------------------------------
 
 /** Versión del schema de `Proyecto` — el import rechaza schemas incompatibles con mensaje ES. */
-export const PROYECTO_SCHEMA_VERSION = "1";
-
-/** Clave localStorage del índice de proyectos. */
-export const LS_INDICE = "concreta-inst-proyectos";
-/** Prefijo de la clave localStorage por proyecto: `concreta-inst-proyecto-<id>`. */
-export const LS_PROYECTO_PREFIX = "concreta-inst-proyecto-";
-/** Clave localStorage del id del proyecto activo (último abierto — redirige rutas legacy). */
-export const LS_ACTIVO = "concreta-inst-proyecto-activo";
+export const PROYECTO_SCHEMA_VERSION = "2";
 
 /**
- * Módulos con clave localStorage legacy (`concreta-inst-hs3`…): al primer arranque su estado
- * migra a un proyecto "Importado"; las claves legacy se conservan (rollback barato).
+ * Claves de la versión 2. Son NUEVAS a propósito: las de la versión 1 no se leen
+ * ni se borran (sin migración, REDISENO-V4 §7.4).
  */
-export const CLAVES_LEGACY = ["hs3", "hs4", "hs5", "hs6", "he1"] as const;
+export const LS_INDICE = "concreta-inst-v2-proyectos";
+/** Prefijo de la clave localStorage por proyecto: `concreta-inst-v2-proyecto-<id>`. */
+export const LS_PROYECTO_PREFIX = "concreta-inst-v2-proyecto-";
+/** Clave localStorage del id del proyecto activo (último abierto — redirige rutas legacy). */
+export const LS_ACTIVO = "concreta-inst-v2-proyecto-activo";
+
+/** Índice de proyectos de la versión 1: solo se cuenta, para avisar en Inicio. */
+export const LS_INDICE_V1 = "concreta-inst-proyectos";

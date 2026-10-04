@@ -10,7 +10,7 @@ import { ENGINE_VERSION } from "../../lib/version";
 // =============================================================================
 // Sidebar v4 (REDISENO-V4 §3.3). La barra lateral enseña TODO el expediente:
 //
-//   - «Proyecto»: La obra (dashboard) y El edificio (datos del edificio).
+//   - «Proyecto»: La obra (dashboard) y El edificio.
 //   - Todas las justificaciones del registry agrupadas por DB, con su código y
 //     un glifo de estado a la derecha: ✓ cumple · ! por revisar · ✕ no cumple ·
 //     «pronto» si aún no existe · ↗ si se justifica fuera. Las no publicadas
@@ -186,7 +186,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <NavLink to={`/p/${proyecto.id}`} end onClick={onClose} className={navClass}>
               La obra
             </NavLink>
-            <NavLink to={`/p/${proyecto.id}/datos`} onClick={onClose} className={navClass}>
+            <NavLink to={`/p/${proyecto.id}/edificio`} onClick={onClose} className={navClass}>
               El edificio
             </NavLink>
           </div>

@@ -68,13 +68,26 @@ export type ZonaClimatica = "α" | "A" | "B" | "C" | "D" | "E";
  *                                          (verificado DBHE p.16). Se compara como un
  *                                          elemento normal (ok/fail), NO "no aplica".
  */
-export type TipoElemento =
+export type TipoElementoEnvolvente =
   | "muro_suelo_exterior"
   | "cubierta_exterior"
   | "contacto_no_habitable_terreno"
   | "hueco"
   | "puerta"
   | "medianeria";
+
+/**
+ * Además de la envolvente, las PARTICIONES INTERIORES entre unidades de uso
+ * (HE1 ap. 3.2, Tabla 3.2-HE1, feature-15): el forjado entre las viviendas y un
+ * local tratado como otra unidad de uso. Su Ulim depende de la relación y la
+ * orientación (`ParticionInput` en calc.ts), no de la Tabla 3.1.1.a.
+ */
+export type TipoElemento = TipoElementoEnvolvente | "particion_interior";
+
+/** Relación entre las unidades que separa una partición interior (Tabla 3.2-HE1). */
+export type RelacionParticion = "mismo_uso" | "distinto_uso" | "zona_comun";
+/** Orientación de una partición interior (Tabla 3.2-HE1). */
+export type OrientacionParticion = "horizontal" | "vertical";
 
 /**
  * Sentido del flujo de calor a través del cerramiento, que selecciona Rsi/Rse
@@ -85,13 +98,13 @@ export type TipoElemento =
 export type DireccionFlujo = "horizontal" | "ascendente" | "descendente";
 
 /**
- * Clase de higrometría del espacio interior (EN ISO 13788:2002, recogida por el
- * DA DB-HE/2). Determina fRsi,min y la HR interior de cálculo:
- *   - `clase_3_o_inferior` → espacios SIN alta producción de humedad: TODOS los
- *      residenciales (default de predimensionado de vivienda). HR 55 %.
- *   - `clase_4`            → alta producción de humedad (cocinas industriales,
- *      restaurantes, pabellones deportivos, duchas colectivas…). HR 62 %.
- *   - `clase_5`            → gran producción de humedad (lavanderías, piscinas…). HR 70 %.
+ * Clase de higrometría del espacio interior (DA DB-HE/2 §2.2.2). Determina
+ * fRsi,min y la HR interior de cálculo:
+ *   - `clase_3_o_inferior` → oficinas, tiendas, almacenes y todos los espacios de
+ *      uso residencial (default de predimensionado de vivienda). HR 55 %.
+ *   - `clase_4`            → «cocinas, pabellones deportivos, duchas colectivas u
+ *      otros de uso similar». HR 62 %.
+ *   - `clase_5`            → «lavanderías, restaurantes y piscinas». HR 70 %.
  */
 export type ClaseHigrometria = "clase_3_o_inferior" | "clase_4" | "clase_5";
 
@@ -180,7 +193,31 @@ export const ULIM_TABLA_3_1_1_a = tablaCTE(
       // UMD — medianerías/particiones de la envolvente térmica: COMPARTEN FILA con
       // UT (mismos valores, verificado DBHE p.16). Se compara como elemento normal.
       medianeria: { "α": 0.9, A: 0.8, B: 0.75, C: 0.7, D: 0.65, E: 0.59 },
-    } satisfies Record<TipoElemento, FilaUlim>,
+    } satisfies Record<TipoElementoEnvolvente, FilaUlim>,
+    /** Nota (*) de la tabla (verificación v4, research/verificacion-he1-v4.md §1.5). */
+    notaEscaparate: {
+      texto:
+        "Los huecos con uso de escaparate en unidades de uso con actividad comercial pueden incrementar el valor de UH en un 50%.",
+      factorUH: 1.5,
+    },
+  },
+);
+
+// =============================================================================
+// BLOQUE 1b — Tabla 3.2-HE1: Ulim de las PARTICIONES INTERIORES [W/m²K]
+// (HE1 ap. 3.2 «Limitación de descompensaciones»). Aplica a cualquier uso (Guía
+// §HE1 4.6). Verificada en la v4 (research/verificacion-he1-v4.md §2, DB p. 18):
+// «distinto uso» y «con zonas comunes» comparten fila, horizontales y verticales.
+// =============================================================================
+
+export const ULIM_PARTICIONES_TABLA_3_2 = tablaCTE(
+  { ...PROC_HE1, articulo: "ap. 3.2", tabla: "Tabla 3.2-HE1" },
+  {
+    ulim_W_m2K: {
+      mismo_uso_horizontal: { "α": 1.9, A: 1.8, B: 1.55, C: 1.35, D: 1.2, E: 1.0 },
+      mismo_uso_vertical: { "α": 1.4, A: 1.4, B: 1.2, C: 1.2, D: 1.2, E: 1.0 },
+      distinto_uso_o_zona_comun: { "α": 1.35, A: 1.25, B: 1.1, C: 0.95, D: 0.85, E: 0.7 },
+    },
   },
 );
 
@@ -208,10 +245,10 @@ export const ULIM_TABLA_3_1_1_a = tablaCTE(
 /** Procedencia base de los Documentos de Apoyo DA DB-HE/1. */
 const PROC_DA_HE1 = {
   db: "DA DB-HE/1",
-  edicion: "2019 (asociado a RD 732/2019)",
-  fecha: "2022-06-14",
+  edicion: "enero 2020 (sustituye a feb. 2015)",
+  fecha: "2020-01",
   fuente:
-    "codigotecnico.org · DA DB-HE/1 Cálculo de parámetros característicos de la envolvente",
+    "codigotecnico.org · DA DB-HE/1 Cálculo de parámetros característicos de la envolvente (sin valor reglamentario)",
 } as const;
 
 /** Par Rsi/Rse [m²K/W] para una dirección de flujo. */
@@ -433,13 +470,27 @@ export const CAMARA_AIRE_SIN_VENTILAR_R = tablaCTE(
     } satisfies Record<DireccionFlujo, number>,
     /** Cifra de predimensionado para cámara ≈ 20–50 mm [m²K/W] (centro del rango). */
     rTipico_m2K_W: 0.17,
+    /**
+     * La Tabla 2 completa: R [m²K/W] por espesor (1, 2 y 5 cm) y orientación de la
+     * cámara; «los valores intermedios se pueden obtener por interpolación lineal».
+     * Más de 5 cm: se toma el de 5 cm (extrapolación, criterio).
+     */
+    porEspesor: {
+      espesores_m: [0.01, 0.02, 0.05],
+      vertical: [0.15, 0.17, 0.18],
+      horizontal: [0.15, 0.16, 0.16],
+    },
   },
 );
 
 // =============================================================================
-// BLOQUE 4 — fRsi,min EXIGIDO. DA DB-HE/2, Tabla 1.
-// Factor de temperatura de la superficie interior MÍNIMO por clase de higrometría
-// (filas) × zona climática de invierno (columnas). EXIGENCIA. CONFIANZA ALTA.
+// BLOQUE 4 — fRsi,min. DA DB-HE/2 §4.1.1, Tabla 1. COMPROBACIÓN COMPLEMENTARIA
+// (DA DB-HE/2, oct. 2013): el DB-HE 2019 solo cuantifica la condensación
+// intersticial (ap. 3.3); la superficial es un procedimiento del DA (verificación
+// v4, §6.3). Factor de temperatura de la superficie interior mínimo por clase de
+// higrometría (filas) × zona climática de invierno (columnas). CONFIANZA ALTA.
+// No se aplica a los huecos ni a los elementos en contacto con el terreno o con
+// no habitables de escasa producción de vapor (DA/2 §4.1.1; §6 de la verificación).
 //
 // VEREDICTO (criterio del motor, no código aquí):
 //   CUMPLE ⟺ fRsi ≥ fRsi,min ; NO CUMPLE ⟺ fRsi < fRsi,min.
@@ -456,9 +507,9 @@ export const CAMARA_AIRE_SIN_VENTILAR_R = tablaCTE(
 /** Procedencia base del Documento de Apoyo DA DB-HE/2 (condensaciones). */
 const PROC_DA_HE2 = {
   db: "DA DB-HE/2",
-  edicion: "2019 (RD 732/2019)",
-  fecha: "2022-06-14",
-  fuente: "codigotecnico.org · DA DB-HE/2 Condensaciones",
+  edicion: "octubre 2013",
+  fecha: "2013-10",
+  fuente: "codigotecnico.org · DA DB-HE/2 Condensaciones (procedimiento de apoyo)",
 } as const;
 
 /**
@@ -477,7 +528,7 @@ export interface FilaFRsiMin {
 export const FRSI_MIN_TABLA_1 = tablaCTE(
   {
     ...PROC_DA_HE2,
-    articulo: "Limitación de condensaciones superficiales",
+    articulo: "§4.1.1 (comprobación complementaria)",
     tabla: "Tabla 1 (fRsi,min)",
   },
   {
@@ -504,7 +555,7 @@ export const FRSI_MIN_TABLA_1 = tablaCTE(
 export const RSI_CONDENSACION = tablaCTE(
   {
     ...PROC_DA_HE2,
-    articulo: "Comprobación de condensaciones superficiales",
+    articulo: "§4.1.2 ec. [9]",
     tabla: "ec. fRsi = 1 − U·0,25",
   },
   {
@@ -699,10 +750,10 @@ export const MU_REFERENCIA = tablaCTE(PROC_MU_REF, {
 // BLOQUE 8 — Condiciones interiores de cálculo por defecto. DA DB-HE/2.
 // θi = 20 °C; HR interior por clase de higrometría (55 / 62 / 70 %). CONFIANZA ALTA.
 //
-// ⚠️ θe / φe de ENERO son DATO CLIMÁTICO por localidad/zona (Anejo climático del
-// DB-HE): son INPUT del motor (origen "dato climático"), NO una tabla fija. La
-// ficha debe declararlos como dato climático, no como cifra del DA. Para
-// predimensionado sin dato, φe típico ~80–90 % (default informativo, confianza MEDIA).
+// ⚠️ θe / φe de ENERO salen del DA DB-HE/2, Apéndice C, Tabla C.1 (capital de la
+// provincia, con la corrección por altitud del §2.1): `CLIMA_TABLA_C1` más abajo.
+// El motor los recibe como entrada. Sin dato, NO hay un valor típico del DA: el
+// motor usa una cota del lado seguro (0 °C y 100 %) y avisa (verificación v4 §8.5).
 // =============================================================================
 
 export const CONDICIONES_DEFECTO = tablaCTE(
@@ -720,10 +771,10 @@ export const CONDICIONES_DEFECTO = tablaCTE(
       clase_5: 70,
     } satisfies Record<ClaseHigrometria, number>,
     /**
-     * φe exterior por defecto SOLO si no hay dato climático [%]. INFORMATIVO,
-     * confianza MEDIA. El motor debe preferir el dato climático real de enero.
+     * Cota del lado seguro SOLO si no hay dato climático: 0 °C y aire exterior
+     * saturado. No es un valor del DA (no lo da): el motor avisa y pide el dato.
      */
-    hrExteriorDefecto_pct: 85,
+    sinDatoExterior: { temp_C: 0, hr_pct: 100 },
   } as const,
 );
 
@@ -917,6 +968,158 @@ export const PSI_PUENTES_TERMICOS_DA_DB_HE_3: {
 };
 
 // =============================================================================
+// BLOQUE 10 — Huecos (feature-15, verificación v4 §4-§5).
+// UH por la ec. (10) del DA DB-HE/1 (enero 2020), con la transmitancia lineal Ψ de
+// la junta vidrio-marco de su Tabla 10. Ug y Uf orientativos del Catálogo de
+// Elementos Constructivos (CEC v6.3, borrador, sin carácter reglamentario): son
+// valores por defecto EDITABLES — en proyecto, los declarados por el fabricante
+// (HE1 ap. 5.1 párr. 5).
+// =============================================================================
+
+export const PSI_HUECO_TABLA_10 = tablaCTE(
+  { ...PROC_DA_HE1, articulo: "§2.1.4.1 ec. (10)", tabla: "Tabla 10" },
+  {
+    /** Ψ [W/(m·K)]: [separador convencional, separador de prestaciones térmicas mejoradas]. */
+    psi_W_mK: {
+      madera_plastico: { simple: [0, 0], doble_o_triple: [0.06, 0.05], doble_be_o_triple_2be: [0.08, 0.06] },
+      metalico_con_rpt: { simple: [0, 0], doble_o_triple: [0.08, 0.06], doble_be_o_triple_2be: [0.11, 0.08] },
+      metalico_sin_rpt: { simple: [0, 0], doble_o_triple: [0.02, 0.01], doble_be_o_triple_2be: [0.05, 0.04] },
+    },
+  },
+);
+
+const PROC_CEC_HUECOS: ProcedenciaCTE = {
+  db: "Catálogo de Elementos Constructivos del CTE (CEC)",
+  edicion: "v6.3 (marzo 2010, borrador)",
+  articulo: "§3.15.2 Acristalamientos · §3.16 Marcos — orientativo, sustituir por el valor del fabricante",
+  fuente: "CEC v6.3 · sin carácter reglamentario (DB-HE Intro III)",
+};
+
+export const UG_REFERENCIA_CEC = tablaCTE(
+  { ...PROC_CEC_HUECOS, tabla: "UH,v vertical, 4-cámara-4" },
+  {
+    /** Ug [W/m²K] de un doble 4/16/4 vertical (cámara de 15-20 mm). */
+    doble_4_16_4: { normal: 2.7, be_0_1: 1.8, be_0_03: 1.6, be_menor_0_03: 1.4 },
+  },
+);
+
+export const UF_REFERENCIA_CEC = tablaCTE(
+  { ...PROC_CEC_HUECOS, tabla: "Marcos (vertical)" },
+  {
+    /** Uf [W/m²K], marco vertical. */
+    uf_W_m2K: {
+      metalico_sin_rpt: 5.7,
+      metalico_rpt_4_12mm: 4.0,
+      metalico_rpt_mayor_12mm: 3.2,
+      madera_700kg_m3: 2.2,
+      madera_500kg_m3: 2.0,
+      pvc_dos_camaras: 2.2,
+      pvc_tres_camaras: 1.8,
+    },
+    /** Fracción de marco por defecto: DB-HE Anejo A (control solar, «de forma simplificada»). */
+    fraccionMarcoDefecto: 0.25,
+  },
+);
+
+// =============================================================================
+// BLOQUE 11 — Clima de enero (feature-15, verificación v4 §8 y §5.B7-B8).
+// DA DB-HE/2 Apéndice C, Tabla C.1: temperatura y humedad medias mensuales de las
+// capitales de provincia. Para otra localidad más alta que la capital: −1 °C por
+// cada 100 m, con la misma humedad absoluta (§2.1, ec. [1]-[2]); si está más
+// baja, los datos de la capital. La altitud de la capital no la da el DA: se toma
+// la de la Tabla a-Anejo G del DB-HE (criterio).
+// Claves = las provincias de `data/zonasClimaticasHE.ts`.
+// =============================================================================
+
+export const CLIMA_TABLA_C1 = tablaCTE(
+  {
+    ...PROC_DA_HE2,
+    articulo: "§2.1 y §4.2.1",
+    tabla: "Apéndice C, Tabla C.1",
+  },
+  {
+    /** T [°C] y HR [%] medias de enero a diciembre. */
+    capitales: {
+      "Álava": { T: [4.6, 6.0, 7.2, 9.2, 12.4, 15.6, 18.3, 18.5, 16.5, 12.7, 7.5, 5.0], HR: [83, 78, 72, 71, 71, 71, 69, 70, 70, 74, 81, 83] },
+      "Albacete": { T: [5.0, 6.3, 8.5, 10.9, 15.3, 20.0, 24.0, 23.7, 20.0, 14.1, 8.5, 5.3], HR: [78, 70, 62, 60, 54, 50, 44, 50, 58, 70, 77, 79] },
+      "Alicante": { T: [11.6, 12.4, 13.8, 15.7, 18.6, 22.2, 25.0, 25.5, 23.2, 19.1, 15.0, 12.1], HR: [67, 65, 63, 65, 65, 65, 64, 68, 69, 70, 69, 68] },
+      "Almería": { T: [12.4, 13.0, 14.4, 16.1, 18.7, 22.3, 25.5, 26.0, 24.1, 20.1, 16.2, 13.3], HR: [70, 68, 66, 65, 67, 65, 64, 66, 66, 69, 70, 69] },
+      "Asturias": { T: [7.5, 8.5, 9.5, 10.3, 12.8, 15.8, 18.0, 18.3, 17.4, 14.0, 10.4, 8.7], HR: [77, 75, 74, 77, 79, 80, 80, 80, 78, 78, 78, 76] },
+      "Ávila": { T: [3.1, 4.0, 5.6, 7.6, 11.5, 16.0, 19.9, 19.4, 16.5, 11.2, 6.0, 3.4], HR: [75, 70, 62, 61, 55, 50, 39, 40, 50, 65, 73, 77] },
+      "Badajoz": { T: [8.7, 10.1, 12.0, 14.2, 17.9, 22.3, 25.3, 25.0, 22.6, 17.4, 12.1, 9.0], HR: [80, 76, 69, 66, 60, 55, 50, 50, 57, 68, 77, 82] },
+      "Baleares": { T: [11.6, 11.8, 12.9, 14.7, 17.6, 21.8, 24.6, 25.3, 23.5, 20.0, 15.6, 13.0], HR: [71, 69, 68, 67, 69, 69, 67, 71, 73, 72, 72, 71] },
+      "Barcelona": { T: [8.8, 9.5, 11.1, 12.8, 16.0, 19.7, 22.9, 23.0, 21.0, 17.1, 12.5, 9.6], HR: [73, 70, 70, 70, 72, 70, 69, 72, 74, 74, 74, 71] },
+      "Burgos": { T: [2.6, 3.9, 5.7, 7.6, 11.2, 15.0, 18.4, 18.3, 15.8, 11.1, 5.8, 3.2], HR: [86, 80, 73, 72, 69, 67, 61, 62, 67, 76, 83, 86] },
+      "Cáceres": { T: [7.8, 9.3, 11.7, 13.0, 16.6, 22.3, 26.1, 25.4, 23.6, 17.4, 12.0, 8.8], HR: [78, 73, 63, 60, 55, 44, 37, 39, 49, 65, 76, 80] },
+      "Cádiz": { T: [12.8, 13.5, 14.7, 16.2, 18.7, 21.5, 24.0, 24.5, 23.5, 20.1, 16.1, 13.3], HR: [77, 75, 70, 71, 71, 70, 69, 69, 70, 73, 76, 77] },
+      "Cantabria": { T: [9.7, 10.3, 10.8, 11.9, 14.3, 17.0, 19.3, 19.5, 18.5, 16.1, 12.5, 10.5], HR: [71, 71, 71, 74, 75, 77, 77, 78, 77, 75, 73, 72] },
+      "Castellón": { T: [10.1, 11.1, 12.7, 14.2, 17.2, 21.3, 24.1, 24.5, 22.3, 18.3, 13.5, 11.2], HR: [68, 66, 64, 66, 67, 66, 66, 69, 71, 71, 73, 69] },
+      "Ceuta": { T: [11.5, 11.6, 12.6, 13.9, 16.3, 18.8, 21.7, 22.2, 20.2, 17.7, 14.1, 12.1], HR: [87, 87, 88, 87, 87, 87, 87, 87, 89, 89, 88, 88] },
+      "Ciudad Real": { T: [5.7, 7.2, 9.6, 11.9, 16.0, 20.8, 25.0, 24.7, 21.0, 14.8, 9.1, 5.9], HR: [80, 74, 66, 65, 59, 54, 47, 48, 57, 68, 78, 82] },
+      "Córdoba": { T: [9.5, 10.9, 13.1, 15.2, 19.2, 23.1, 26.9, 26.7, 23.7, 18.4, 12.9, 9.7], HR: [80, 75, 67, 65, 58, 53, 46, 49, 55, 67, 76, 80] },
+      "A Coruña": { T: [10.2, 10.5, 11.3, 12.1, 14.1, 16.4, 18.4, 18.9, 18.1, 15.7, 12.7, 10.9], HR: [77, 76, 74, 76, 78, 79, 79, 79, 79, 79, 79, 78] },
+      "Cuenca": { T: [4.2, 5.2, 7.4, 9.6, 13.6, 18.2, 22.4, 22.1, 18.6, 12.9, 7.6, 4.8], HR: [78, 73, 64, 62, 58, 54, 44, 46, 56, 68, 76, 79] },
+      "Girona": { T: [6.8, 7.9, 9.8, 11.6, 15.4, 19.4, 22.8, 22.4, 19.9, 15.2, 10.2, 7.7], HR: [77, 73, 71, 71, 70, 67, 62, 68, 72, 76, 77, 75] },
+      "Granada": { T: [6.5, 8.4, 10.5, 12.4, 16.3, 21.1, 24.3, 24.1, 21.1, 15.4, 10.6, 7.4], HR: [76, 71, 64, 61, 56, 49, 42, 42, 53, 62, 73, 77] },
+      "Guadalajara": { T: [5.5, 6.8, 8.8, 11.6, 15.3, 19.8, 23.5, 22.8, 19.5, 14.1, 9.0, 5.9], HR: [80, 76, 69, 68, 67, 62, 53, 54, 61, 72, 79, 81] },
+      "Guipúzcoa": { T: [7.9, 8.5, 9.4, 10.7, 13.5, 16.1, 18.4, 18.7, 18.0, 15.2, 10.9, 8.6], HR: [76, 74, 74, 79, 79, 82, 82, 83, 79, 76, 76, 76] },
+      "Huelva": { T: [12.2, 12.8, 14.4, 16.5, 19.2, 22.2, 25.3, 25.7, 23.7, 20.0, 15.4, 12.5], HR: [76, 72, 66, 63, 60, 59, 54, 54, 60, 67, 72, 75] },
+      "Huesca": { T: [4.7, 6.7, 9.0, 11.3, 15.3, 19.5, 23.3, 22.7, 19.7, 14.6, 8.7, 5.3], HR: [80, 73, 64, 63, 60, 56, 48, 53, 61, 70, 78, 81] },
+      "Jaén": { T: [8.7, 9.9, 12.0, 14.3, 18.5, 23.1, 27.2, 27.1, 23.6, 17.6, 12.2, 8.7], HR: [77, 72, 67, 64, 59, 53, 44, 45, 55, 67, 75, 77] },
+      "León": { T: [3.1, 4.4, 6.6, 8.6, 12.1, 16.4, 19.7, 19.1, 16.7, 11.7, 6.8, 3.8], HR: [81, 75, 66, 63, 60, 57, 52, 53, 60, 72, 78, 81] },
+      "Lleida": { T: [5.5, 7.8, 10.3, 13.0, 17.1, 21.2, 24.6, 24.0, 21.1, 15.7, 9.2, 5.8], HR: [81, 69, 61, 56, 55, 54, 47, 54, 62, 70, 77, 82] },
+      "La Rioja": { T: [5.8, 7.3, 9.4, 11.5, 15.1, 19.0, 22.2, 21.8, 19.2, 14.4, 9.1, 6.3], HR: [75, 68, 62, 61, 59, 56, 55, 56, 61, 69, 73, 76] },
+      "Lugo": { T: [5.8, 6.5, 7.8, 9.5, 11.7, 14.9, 17.2, 17.5, 16.0, 12.5, 8.6, 6.3], HR: [85, 81, 77, 77, 76, 76, 75, 75, 77, 82, 84, 85] },
+      "Madrid": { T: [6.2, 7.4, 9.9, 12.2, 16.0, 20.7, 24.4, 23.9, 20.5, 14.7, 9.4, 6.4], HR: [71, 66, 56, 55, 51, 46, 37, 39, 50, 63, 70, 73] },
+      "Málaga": { T: [12.2, 12.8, 14.0, 15.8, 18.7, 22.1, 24.7, 25.3, 23.1, 19.1, 15.1, 12.6], HR: [71, 70, 66, 65, 61, 59, 60, 63, 65, 70, 72, 72] },
+      "Melilla": { T: [13.2, 13.8, 14.6, 15.9, 18.3, 21.5, 24.4, 25.3, 23.5, 20.0, 16.6, 14.1], HR: [72, 72, 71, 70, 69, 68, 67, 68, 72, 75, 74, 73] },
+      "Murcia": { T: [10.6, 11.4, 12.6, 14.5, 17.4, 21.0, 23.9, 24.6, 22.5, 18.7, 14.3, 11.3], HR: [72, 69, 69, 68, 70, 71, 72, 74, 73, 73, 73, 73] },
+      "Navarra": { T: [4.5, 6.5, 8.0, 9.9, 13.3, 17.3, 20.5, 20.3, 18.2, 13.7, 8.3, 5.7], HR: [80, 73, 68, 66, 66, 62, 58, 61, 61, 68, 76, 79] },
+      "Ourense": { T: [7.4, 9.3, 10.7, 12.4, 15.3, 19.3, 21.9, 21.7, 19.8, 15.0, 10.6, 8.2], HR: [83, 75, 69, 70, 67, 64, 61, 62, 64, 73, 83, 84] },
+      "Palencia": { T: [4.1, 5.6, 7.5, 9.5, 13.0, 17.2, 20.7, 20.3, 17.9, 13.0, 7.6, 4.4], HR: [84, 77, 71, 70, 67, 64, 58, 59, 63, 73, 80, 85] },
+      "Las Palmas": { T: [17.5, 17.6, 18.3, 18.7, 19.9, 21.4, 23.2, 24.0, 23.9, 22.5, 20.4, 18.3], HR: [68, 67, 65, 66, 65, 67, 66, 67, 69, 70, 70, 68] },
+      "Pontevedra": { T: [9.9, 10.7, 11.9, 13.6, 15.4, 18.8, 20.7, 20.5, 19.1, 16.1, 12.6, 10.3], HR: [74, 73, 69, 67, 68, 66, 65, 65, 69, 72, 73, 74] },
+      "Salamanca": { T: [3.7, 5.3, 7.3, 9.6, 13.4, 17.8, 21.0, 20.3, 17.5, 12.3, 7.0, 4.1], HR: [85, 78, 69, 66, 62, 58, 50, 53, 62, 74, 82, 86] },
+      "Santa Cruz de Tenerife": { T: [17.9, 18.0, 18.6, 19.1, 20.5, 22.2, 24.6, 25.1, 24.4, 22.4, 20.7, 18.8], HR: [66, 66, 62, 61, 60, 59, 56, 58, 63, 65, 67, 66] },
+      "Segovia": { T: [4.1, 5.2, 7.1, 9.1, 13.1, 17.7, 21.6, 21.2, 17.9, 12.6, 7.3, 4.3], HR: [75, 71, 65, 65, 61, 55, 47, 49, 55, 65, 73, 78] },
+      "Sevilla": { T: [10.7, 11.9, 14.0, 16.0, 19.6, 23.4, 26.8, 26.8, 24.4, 19.5, 14.3, 11.1], HR: [79, 75, 68, 65, 59, 56, 51, 52, 58, 67, 76, 79] },
+      "Soria": { T: [2.9, 4.0, 5.8, 8.0, 11.8, 16.1, 19.9, 19.5, 16.5, 11.3, 6.1, 3.4], HR: [77, 73, 68, 67, 64, 60, 53, 54, 60, 70, 76, 78] },
+      "Tarragona": { T: [10.0, 11.3, 13.1, 15.3, 18.4, 22.2, 25.3, 25.3, 22.7, 18.4, 13.5, 10.7], HR: [66, 63, 59, 59, 61, 60, 59, 62, 67, 70, 68, 66] },
+      "Teruel": { T: [3.8, 4.8, 6.8, 9.3, 12.6, 17.5, 21.3, 20.6, 17.9, 12.1, 7.0, 4.5], HR: [72, 67, 60, 60, 60, 55, 50, 54, 59, 66, 71, 76] },
+      "Toledo": { T: [6.1, 8.1, 10.9, 12.8, 16.8, 22.5, 26.5, 25.7, 22.6, 16.2, 10.7, 7.1], HR: [78, 72, 59, 62, 55, 47, 43, 45, 54, 68, 77, 81] },
+      "Valencia": { T: [10.4, 11.4, 12.6, 14.5, 17.4, 21.1, 24.0, 24.5, 22.3, 18.3, 13.7, 10.9], HR: [63, 61, 60, 62, 64, 66, 67, 69, 68, 67, 66, 64] },
+      "Valladolid": { T: [4.1, 6.1, 8.1, 9.9, 13.3, 18.0, 21.5, 21.3, 18.6, 12.9, 7.6, 4.8], HR: [82, 72, 62, 61, 57, 52, 44, 46, 53, 67, 77, 83] },
+      "Vizcaya": { T: [8.9, 9.6, 10.4, 11.8, 14.6, 17.4, 19.7, 19.8, 18.8, 16.0, 11.8, 9.5], HR: [73, 70, 70, 72, 71, 72, 73, 75, 74, 74, 74, 74] },
+      "Zamora": { T: [4.3, 6.3, 8.3, 10.5, 14.0, 18.5, 21.8, 21.3, 18.7, 13.4, 8.1, 4.9], HR: [83, 75, 65, 63, 59, 54, 47, 50, 58, 70, 79, 83] },
+      "Zaragoza": { T: [6.2, 8.0, 10.3, 12.8, 16.8, 21.0, 24.3, 23.8, 20.7, 15.4, 9.7, 6.5], HR: [76, 69, 60, 59, 55, 52, 48, 54, 61, 70, 75, 77] },
+    } as Record<string, { T: readonly number[]; HR: readonly number[] }>,
+  },
+);
+
+export const ALTITUD_CAPITAL_ANEJO_G = tablaCTE(
+  {
+    db: "DB-HE",
+    edicion: "2019 (RD 732/2019)",
+    fecha: "2022-06-14",
+    articulo: "Anejo G",
+    tabla: "Tabla a-Anejo G (columna Altitud)",
+    fuente: "codigotecnico.org · DB-HE p. 54 — altitud de referencia de la capital (criterio: el DA/2 no la fija)",
+  },
+  {
+    altitud_m: {
+      "Álava": 540, "Albacete": 686, "Alicante": 8, "Almería": 16, "Asturias": 232, "Ávila": 1131, "Badajoz": 186,
+      "Baleares": 15, "Barcelona": 12, "Burgos": 929, "Cáceres": 459, "Cádiz": 14, "Cantabria": 11, "Castellón": 27,
+      "Ceuta": 40, "Ciudad Real": 628, "Córdoba": 106, "A Coruña": 26, "Cuenca": 999, "Girona": 70, "Granada": 683,
+      "Guadalajara": 685, "Guipúzcoa": 12, "Huelva": 30, "Huesca": 488, "Jaén": 568, "León": 838, "Lleida": 182,
+      "La Rioja": 385, "Lugo": 454, "Madrid": 655, "Málaga": 11, "Melilla": 15, "Murcia": 39, "Navarra": 490,
+      "Ourense": 139, "Palencia": 734, "Las Palmas": 13, "Pontevedra": 27, "Salamanca": 800,
+      "Santa Cruz de Tenerife": 5, "Segovia": 1002, "Sevilla": 11, "Soria": 1063, "Tarragona": 69, "Teruel": 912,
+      "Toledo": 629, "Valencia": 13, "Valladolid": 698, "Vizcaya": 6, "Zamora": 649, "Zaragoza": 199,
+    } as Record<string, number>,
+  },
+);
+
+// =============================================================================
 // HELPERS DE LOOKUP — puros, deterministas. Todas las cifras salen de las tablas
 // anteriores. El motor (Fase 2) consume estos helpers; no replica cifras.
 // =============================================================================
@@ -928,7 +1131,73 @@ export const PSI_PUENTES_TERMICOS_DA_DB_HE_3: {
  * añadiera una fila sin límite, el motor lo trataría como "no aplica".
  */
 export function ulimDe(tipo: TipoElemento, zona: ZonaClimatica): number | null {
+  // Las particiones interiores no están en la Tabla 3.1.1.a: su límite, con
+  // `ulimParticionDe` (Tabla 3.2), lo pone el motor.
+  if (tipo === "particion_interior") return null;
   return ULIM_TABLA_3_1_1_a.datos.ulim_W_m2K[tipo][zona];
+}
+
+/** Ulim de una partición interior [W/m²K] (Tabla 3.2-HE1). */
+export function ulimParticionDe(
+  relacion: RelacionParticion,
+  orientacion: OrientacionParticion,
+  zona: ZonaClimatica,
+): number {
+  const t = ULIM_PARTICIONES_TABLA_3_2.datos.ulim_W_m2K;
+  if (relacion !== "mismo_uso") return t.distinto_uso_o_zona_comun[zona];
+  return orientacion === "horizontal" ? t.mismo_uso_horizontal[zona] : t.mismo_uso_vertical[zona];
+}
+
+/**
+ * R de una cámara de aire sin ventilar [m²K/W] por su espesor, interpolando en la
+ * Tabla 2 del DA DB-HE/1. `flujo` horizontal ⇒ cámara vertical (muro).
+ */
+export function rCamaraDe(espesor_m: number, flujo: DireccionFlujo): number {
+  const t = CAMARA_AIRE_SIN_VENTILAR_R.datos.porEspesor;
+  const fila = flujo === "horizontal" ? t.vertical : t.horizontal;
+  const xs = t.espesores_m;
+  if (espesor_m <= xs[0]) return fila[0];
+  for (let i = 1; i < xs.length; i++) {
+    if (espesor_m <= xs[i]) {
+      const f = (espesor_m - xs[i - 1]) / (xs[i] - xs[i - 1]);
+      return fila[i - 1] + f * (fila[i] - fila[i - 1]);
+    }
+  }
+  return fila[fila.length - 1];
+}
+
+/**
+ * Condiciones exteriores de enero de un emplazamiento (DA DB-HE/2 §2.1): las de la
+ * capital de la provincia (Tabla C.1) y, si el emplazamiento está más alto, −1 °C
+ * por cada 100 m con la misma humedad absoluta. `null` si la provincia no está.
+ */
+export function climaEneroDe(
+  provincia: string,
+  altitud_m: number,
+): { temp_C: number; hr_pct: number; altitudCapital_m: number; corregido: boolean } | null {
+  const c = CLIMA_TABLA_C1.datos.capitales[provincia];
+  const hCap = ALTITUD_CAPITAL_ANEJO_G.datos.altitud_m[provincia];
+  if (c === undefined || hCap === undefined) return null;
+  const t0 = c.T[0];
+  const hr0 = c.HR[0];
+  if (!Number.isFinite(altitud_m) || altitud_m <= hCap) return { temp_C: t0, hr_pct: hr0, altitudCapital_m: hCap, corregido: false };
+  const t = t0 - (altitud_m - hCap) / 100;
+  const m = PSAT_MAGNUS.datos;
+  const psat = (th: number) => {
+    const r = th >= 0 ? m.positiva : m.negativa;
+    return m.p0_Pa * Math.exp((r.a * th) / (r.b_C + th));
+  };
+  const pe = (hr0 / 100) * psat(t0);
+  return { temp_C: t, hr_pct: Math.min(100, (100 * pe) / psat(t)), altitudCapital_m: hCap, corregido: true };
+}
+
+/** Ψ de la junta vidrio-marco [W/(m·K)] (DA DB-HE/1, Tabla 10). */
+export function psiHuecoDe(
+  marco: keyof typeof PSI_HUECO_TABLA_10.datos.psi_W_mK,
+  vidrio: "simple" | "doble_o_triple" | "doble_be_o_triple_2be",
+  separadorMejorado: boolean,
+): number {
+  return PSI_HUECO_TABLA_10.datos.psi_W_mK[marco][vidrio][separadorMejorado ? 1 : 0];
 }
 
 /**

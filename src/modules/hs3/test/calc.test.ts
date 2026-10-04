@@ -71,7 +71,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
   it("vivienda 0-1 dormitorio", () => {
     expect(calcHS3(inputs01Dorm)).toMatchInlineSnapshot(`
       {
-        "areaPaso_cm2": 112,
+        "areaPaso_cm2": 70,
         "balanceOk": false,
         "categoriaDormitorios": "0-1",
         "caudalEquilibrado_l_s": 14,
@@ -86,7 +86,8 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
             },
           ],
           "estado": "neutral",
-          "qvt_l_s": 12,
+          "metodo": "tablas_4_2_4_3",
+          "qvt_l_s": 14,
           "seccionRequerida_cm2": 625,
         },
         "estadoBalance": "warn",
@@ -98,6 +99,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
         "porEstancia": [
           {
             "areaAbertura_cm2": 32,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 8,
             "caudalRequerido_l_s": 8,
@@ -112,6 +114,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
           },
           {
             "areaAbertura_cm2": 24,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 6,
             "caudalRequerido_l_s": 6,
@@ -126,6 +129,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
           },
           {
             "areaAbertura_cm2": 24,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": 50,
             "caudalPropuesto_l_s": 6,
             "caudalRequerido_l_s": 6,
@@ -140,6 +144,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
           },
           {
             "areaAbertura_cm2": 24,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 6,
             "caudalRequerido_l_s": 6,
@@ -166,7 +171,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
   it("vivienda 2 dormitorios (defaults)", () => {
     expect(calcHS3(inputs2Dorm)).toMatchInlineSnapshot(`
       {
-        "areaPaso_cm2": 192,
+        "areaPaso_cm2": 128,
         "balanceOk": false,
         "categoriaDormitorios": "2",
         "caudalEquilibrado_l_s": 24,
@@ -181,6 +186,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
             },
           ],
           "estado": "neutral",
+          "metodo": "tablas_4_2_4_3",
           "qvt_l_s": 24,
           "seccionRequerida_cm2": 625,
         },
@@ -193,6 +199,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
         "porEstancia": [
           {
             "areaAbertura_cm2": 32,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 8,
             "caudalRequerido_l_s": 8,
@@ -207,6 +214,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
           },
           {
             "areaAbertura_cm2": 16,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 4,
             "caudalRequerido_l_s": 4,
@@ -221,6 +229,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
           },
           {
             "areaAbertura_cm2": 32,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 8,
             "caudalRequerido_l_s": 8,
@@ -234,7 +243,8 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
             "tipoAbertura": "admision",
           },
           {
-            "areaAbertura_cm2": 28,
+            "areaAbertura_cm2": 64,
+            "areaPaso_cm2": 128,
             "caudalCoccion_l_s": 50,
             "caudalPropuesto_l_s": 16,
             "caudalRequerido_l_s": 7,
@@ -248,7 +258,8 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
             "tipoAbertura": "extraccion",
           },
           {
-            "areaAbertura_cm2": 28,
+            "areaAbertura_cm2": 32,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 8,
             "caudalRequerido_l_s": 7,
@@ -275,7 +286,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
   it("vivienda 3+ dormitorios", () => {
     expect(calcHS3(inputs3Dorm)).toMatchInlineSnapshot(`
       {
-        "areaPaso_cm2": 264,
+        "areaPaso_cm2": 136,
         "balanceOk": false,
         "categoriaDormitorios": "3+",
         "caudalEquilibrado_l_s": 33,
@@ -290,6 +301,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
             },
           ],
           "estado": "neutral",
+          "metodo": "tablas_4_2_4_3",
           "qvt_l_s": 33,
           "seccionRequerida_cm2": 625,
         },
@@ -302,6 +314,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
         "porEstancia": [
           {
             "areaAbertura_cm2": 32,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 8,
             "caudalRequerido_l_s": 8,
@@ -316,6 +329,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
           },
           {
             "areaAbertura_cm2": 16,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 4,
             "caudalRequerido_l_s": 4,
@@ -330,6 +344,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
           },
           {
             "areaAbertura_cm2": 16,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 4,
             "caudalRequerido_l_s": 4,
@@ -344,6 +359,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
           },
           {
             "areaAbertura_cm2": 40,
+            "areaPaso_cm2": 80,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 10,
             "caudalRequerido_l_s": 10,
@@ -358,6 +374,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
           },
           {
             "areaAbertura_cm2": 32,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": 50,
             "caudalPropuesto_l_s": 8,
             "caudalRequerido_l_s": 8,
@@ -371,7 +388,8 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
             "tipoAbertura": "extraccion",
           },
           {
-            "areaAbertura_cm2": 32,
+            "areaAbertura_cm2": 68,
+            "areaPaso_cm2": 136,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 17,
             "caudalRequerido_l_s": 8,
@@ -386,6 +404,7 @@ describe("calcHS3 — snapshots por categoría (SPEC §5)", () => {
           },
           {
             "areaAbertura_cm2": 32,
+            "areaPaso_cm2": 70,
             "caudalCoccion_l_s": null,
             "caudalPropuesto_l_s": 8,
             "caudalRequerido_l_s": 8,

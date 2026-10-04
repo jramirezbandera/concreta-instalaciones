@@ -1,6 +1,6 @@
 // =============================================================================
 // crearProyectoDemo — feature-6 T2.6: el proyecto Demo precargado que enseña el
-// producto sin pedir nada (vivienda colectiva realista en Cáceres).
+// producto sin pedir nada (plurifamiliar con locales en Cáceres).
 //
 // Determinista por contrato: cero Date.now/Math.random — `nowIso` llega como
 // parámetro. Coherencia POR CONSTRUCCIÓN: los `inputs` sembrados de cada
@@ -10,22 +10,25 @@
 // inputs — lo que el usuario abre coincide siempre con lo cacheado.
 // =============================================================================
 
-import { calcHS3, hs3Defaults } from "../../modules/hs3/calc";
-import { calcHS4, hs4Defaults } from "../../modules/hs4/calc";
-import { calcHS5, hs5Defaults } from "../../modules/hs5/calc";
-import { calcHS6, hs6Defaults } from "../../modules/hs6/calc";
-import { calcHE1, he1Defaults } from "../../modules/he1/calc";
-import type { HS3Inputs } from "../../modules/hs3/calc";
-import type { HS4Inputs } from "../../modules/hs4/calc";
-import type { HS5Inputs } from "../../modules/hs5/calc";
-import type { HS6Inputs } from "../../modules/hs6/calc";
-import type { HE1Inputs } from "../../modules/he1/calc";
+import { hs3EstadoDefaults, type Hs3Estado } from "../../modules/hs3/estado";
+import { justificarHs3 } from "../../modules/hs3/justificacion";
+import { hs4EstadoDefaults, type Hs4Estado } from "../../modules/hs4/estado";
+import { justificarHs4 } from "../../modules/hs4/justificacion";
+import { hs5EstadoDefaults, type Hs5Estado } from "../../modules/hs5/estado";
+import { justificarHs5 } from "../../modules/hs5/justificacion";
+import { hs6EstadoDefaults, type Hs6Estado } from "../../modules/hs6/estado";
+import { justificarHs6 } from "../../modules/hs6/justificacion";
+import { he1EstadoDefaults, type He1Estado } from "../../modules/he1/estado";
+import { justificarHe1 } from "../../modules/he1/justificacion";
 import type { ZonaClimatica } from "../../modules/he1/tablas";
 import {
   LETRAS_INVIERNO,
   zonaClimaticaDe,
   zonaTermicaHS3De,
 } from "../../data/zonasClimaticasHE";
+import { veredictoConRevision } from "../cte/estados";
+import { edificioDeCaso } from "../edificio/casos";
+import { resumenEdificio } from "../edificio/derivar";
 import type {
   DatosGenerales,
   JustificacionEnProyecto,
@@ -40,9 +43,14 @@ export const DEMO_ID = "demo";
 export const DEMO_NOMBRE = "Demo — Vivienda C/ Mayor 12";
 
 // -----------------------------------------------------------------------------
-// DATOS GENERALES DEL DEMO — vivienda colectiva de 12 viviendas en Cáceres
-// (459 m): B+3 sobre rasante, sótano de garaje y trasteros, cubierta plana no
-// transitable, Zona de radón II (Apéndice B del DB-HS6) y 250 kPa de acometida.
+// DATOS DE LA OBRA DEL DEMO — obra nueva en Cáceres (459 m), Zona de radón II
+// (Apéndice B del DB-HS6) y 250 kPa de acometida. El edificio es el caso
+// «Plurifamiliar con locales» (feature-12): PB con local sin uso y portal,
+// P1–P3 con dos viviendas por planta, sótano de garaje, trasteros e
+// instalaciones, cubierta plana no transitable.
+//
+// HS5 (feature-14) y HS4, HS3, HS6 y HE1 (feature-15) salen del edificio, con
+// las decisiones habituales.
 // -----------------------------------------------------------------------------
 
 const DATOS_GENERALES_DEMO: DatosGenerales = {
@@ -50,18 +58,20 @@ const DATOS_GENERALES_DEMO: DatosGenerales = {
   municipioIne: "10037", // código INE (feature-9)
   provincia: "Cáceres",
   altitud_m: 459,
-  uso: "vivienda_colectiva",
   intervencion: "obra_nueva",
-  plantasSobreRasante: 4,
-  plantasBajoRasante: 1,
-  tipoCubierta: "plana_no_transitable",
-  numViviendas: 12,
-  tieneGaraje: true,
-  tieneTrasteros: true,
   tienePiscina: false,
-  tieneLocalPB: false,
+  // Zona de radón: DATO DEL PROYECTISTA, pendiente de comprobar en el Apéndice
+  // B. No está verificada y hay indicio de que Cáceres no figura en él
+  // (research/verificacion-hs6-v4.md, nota 10.2); el Demo la conserva para
+  // enseñar la protección completa de una zona II.
   zonaRadon: "II",
   presionAcometida_kPa: 250,
+  // Cota del alcantarillado en la acometida (feature-14): dato de la obra del
+  // Demo, como la presión. La zona pluviométrica NO se rellena: Cáceres cae
+  // junto a los límites de zona e isoyeta de la Figura B.1 y no hay relación
+  // oficial por municipio (research/verificacion-hs5-pluviales.md, A6e). El
+  // Demo enseña el aviso de la intensidad supuesta.
+  cotaAlcantarillado_m: -1.2,
 };
 
 // -----------------------------------------------------------------------------
@@ -105,6 +115,8 @@ function letraInviernoDe(zonaAnejoB: string): ZonaClimatica {
  */
 export function crearProyectoDemo(nowIso: string): Proyecto {
   const dg = DATOS_GENERALES_DEMO;
+  const edificio = edificioDeCaso("plurifamiliar_locales");
+  const resumen = resumenEdificio(edificio);
 
   // Contexto heredado, calculado de las TABLAS (nunca de memoria):
   //   - Zona térmica HS3 de Cáceres a 459 m (Tabla 4.4 del DB-HS3) → "Z".
@@ -121,29 +133,39 @@ export function crearProyectoDemo(nowIso: string): Proyecto {
   // MATERIALIZADOS de forma coherente con los datos generales del Demo.
   // structuredClone ⇒ arrays/objetos anidados frescos (no se comparten los de
   // los defaults, que deben permanecer inmutables).
-  const hs3Inputs: HS3Inputs = structuredClone({
-    ...hs3Defaults,
-    zonaTermica: zt.zona,
-  });
-  const hs4Inputs: HS4Inputs = structuredClone({
-    ...hs4Defaults,
-    presionAcometida_kPa: 250,
-  });
-  const hs5Inputs: HS5Inputs = structuredClone({
-    ...hs5Defaults,
+  // HS3 sale de El edificio (feature-15), con la zona térmica heredada.
+  const hs3Inputs: Hs3Estado = structuredClone({ ...hs3EstadoDefaults, zonaTermica: zt.zona });
+  const hs3 = justificarHs3(hs3Inputs, edificio);
+  // HS4 sale de El edificio (feature-15); la presión es el dato de la obra.
+  const hs4Inputs: Hs4Estado = structuredClone({ ...hs4EstadoDefaults });
+  const hs4 = justificarHs4(hs4Inputs, edificio, { presionAcometida_kPa: dg.presionAcometida_kPa });
+  // HS5 sale de El edificio (feature-14) con las decisiones habituales.
+  const hs5Inputs: Hs5Estado = structuredClone({
+    ...hs5EstadoDefaults,
     uso: "privado",
-    numPlantas: dg.plantasSobreRasante,
-    cubiertaTransitable: false,
+    numPlantas: resumen.plantasSobreRasante,
+    cubiertaTransitable: resumen.cubiertaTransitable,
   });
-  const hs6Inputs: HS6Inputs = structuredClone({
-    ...hs6Defaults,
+  const hs5 = justificarHs5(hs5Inputs, edificio, {
+    pluviometria: dg.pluviometria,
+    cotaAlcantarillado_m: dg.cotaAlcantarillado_m,
+  });
+  // Cumple con avisos sin revisar → «warn», como lo cachea la pantalla.
+  const hs5Veredicto: Veredicto = veredictoConRevision(hs5.veredicto, hs5.avisos.length);
+  // HS6 sale de El edificio (feature-15); la zona y el municipio, de la obra.
+  const hs6Inputs: Hs6Estado = structuredClone({
+    ...hs6EstadoDefaults,
     municipio: dg.municipio,
     zona: dg.zonaRadon,
   });
-  const he1Inputs: HE1Inputs = structuredClone({
-    ...he1Defaults,
+  const hs6 = justificarHs6(hs6Inputs, edificio);
+  // HE1 sale de El edificio (feature-15); la zona, de la obra, y el clima de
+  // enero, de la tabla C.1 del DA DB-HE/2 por la provincia y la altitud.
+  const he1Inputs: He1Estado = structuredClone({
+    ...he1EstadoDefaults,
     zonaClimatica: letraInviernoDe(zc.zona),
   });
+  const he1 = justificarHe1(he1Inputs, edificio, { provincia: dg.provincia, altitud_m: dg.altitud_m, municipio: dg.municipio });
 
   // Cache de veredictos calculado DE VERDAD en construcción. Con esta
   // materialización los cinco salen "ok"/"warn" (HS3 da "warn" en zona Z:
@@ -154,12 +176,13 @@ export function crearProyectoDemo(nowIso: string): Proyecto {
     creado: nowIso,
     modificado: nowIso,
     datosGenerales: { ...dg },
+    edificio,
     justificaciones: {
-      hs3: justificacionDemo(hs3Inputs, calcHS3(hs3Inputs).veredictoGlobal),
-      hs4: justificacionDemo(hs4Inputs, calcHS4(hs4Inputs).veredictoGlobal),
-      hs5: justificacionDemo(hs5Inputs, calcHS5(hs5Inputs).veredictoGlobal),
-      hs6: justificacionDemo(hs6Inputs, calcHS6(hs6Inputs).veredictoGlobal),
-      he1: justificacionDemo(he1Inputs, calcHE1(he1Inputs).veredictoGlobal),
+      hs3: justificacionDemo(hs3Inputs, veredictoConRevision(hs3.veredicto, hs3.avisos.length)),
+      hs4: justificacionDemo(hs4Inputs, veredictoConRevision(hs4.veredicto, hs4.avisos.length)),
+      hs5: justificacionDemo(hs5Inputs, hs5Veredicto),
+      hs6: justificacionDemo(hs6Inputs, veredictoConRevision(hs6.veredicto, hs6.avisos.length)),
+      he1: justificacionDemo(he1Inputs, veredictoConRevision(he1.veredicto, he1.avisos.length)),
     },
   };
 }

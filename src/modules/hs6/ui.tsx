@@ -1,230 +1,112 @@
-// DB-HS6 — Pantalla del módulo de PROTECCIÓN FRENTE AL RADÓN. Cablea el motor
-// (./calc), el render SVG (./svg) y la ficha PDF (./ficha) sobre el esqueleto
-// v4 (<ModuleLayout>, REDISENO-V4 §3.3): cabecera con veredicto (el resumen
-// sale de ./resumen), a la izquierda el editor de LISTA DINÁMICA de soluciones (añadir/quitar con menú
-// de tipo e ids deterministas). El motor clasifica por zona, comprueba la
-// adecuación de la COMBINACIÓN de soluciones propuesta y el checklist
-// cualitativo/geométrico de cada medida; el elemento crítico (la medida que
-// falta o el requisito incumplido) se resalta en el SVG y en la tabla.
-//
-// MIGRACIÓN (T5.2, patrón de HS5/T5.1): el estado viene de useJustificacionState
-// (defaults ← guardados en el proyecto ← heredados del expediente ← URL) — los
-// campos heredados (municipio / zona) ya NO tienen campo local en el panel de
-// inputs: se ven y se excepcionan en «Del proyecto», arriba a la izquierda.
-// Siguen viviendo en el estado (los alimenta la herencia) y el motor los recibe
-// igual. `localHabitableEnContactoConTerreno` NO está en el mapa de herencia →
-// conserva su campo local en "Emplazamiento".
+// DB-HS6 — Pantalla del módulo de protección frente al radón (feature-15, al
+// patrón de HS5). La protección se deduce de El edificio: a la izquierda «Qué
+// entra» y las decisiones; a la derecha la sección por lo que toca el terreno,
+// con las medidas como etiquetas pulsables y la franja debajo; Comprobaciones es
+// la lista y Memoria, el texto.
 //
 // React 19 + React Compiler: componente PURO. El cálculo es síncrono en render
-// (useMemo sobre el estado diferido); no hay efectos de cálculo ni botón
-// "calcular" (feedback inmediato). Los ids de las soluciones se generan de forma
-// DETERMINISTA en los handlers de evento (nunca en render, nunca con
-// Math.random/Date). Las mutaciones de la lista son siempre INMUTABLES.
+// (useMemo sobre el estado diferido); no hay efectos de cálculo.
 
-import { useDeferredValue, useMemo, useState, type JSX, type ReactNode } from "react";
-import { Trash2, Plus, Info } from "lucide-react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useJustificacionState } from "../../hooks/useJustificacionState";
 import { usePdfPreview } from "../../hooks/usePdfPreview";
-import { ModuleLayout, type ResumenVeredicto } from "../../components/justificacion/ModuleLayout";
-import { LienzoAjustado } from "../../components/justificacion/LienzoAjustado";
-import { ajustar } from "../../lib/ui/ajustar";
-import { FranjaDetalle } from "../../components/justificacion/FranjaDetalle";
-import { FilaResumen } from "../../components/justificacion/FilaResumen";
-import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
-import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
-import { Field, NumberInput, SelectInput, InputLabel } from "../../components/ui/InputLabel";
-import { showToast } from "../../components/ui/Toast";
-import { renderFicha } from "../../lib/pdf/renderFicha";
-import { STATUS_LABEL } from "../../lib/pdf/utils";
-import { STATE_TEXT } from "../../lib/ui/veredicto";
-import { fmt } from "../../lib/units/format";
-import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
-import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import {
-  calcHS6,
-  hs6Defaults,
-  type HS6Inputs,
-  type HS6Result,
-  type ResultadoMedidaHS6,
-  type SolucionBarreraInput,
-  type SolucionDespresurizacionInput,
-  type SolucionEspacioContencionInput,
-  type SolucionHS6Input,
-} from "./calc";
-import type {
-  TipoSolucionHS6,
-  TipoVentilacionContencion,
-  ViaJustificacionBarrera,
-} from "./tablas";
-import { HS6SVG } from "./svg";
-import { HS6_PDF_SVG_ID, hs6NativeSize } from "./svg-meta";
+  ModuleLayout,
+  type AvisoModulo,
+  type ResumenVeredicto,
+  type VistaModulo,
+} from "../../components/justificacion/ModuleLayout";
+import { DibujoConEtiquetas } from "../../components/justificacion/DibujoConEtiquetas";
+import { FranjaDetalle } from "../../components/justificacion/FranjaDetalle";
+import { LienzoAjustado } from "../../components/justificacion/LienzoAjustado";
+import { ListaComprobaciones } from "../../components/justificacion/ListaComprobaciones";
+import { QueEntra } from "../../components/justificacion/QueEntra";
+import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
+import { showToast } from "../../components/ui/Toast";
+import { avisosPendientes, estadosElementos, veredictoConRevision } from "../../lib/cte/estados";
+import { textoPlanoMemoria } from "../../lib/cte/memoria";
+import { renderFicha } from "../../lib/pdf/renderFicha";
+import { useProyecto } from "../../lib/proyecto/ProyectoContext";
+import { ajustar } from "../../lib/ui/ajustar";
+import { DecisionesHs6 } from "./DecisionesHs6";
+import { filasQueEntraHs6 } from "./entra";
+import { hs6EstadoDefaults, type Hs6Estado } from "./estado";
 import { toFichaData } from "./ficha";
-import { resumenHs6 } from "./resumen";
+import { justificarHs6 } from "./justificacion";
+import { memoriaHs6 } from "./memoria";
+import { calcularSeccionHs6, tamanoDibujoHs6, zonasPbDe } from "./seccion";
+import { DibujoPdfHs6, SeccionHs6 } from "./SeccionHs6";
+import { HS6_PDF_SVG_ID } from "./svg-meta";
+import {
+  describirSeccionHs6,
+  franjaDe,
+  fraseHs6,
+  metricasHs6,
+  resultadoLista,
+  textoAviso,
+  textoEtiqueta,
+} from "./textos";
 
-// -----------------------------------------------------------------------------
-// Opciones de los selects (declaradas a módulo: estables entre renders).
-// -----------------------------------------------------------------------------
+type Hs6State = { [K in keyof Hs6Estado]: Hs6Estado[K] };
 
-// Ámbito (art. 1): expuesto como select Sí/No para que cierre la columna como el
-// resto de controles del panel (paridad visual con HE1/HS4).
-const AMBITO_OPTIONS: { value: "si" | "no"; label: string }[] = [
-  { value: "si", label: "Sí — habitable y en contacto" },
-  { value: "no", label: "No — fuera de ámbito" },
-];
-
-const TIPO_SOLUCION_OPTIONS: { value: TipoSolucionHS6; label: string }[] = [
-  { value: "barrera", label: "Barrera de protección" },
-  { value: "espacio_contencion", label: "Espacio de contención ventilado" },
-  { value: "despresurizacion", label: "Despresurización del terreno" },
-];
-
-const TIPO_SOLUCION_LABEL: Record<TipoSolucionHS6, string> = {
-  barrera: "Barrera de protección",
-  espacio_contencion: "Espacio de contención ventilado",
-  despresurizacion: "Despresurización del terreno",
-};
-
-const VIA_BARRERA_OPTIONS: { value: ViaJustificacionBarrera; label: string }[] = [
-  { value: "lamina_tipo", label: "Lámina-tipo (vía simplificada)" },
-  { value: "calculo", label: "Cálculo de difusión (Nivel B — diferida)" },
-];
-
-const VENTILACION_OPTIONS: { value: TipoVentilacionContencion; label: string }[] = [
-  { value: "natural", label: "Natural (criterio 10 cm²/ml)" },
-  { value: "mecanica", label: "Mecánica (remite a DB-HS3)" },
-];
-
-const ESTADO_LABEL: Record<string, string> = {
-  ok: "Cumple",
-  warn: "Aviso",
-  fail: "No cumple",
-  neutral: "Informativo",
-};
-
-// -----------------------------------------------------------------------------
-// Ids deterministas (contador derivado del estado actual). NO usa Math.random ni
-// Date (React-Compiler-safe; solo se invoca en handlers). Extrae el sufijo
-// numérico mayor de los ids "<prefix>N" y devuelve el siguiente; ignora los ids
-// semilla con otra forma. Garantiza unicidad e idempotencia por estado.
-// -----------------------------------------------------------------------------
-function nextId(items: { id: string }[], prefix: string): string {
-  const re = new RegExp(`^${prefix}(\\d+)$`);
-  let max = 0;
-  for (const it of items) {
-    const m = re.exec(it.id);
-    if (m) {
-      const n = Number(m[1]);
-      if (n > max) max = n;
-    }
-  }
-  return `${prefix}${max + 1}`;
-}
-
-// -----------------------------------------------------------------------------
-// Plantillas de solución por tipo (defaults razonables para cada medida nueva).
-// `id` lo asigna el handler (determinista); aquí solo se fija la forma + valores.
-// -----------------------------------------------------------------------------
-function nuevaSolucion(tipo: TipoSolucionHS6, id: string): SolucionHS6Input {
-  switch (tipo) {
-    case "barrera":
-      return {
-        tipo: "barrera",
-        id,
-        via: "lamina_tipo",
-        continuidadSellada: true,
-        penetracionesSelladas: true,
-        puertasEstancas: true,
-        coefDifusion_m2_s: 8e-12,
-        espesor_mm: 2.5,
-      };
-    case "espacio_contencion":
-      return {
-        tipo: "espacio_contencion",
-        id,
-        ventilacion: "natural",
-        perimetro_m: 40,
-        areaAberturas_cm2: 480,
-        alturaCamara_mm: 80,
-      };
-    case "despresurizacion":
-      return {
-        tipo: "despresurizacion",
-        id,
-        redCaptacion: true,
-        extraccionMecanica: true,
-        geotextil: true,
-      };
-  }
-}
-
-/**
- * Alias mapeado de HS6Inputs para el generic de useJustificacionState: los
- * `interface` NO llevan index signature implícita y no satisfacen la
- * restricción `Record<string, unknown>` del hook; el alias mapeado (idéntico
- * estructuralmente y mutuamente asignable) sí. Mismo truco que en HS5 (T5.1).
- */
-type Hs6State = { [K in keyof HS6Inputs]: HS6Inputs[K] };
-
-export function Hs6Module(): JSX.Element {
-  const { state, setField, reset, herencia } = useJustificacionState<Hs6State>(
-    "hs6",
-    hs6Defaults,
-  );
-  const { proyecto, derivados } = useProyecto();
+export function Hs6Module() {
+  const { state, setField, reset, herencia } = useJustificacionState<Hs6State>("hs6", hs6EstadoDefaults);
+  const { proyecto, marcarRevisado } = useProyecto();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [vista, setVista] = useState<VistaModulo>("esquema");
 
   const deferredState = useDeferredValue(state);
-  const result = useMemo(() => calcHS6(deferredState), [deferredState]);
+  const edificio = proyecto.edificio;
+  const j = useMemo(() => justificarHs6(deferredState, edificio), [deferredState, edificio]);
 
-  // ── Validación de entrada (pragmática, como he1/hs4) ───────────────────────
-  // El motor degrada cualquier dato faltante/incoherente a warn/fail y nunca
-  // lanza; la ficha es útil incluso "sin exigencia". Solo exigimos que los campos
-  // numéricos aportados sean finitos para no emitir una ficha con NaN.
-  const numerosFinitos = state.soluciones.every((s) => {
-    if (s.tipo === "barrera") {
-      return (
-        (s.coefDifusion_m2_s === undefined || Number.isFinite(s.coefDifusion_m2_s)) &&
-        (s.espesor_mm === undefined || Number.isFinite(s.espesor_mm))
-      );
-    }
-    if (s.tipo === "espacio_contencion") {
-      return (
-        Number.isFinite(s.perimetro_m) &&
-        (s.areaAberturas_cm2 === undefined || Number.isFinite(s.areaAberturas_cm2)) &&
-        (s.alturaCamara_mm === undefined || Number.isFinite(s.alturaCamara_mm))
-      );
-    }
-    return true;
-  });
-  const valid = numerosFinitos;
+  // ── Avisos y estados ───────────────────────────────────────────────────────
+  const revisados = proyecto.justificaciones.hs6?.revisados ?? [];
+  const pendientes = avisosPendientes(j.avisos, revisados);
+  const estados = estadosElementos(j.elementos, j.avisos, revisados);
 
-  // Ficha con cabecera de expediente: la transformación pura de ./ficha se
-  // completa aquí con la identificación del proyecto activo y las notas de
-  // excepción local (campos heredados que difieren del expediente).
-  // DECISIÓN fechaProyecto: se usa `proyecto.modificado` (último instante en que
-  // el usuario editó el expediente) formateado legible es-ES — es la fecha que
-  // ya enseña el listado de InicioPage y la más veraz para el sello de la ficha
-  // (no existe una "fecha de proyecto" declarativa en DatosGenerales).
-  // La misma función alimenta el botón «Ficha PDF» y la pestaña Memoria.
-  const generarFicha = () => {
-    const base = toFichaData(deferredState, result);
-    return renderFicha({
-      ...base,
-      proyecto: proyecto.nombre,
-      fechaProyecto: formatearFecha(proyecto.modificado),
-      observaciones: [
-        ...(base.observaciones ?? []),
-        ...notasExcepcionesLocales({
-          key: "hs6",
-          dg: proyecto.datosGenerales,
-          d: derivados,
-          state: deferredState,
-          overrides: herencia.campos.filter((c) => c.override).map((c) => c.campo),
-        }),
-      ],
-    });
+  const porDefecto = j.elementos.find((e) => e.id === "barrera")?.id ?? j.elementos[0]?.id ?? null;
+  const selVigente = selectedId !== null && j.elementos.some((e) => e.id === selectedId) ? selectedId : porDefecto;
+  const elementoSel = j.elementos.find((e) => e.id === selVigente) ?? null;
+
+  const verEnDibujo = (id: string) => {
+    setSelectedId(id);
+    setVista("esquema");
   };
-  const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } =
-    usePdfPreview(generarFicha, valid);
+
+  const avisos: AvisoModulo[] = j.avisos.map((a) => {
+    const t = textoAviso(a);
+    return {
+      id: a.id,
+      titulo: t.titulo,
+      detalle: t.detalle,
+      revisado: revisados.includes(a.id),
+      onVer: a.elementoId ? () => verEnDibujo(a.elementoId!) : undefined,
+      onRevisar: (b: boolean) => marcarRevisado("hs6", a.id, b),
+    };
+  });
+
+  const nPendientes = pendientes.length;
+  const resumen: ResumenVeredicto | null = useMemo(() => {
+    if (j.elementos.length === 0) return null;
+    return {
+      veredicto: veredictoConRevision(j.veredicto, nPendientes),
+      sujeto: "Protección frente al radón",
+      metricas: metricasHs6(j),
+      frase: fraseHs6(j),
+    };
+  }, [j, nPendientes]);
+
+  // ── Ficha PDF ──────────────────────────────────────────────────────────────
+  const tamano = tamanoDibujoHs6();
+  const valid = j.elementos.length > 0;
+  const generarFicha = () => {
+    const base = toFichaData(j, { estado: deferredState, edificio, revisados, svg: tamano });
+    return renderFicha({ ...base, proyecto: proyecto.nombre, fechaProyecto: formatearFecha(proyecto.modificado) });
+  };
+  const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } = usePdfPreview(
+    generarFicha,
+    valid,
+  );
 
   const handleShare = async () => {
     try {
@@ -235,127 +117,107 @@ export function Hs6Module(): JSX.Element {
     }
   };
 
-  // ── Mutaciones inmutables de la lista de soluciones ────────────────────────
-  const addSolucion = (tipo: TipoSolucionHS6) => {
-    const id = nextId(state.soluciones, "sol-");
-    setField("soluciones", [...state.soluciones, nuevaSolucion(tipo, id)]);
-  };
-
-  const removeSolucion = (id: string) => {
-    setField(
-      "soluciones",
-      state.soluciones.filter((s) => s.id !== id),
-    );
-  };
-
-  // Patch tipado: el patch debe pertenecer al MISMO `tipo` que la solución (la
-  // unión discriminada se conserva porque solo se parchea la solución de ese id).
-  const patchSolucion = <S extends SolucionHS6Input>(id: string, patch: Partial<S>) => {
-    setField(
-      "soluciones",
-      state.soluciones.map((s) => (s.id === id ? ({ ...s, ...patch } as SolucionHS6Input) : s)),
-    );
-  };
-
-  // ── Lienzo: el dibujo cabe entero, con la proporción de su tamaño nativo ──
-  const { nativeW, nativeH } = hs6NativeSize(result);
-
-  // Resumen para la banda del shell (mismo contenido que la antigua banda
-  // inline, ver ./resumen). `null` con datos inválidos → banda neutra "Datos
-  // insuficientes" del shell.
-  const resumen: ResumenVeredicto | null = useMemo(
-    () => (valid ? resumenHs6(result) : null),
-    [valid, result],
+  // ── Izquierda ──────────────────────────────────────────────────────────────
+  const queEntra = (
+    <QueEntra
+      filas={filasQueEntraHs6(j, estados)}
+      seleccion={selVigente}
+      onSelect={verEnDibujo}
+      enlace={{ to: `/p/${proyecto.id}/edificio`, label: "Editar el edificio" }}
+    />
   );
+  const entradas = <DecisionesHs6 state={state} setField={setField} j={j} />;
 
-  const entradas = (
-    <>
-      <CollapsibleSection label="Emplazamiento" refNorma="DB-HS6 art. 1 / Apéndice B">
-        <Field
-          id="ambito"
-          label="Local en contacto"
-          help="Ámbito de aplicación (art. 1): ¿el local es HABITABLE y está en CONTACTO con el terreno (planta baja, sótano, semisótano)? Si no lo es (local no habitable o con una planta interpuesta), HS6 no exige medidas."
-          refText="DB-HS6 art. 1"
-        >
-          <SelectInput<"si" | "no">
-            id="ambito"
-            value={state.localHabitableEnContactoConTerreno ? "si" : "no"}
-            options={AMBITO_OPTIONS}
-            onChange={(v) =>
-              setField("localHabitableEnContactoConTerreno", v === "si")
+  // ── El dibujo ──────────────────────────────────────────────────────────────
+  const seccion = calcularSeccionHs6(j, zonasPbDe(edificio));
+  const etiquetasDibujo = seccion.etiquetas.flatMap((e) => {
+    const el = j.elementos.find((x) => x.id === e.elementoId);
+    if (!el) return [];
+    return [
+      { key: e.key, elementoId: e.elementoId, x: e.x, y: e.y, texto: textoEtiqueta(el), estado: estados[el.id] ?? "ok", nombre: el.nombre },
+    ];
+  });
+  const lienzo = (
+    <LienzoAjustado anchoMin={560}>
+      {(caja) => {
+        const { width, height } = ajustar(seccion.ancho, seccion.alto, caja, { max: 900 });
+        return (
+          <DibujoConEtiquetas
+            ancho={width}
+            alto={height}
+            viewW={seccion.ancho}
+            viewH={seccion.alto}
+            seleccion={selVigente}
+            onSelect={setSelectedId}
+            etiquetas={etiquetasDibujo}
+            svg={
+              <SeccionHs6
+                seccion={seccion}
+                mode="screen"
+                width={width}
+                height={height}
+                titulo="Protección frente al radón (DB-HS6): sección por lo que toca el terreno"
+                descripcion={describirSeccionHs6(j)}
+                seleccion={selVigente}
+                estados={estados}
+                onSelect={setSelectedId}
+              />
             }
           />
-        </Field>
-      </CollapsibleSection>
-      <CollapsibleSection
-        label="Soluciones propuestas"
-        refNorma="DB-HS6 art. 3.1–3.3"
-      >
-        <div className="flex flex-col gap-3">
-          {state.soluciones.map((s) => (
-            <SolucionCard
-              key={s.id}
-              solucion={s}
-              onPatch={(patch) => patchSolucion(s.id, patch)}
-              onRemove={() => removeSolucion(s.id)}
-            />
-          ))}
-          {state.soluciones.length === 0 && (
-            <p className="text-text-disabled px-1 text-[12px] leading-snug">
-              No hay soluciones propuestas. Añada al menos una medida de protección
-              según el nivel exigido por la zona (art. 3.1).
-            </p>
-          )}
-        </div>
-        <AddSolucionMenu onAdd={addSolucion} />
-      </CollapsibleSection>
-    </>
+        );
+      }}
+    </LienzoAjustado>
   );
+
+  const cabeceraDibujo = (
+    <span className="text-text-disabled text-[11.5px]">
+      Pulsa una medida para ver qué pide el DB. Las flechas son el radón que sube del terreno.
+    </span>
+  );
+
+  const franja = elementoSel ? (
+    <FranjaDetalle detalle={franjaDe(elementoSel, j, estados[elementoSel.id] ?? "ok")} />
+  ) : (
+    <FranjaDetalle seleccion={null} pista="Pulsa un elemento del dibujo o de la lista." />
+  );
+
+  // ── Comprobaciones ─────────────────────────────────────────────────────────
+  const filasLista = j.elementos.map((el) => ({
+    id: el.id,
+    nombre: el.nombre,
+    resultado: resultadoLista(el),
+    estado: estados[el.id] ?? "ok",
+  }));
+  const comprobaciones = <ListaComprobaciones filas={filasLista} seleccion={selVigente} onSelect={setSelectedId} />;
+
+  const memoria = useMemo(() => memoriaHs6(j), [j]);
 
   return (
     <ModuleLayout
       justificacionKey="hs6"
       resultado={resumen}
       herencia={herencia}
-      acciones={{
-        onExportPdf: handleExportPdf,
-        pdfExporting,
-        onShare: handleShare,
-        onReset: reset,
-      }}
-      avisos={result.warnings}
+      acciones={{ onExportPdf: handleExportPdf, pdfExporting, onShare: handleShare, onReset: reset }}
+      avisos={avisos}
+      queEntra={queEntra}
       entradas={entradas}
-      dibujo={{
-        titulo: "Sección en contacto con el terreno",
-        lienzo: (
-          <LienzoAjustado>
-            {(caja) => {
-              const { width, height } = ajustar(nativeW, nativeH, caja, { max: 900 });
-              return <HS6SVG result={result} mode="screen" width={width} height={height} />;
-            }}
-          </LienzoAjustado>
-        ),
-        franja: (
-          <FranjaDetalle
-            etiqueta="Lo que falta"
-            seleccion={result.elementoCritico ?? null}
-            pista={
-              result.aplica
-                ? "La combinación propuesta cubre lo que exige la zona."
-                : "En este emplazamiento HS6 no exige medidas."
-            }
-          />
-        ),
-      }}
-      comprobaciones={<ResultsTable result={result} />}
-      memoria={{ generar: generarFicha, valid }}
+      comprobacionesConColumna
+      totalComprobaciones={j.elementos.length}
+      vista={vista}
+      onVista={setVista}
+      dibujo={{ titulo: "Lo que toca el terreno", cabecera: cabeceraDibujo, lienzo, franja }}
+      comprobaciones={comprobaciones}
+      memoria={{ texto: memoria, textoPlano: textoPlanoMemoria(memoria), onFichaPdf: valid ? handleExportPdf : undefined }}
     >
-      {/* Clon oculto del SVG para el raster del PDF (mismo id que busca renderFicha).
-          Modo 'pdf' al tamaño NATIVO del viewBox (hs6NativeSize): renderFicha lo
-          clona y rasteriza con scale = CW/nativeW sin deformar. */}
       <div className="h-0 w-0 overflow-hidden" aria-hidden="true">
         <div id={HS6_PDF_SVG_ID} style={{ position: "absolute", left: "-9999px", top: 0 }}>
-          <HS6SVG result={result} mode="pdf" width={nativeW} height={nativeH} />
+          <DibujoPdfHs6
+            j={j}
+            edificio={edificio}
+            revisados={revisados}
+            width={560}
+            height={Math.round((560 * tamano.nativeH) / tamano.nativeW)}
+          />
         </div>
       </div>
 
@@ -372,579 +234,8 @@ export function Hs6Module(): JSX.Element {
   );
 }
 
-/**
- * "22 ago 2026" — fecha corta es-ES a partir de un ISO (mismo formato que el
- * listado de expedientes de InicioPage). Solo para la cabecera de la ficha; el
- * ISO llega ya construido desde la persistencia (aquí no hay Date.now).
- */
 function formatearFecha(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-ES", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(d);
-}
-
-// -----------------------------------------------------------------------------
-// Menú de "añadir solución": botón "+ Añadir" que despliega los tres tipos de
-// medida (barrera / espacio de contención / despresurización). Determinista: el
-// id lo asigna el handler en el padre; aquí solo se elige el tipo.
-// -----------------------------------------------------------------------------
-function AddSolucionMenu({ onAdd }: { onAdd: (tipo: TipoSolucionHS6) => void }) {
-  const [abierto, setAbierto] = useState(false);
-
-  return (
-    <div className="mt-3">
-      <button
-        type="button"
-        onClick={() => setAbierto((a) => !a)}
-        aria-expanded={abierto}
-        className="border-border-main text-text-secondary hover:bg-bg-elevated hover:text-text-primary flex w-full items-center justify-center gap-1.5 rounded border border-dashed py-2 text-[13px] transition-colors"
-      >
-        <Plus size={14} />
-        Añadir solución
-      </button>
-      {abierto && (
-        <div className="border-border-sub bg-bg-primary mt-1.5 flex flex-col gap-1 rounded border p-1.5">
-          {TIPO_SOLUCION_OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => {
-                onAdd(o.value);
-                setAbierto(false);
-              }}
-              className="text-text-secondary hover:bg-bg-elevated hover:text-text-primary rounded px-2 py-1.5 text-left text-[13px] transition-colors"
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Tarjeta editable de una SOLUCIÓN (lista dinámica). Cabecera con el tipo (fijo,
-// se elige al añadir) + nombre opcional + botón quitar; cuerpo según el `tipo`
-// (unión discriminada): barrera, espacio de contención o despresurización. El
-// `onPatch` está tipado al tipo concreto de la solución para preservar la unión.
-// -----------------------------------------------------------------------------
-function SolucionCard({
-  solucion,
-  onPatch,
-  onRemove,
-}: {
-  solucion: SolucionHS6Input;
-  onPatch: (patch: Partial<SolucionHS6Input>) => void;
-  onRemove: () => void;
-}) {
-  const nombreId = `nombre-${solucion.id}`;
-  return (
-    <div className="border-border-sub bg-bg-primary rounded border p-2.5">
-      <div className="flex items-center gap-2">
-        <span className="text-text-disabled flex-1 truncate text-[11px] font-semibold tracking-[0.04em] uppercase">
-          {TIPO_SOLUCION_LABEL[solucion.tipo]}
-        </span>
-        <span className="text-text-disabled shrink-0 font-mono text-[11px]">{solucion.id}</span>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label="Quitar solución"
-          title="Quitar solución"
-          className="text-text-disabled hover:text-state-fail shrink-0 rounded p-1 transition-colors"
-        >
-          <Trash2 size={15} />
-        </button>
-      </div>
-
-      <div className="mt-2">
-        <input
-          id={nombreId}
-          type="text"
-          value={solucion.nombre ?? ""}
-          onChange={(e) => onPatch({ nombre: e.target.value })}
-          aria-label="Nombre de la solución"
-          placeholder="Nombre (opcional)"
-          className="border-border-main bg-bg-primary text-text-primary focus:border-accent focus:ring-accent/30 w-full rounded border px-2 py-1 text-[13px] transition-colors focus:ring-1 focus:outline-none"
-        />
-      </div>
-
-      <div className="border-border-sub mt-3 border-t pt-2">
-        {solucion.tipo === "barrera" && (
-          <BarreraFields
-            solucion={solucion}
-            onPatch={(p) => onPatch(p as Partial<SolucionHS6Input>)}
-          />
-        )}
-        {solucion.tipo === "espacio_contencion" && (
-          <EspacioContencionFields
-            solucion={solucion}
-            onPatch={(p) => onPatch(p as Partial<SolucionHS6Input>)}
-          />
-        )}
-        {solucion.tipo === "despresurizacion" && (
-          <DespresurizacionFields
-            solucion={solucion}
-            onPatch={(p) => onPatch(p as Partial<SolucionHS6Input>)}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Fila de checkbox densa (label-izq con ayuda / control-der), para los checklists
-// cualitativos (sellados, penetraciones, captación…). El `title`/aria del input
-// describe el efecto; el texto refuerza (no solo color).
-// -----------------------------------------------------------------------------
-function CheckRow({
-  id,
-  label,
-  help,
-  refText,
-  checked,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  help?: string;
-  refText?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="mt-2 flex items-center justify-between gap-3">
-      <InputLabel htmlFor={id} label={label} help={help} refText={refText} />
-      <input
-        id={id}
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="accent-accent h-4 w-4 shrink-0 cursor-pointer"
-      />
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Campos de una BARRERA de protección (art. 3.2): vía de justificación + checklist
-// (continuidad / penetraciones / puertas) + (solo lámina-tipo) coef. difusión y
-// espesor de la lámina. El motor exige coef ≤ 1e-11 m²/s y espesor ≥ 2 mm.
-// -----------------------------------------------------------------------------
-function BarreraFields({
-  solucion,
-  onPatch,
-}: {
-  solucion: SolucionBarreraInput;
-  onPatch: (patch: Partial<SolucionBarreraInput>) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-3">
-        <InputLabel
-          htmlFor={`via-${solucion.id}`}
-          label="Vía"
-          help="Vía de justificación de la barrera. «Lámina-tipo» es la vía simplificada cuantitativa (coef. difusión ≤ 1e-11 m²/s y espesor ≥ 2 mm). «Cálculo» (E < Elim, Nivel B) está DIFERIDA: el motor no la evalúa (fórmula no verificada literalmente); justifíquela manualmente."
-          refText="DB-HS6 art. 3.2"
-        />
-        <div className="w-44 shrink-0">
-          <SelectInput<ViaJustificacionBarrera>
-            id={`via-${solucion.id}`}
-            value={solucion.via}
-            options={VIA_BARRERA_OPTIONS}
-            onChange={(v) => onPatch({ via: v })}
-          />
-        </div>
-      </div>
-
-      {solucion.via === "lamina_tipo" && (
-        <>
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <InputLabel
-              htmlFor={`coef-${solucion.id}`}
-              label="Coef. difusión"
-              sub="D"
-              help="Coeficiente de difusión del radón de la lámina [m²/s]. Para la vía lámina-tipo debe ser ≤ 1e-11 m²/s (art. 3.2). Use el dato del fabricante (DIT/ETE)."
-              refText="DB-HS6 art. 3.2 (≤ 1e-11 m²/s)"
-            />
-            <div className="flex w-32 shrink-0 items-center gap-1.5">
-              <div className="flex-1">
-                <NumberInput
-                  id={`coef-${solucion.id}`}
-                  value={solucion.coefDifusion_m2_s ?? Number.NaN}
-                  onChange={(v) =>
-                    onPatch({ coefDifusion_m2_s: Number.isFinite(v) ? v : undefined })
-                  }
-                  min={0}
-                  step={1e-12}
-                />
-              </div>
-              <span className="text-text-disabled w-8 shrink-0 text-[10px]">m²/s</span>
-            </div>
-          </div>
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <InputLabel
-              htmlFor={`espesor-${solucion.id}`}
-              label="Espesor"
-              sub="e"
-              help="Espesor de la lámina [mm]. Para la vía lámina-tipo debe ser ≥ 2 mm (art. 3.2)."
-              refText="DB-HS6 art. 3.2 (≥ 2 mm)"
-            />
-            <div className="flex w-32 shrink-0 items-center gap-1.5">
-              <div className="flex-1">
-                <NumberInput
-                  id={`espesor-${solucion.id}`}
-                  value={solucion.espesor_mm ?? Number.NaN}
-                  onChange={(v) =>
-                    onPatch({ espesor_mm: Number.isFinite(v) ? v : undefined })
-                  }
-                  min={0}
-                  step={0.5}
-                />
-              </div>
-              <span className="text-text-disabled w-8 shrink-0 text-[11px]">mm</span>
-            </div>
-          </div>
-        </>
-      )}
-
-      <CheckRow
-        id={`continuidad-${solucion.id}`}
-        label="Continuidad sellada"
-        help="La barrera forma una capa CONTINUA y SELLADA en toda su superficie (art. 3.2)."
-        refText="DB-HS6 art. 3.2"
-        checked={solucion.continuidadSellada}
-        onChange={(v) => onPatch({ continuidadSellada: v })}
-      />
-      <CheckRow
-        id={`penetraciones-${solucion.id}`}
-        label="Penetraciones selladas"
-        help="Las penetraciones (tuberías, juntas, arquetas) que atraviesan la barrera están selladas (art. 3.2)."
-        refText="DB-HS6 art. 3.2"
-        checked={solucion.penetracionesSelladas}
-        onChange={(v) => onPatch({ penetracionesSelladas: v })}
-      />
-      <CheckRow
-        id={`puertas-${solucion.id}`}
-        label="Puertas estancas"
-        help="Las puertas de comunicación con el espacio protegido son estancas (art. 3.2)."
-        refText="DB-HS6 art. 3.2"
-        checked={solucion.puertasEstancas}
-        onChange={(v) => onPatch({ puertasEstancas: v })}
-      />
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Campos de un ESPACIO DE CONTENCIÓN ventilado (art. 3.2): tipo de ventilación +
-// perímetro + (solo natural) área de aberturas + altura de cámara. El motor exige,
-// para natural, área ≥ 10 cm²/ml · perímetro y altura ≥ 50 mm; mecánica remite a HS3.
-// -----------------------------------------------------------------------------
-function EspacioContencionFields({
-  solucion,
-  onPatch,
-}: {
-  solucion: SolucionEspacioContencionInput;
-  onPatch: (patch: Partial<SolucionEspacioContencionInput>) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-3">
-        <InputLabel
-          htmlFor={`vent-${solucion.id}`}
-          label="Ventilación"
-          help="Tipo de ventilación de la cámara. «Natural» se verifica por el criterio geométrico (área de aberturas ≥ 10 cm²/ml de perímetro). «Mecánica» remite el dimensionado del caudal a DB-HS3 §3.2.1 (fuera de este módulo)."
-          refText="DB-HS6 art. 3.2"
-        />
-        <div className="w-44 shrink-0">
-          <SelectInput<TipoVentilacionContencion>
-            id={`vent-${solucion.id}`}
-            value={solucion.ventilacion}
-            options={VENTILACION_OPTIONS}
-            onChange={(v) => onPatch({ ventilacion: v })}
-          />
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <InputLabel
-          htmlFor={`perimetro-${solucion.id}`}
-          label="Perímetro"
-          sub="p"
-          help="Perímetro de la cámara de contención [m]. Fija el área de aberturas exigida en ventilación natural (10 cm²/ml · perímetro, art. 3.2)."
-          refText="DB-HS6 art. 3.2"
-        />
-        <div className="flex w-32 shrink-0 items-center gap-1.5">
-          <div className="flex-1">
-            <NumberInput
-              id={`perimetro-${solucion.id}`}
-              value={solucion.perimetro_m}
-              onChange={(v) => onPatch({ perimetro_m: v })}
-              min={0}
-              step={1}
-            />
-          </div>
-          <span className="text-text-disabled w-8 shrink-0 text-[11px]">m</span>
-        </div>
-      </div>
-
-      {solucion.ventilacion === "natural" && (
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <InputLabel
-            htmlFor={`area-${solucion.id}`}
-            label="Aberturas"
-            sub="A"
-            help="Área TOTAL de aberturas de ventilación de la cámara [cm²]. En ventilación natural debe alcanzar 10 cm²/ml · perímetro (art. 3.2)."
-            refText="DB-HS6 art. 3.2 (≥ 10 cm²/ml)"
-          />
-          <div className="flex w-32 shrink-0 items-center gap-1.5">
-            <div className="flex-1">
-              <NumberInput
-                id={`area-${solucion.id}`}
-                value={solucion.areaAberturas_cm2 ?? Number.NaN}
-                onChange={(v) =>
-                  onPatch({ areaAberturas_cm2: Number.isFinite(v) ? v : undefined })
-                }
-                min={0}
-                step={10}
-              />
-            </div>
-            <span className="text-text-disabled w-8 shrink-0 text-[11px]">cm²</span>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <InputLabel
-          htmlFor={`altura-${solucion.id}`}
-          label="Altura cámara"
-          sub="h"
-          help="Altura libre de la cámara [mm]. Mínimo recomendado ≥ 50 mm (art. 3.2). Si se deja vacío, el motor lo trata como informativo (no descalifica la medida)."
-          refText="DB-HS6 art. 3.2 (≥ 50 mm)"
-        />
-        <div className="flex w-32 shrink-0 items-center gap-1.5">
-          <div className="flex-1">
-            <NumberInput
-              id={`altura-${solucion.id}`}
-              value={solucion.alturaCamara_mm ?? Number.NaN}
-              onChange={(v) =>
-                onPatch({ alturaCamara_mm: Number.isFinite(v) ? v : undefined })
-              }
-              min={0}
-              step={5}
-            />
-          </div>
-          <span className="text-text-disabled w-8 shrink-0 text-[11px]">mm</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Campos de la DESPRESURIZACIÓN del terreno (art. 3.3) — cualitativa: presencia
-// de los tres elementos del sistema (red de captación + extracción mecánica +
-// geotextil). Solo válida como medida ADICIONAL en Zona II.
-// -----------------------------------------------------------------------------
-function DespresurizacionFields({
-  solucion,
-  onPatch,
-}: {
-  solucion: SolucionDespresurizacionInput;
-  onPatch: (patch: Partial<SolucionDespresurizacionInput>) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <CheckRow
-        id={`captacion-${solucion.id}`}
-        label="Red de captación"
-        help="Red de captación embebida en relleno de áridos (grava) bajo la solera (art. 3.3)."
-        refText="DB-HS6 art. 3.3"
-        checked={solucion.redCaptacion}
-        onChange={(v) => onPatch({ redCaptacion: v })}
-      />
-      <CheckRow
-        id={`extraccion-${solucion.id}`}
-        label="Extracción mecánica"
-        help="Sistema de extracción mecánica conectado a la red de captación (art. 3.3)."
-        refText="DB-HS6 art. 3.3"
-        checked={solucion.extraccionMecanica}
-        onChange={(v) => onPatch({ extraccionMecanica: v })}
-      />
-      <CheckRow
-        id={`geotextil-${solucion.id}`}
-        label="Geotextil"
-        help="Geotextil de separación entre el relleno granular y el terreno (art. 3.3)."
-        refText="DB-HS6 art. 3.3"
-        checked={solucion.geotextil}
-        onChange={(v) => onPatch({ geotextil: v })}
-      />
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Tabla de resultados ACCESIBLE (WCAG: el dato SIEMPRE en texto/tabla, no solo en
-// el SVG). Resumen de exigencia (zona, nivel de referencia, medidas válidas/mín,
-// combinación suficiente) + una fila por medida con su estado/motivo + los avisos
-// del motor. Cada verificación lleva su etiqueta textual (no solo color, WCAG 1.4.1).
-// -----------------------------------------------------------------------------
-function ResultsTable({ result }: { result: HS6Result }) {
-  return (
-    <div className="max-w-3xl">
-      <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-        Verificación por medida
-      </div>
-      {result.porMedida.length === 0 ? (
-        <p className="text-text-disabled text-[12px] leading-snug">
-          No hay soluciones propuestas que verificar.
-        </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="text-text-disabled border-border-sub border-b text-left text-[11px] uppercase">
-                <th scope="col" className="py-1.5 font-medium">Medida</th>
-                <th scope="col" className="py-1.5 text-center font-medium">Cuenta</th>
-                <th scope="col" className="py-1.5 text-right font-medium">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.porMedida.map((m) => (
-                <MedidaResultRow key={m.id} m={m} critico={m.id === result.elementoCriticoId} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className="text-text-disabled mt-5 mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-        Resumen
-      </div>
-      <dl className="max-w-2xl text-[13px]">
-        <FilaResumen
-          k="Zona de radón"
-          v={`Zona ${result.zona}`}
-          sub={result.aplica ? "indexa el nivel de protección" : "sin exigencia HS6"}
-        />
-        <FilaResumen
-          k="Nivel de referencia"
-          v={`≤ ${fmt(result.nivelReferencia_Bq_m3, "Bq/m³", 0)}`}
-          sub="concentración media anual (art. 2)"
-        />
-        <FilaResumen
-          k="Nivel de protección exigido"
-          v={
-            result.aplica
-              ? `${result.nMedidasMin} medida(s)${
-                  result.barreraObligatoria ? " · barrera obligatoria" : ""
-                }`
-              : "Sin exigencia"
-          }
-          sub={result.aplica ? "art. 3.1" : result.motivoNoAplica ?? undefined}
-        />
-        {result.aplica && (
-          <FilaResumen
-            k="Combinación propuesta"
-            v={`${result.nMedidasValidas} válida(s) de ${result.nMedidasMin} exigida(s)`}
-            sub={result.combinacionSuficiente ? "suficiente" : "INSUFICIENTE"}
-            estado={result.combinacionSuficiente ? "ok" : "fail"}
-          />
-        )}
-        <FilaResumen
-          k="Veredicto global"
-          v={STATUS_LABEL[result.veredictoGlobal]}
-          estado={result.veredictoGlobal}
-        />
-      </dl>
-
-      {result.elementoCritico && (
-        <div className="mt-3">
-          <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-            Elemento crítico
-          </div>
-          <p className="text-state-fail text-[12px] leading-snug">{result.elementoCritico}</p>
-        </div>
-      )}
-
-      {/* Zona de ALCANCE Y SUPUESTOS: limitaciones agrupadas tras el resumen. */}
-      <div className="mt-5">
-        <div className="text-text-disabled mb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-          Alcance y supuestos
-        </div>
-        <DisclosureNote>
-          <span className="font-semibold">Predimensionado de Nivel A:</span> este módulo clasifica
-          por zona, comprueba la adecuación de la combinación de soluciones a la exigencia de la zona
-          y el checklist cualitativo/geométrico de cada medida. NO calcula la concentración de radón
-          resultante (eso exigiría un modelo de transporte) ni sustituye una medición en el local
-          terminado.
-        </DisclosureNote>
-        <DisclosureNote>
-          <span className="font-semibold">Barrera por cálculo (Nivel B):</span> el sub-cálculo de la
-          barrera por difusión (E &lt; Elim) está DIFERIDO (la fórmula diverge entre fuentes y no
-          está verificada literalmente). Solo se soporta la vía «lámina-tipo» (coef. difusión ≤
-          1e-11 m²/s y espesor ≥ 2 mm).
-        </DisclosureNote>
-        <p className="text-text-disabled text-[11px] leading-snug">
-          Los umbrales cuantitativos de la vía simplificada (lámina-tipo, ventilación natural, altura
-          de cámara) están transcritos por triangulación y pendientes de auditoría literal del PDF
-          maquetado. La estructura de la exigencia (ámbito art. 1, nivel de referencia art. 2,
-          niveles por zona art. 3.1 y zonas del Apéndice B) es de confianza alta.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Fila de la tabla de verificación por medida. Nombre + tipo, si CUENTA como
-// medida válida (texto, no solo color), su estado (etiqueta textual + color), y su
-// motivo bajo el nombre. La medida crítica se marca «◆ crítica» (no solo color).
-// -----------------------------------------------------------------------------
-function MedidaResultRow({ m, critico }: { m: ResultadoMedidaHS6; critico: boolean }) {
-  return (
-    <tr className="border-border-sub border-b align-top">
-      <td className="text-text-secondary py-1.5">
-        <span className="text-text-primary">{m.nombre}</span>{" "}
-        <span className="text-text-disabled text-[11px]">({TIPO_SOLUCION_LABEL[m.tipo]})</span>
-        {critico && (
-          <span className="text-state-fail ml-1 text-[11px] font-semibold">◆ crítica</span>
-        )}
-        <span className="text-text-disabled mt-0.5 block text-[11px] leading-snug">{m.motivo}</span>
-      </td>
-      <td className="py-1.5 text-center">
-        {m.cuenta ? (
-          <span className="text-state-ok text-[12px] font-semibold">Sí</span>
-        ) : (
-          <span className="text-text-disabled text-[12px]">No</span>
-        )}
-      </td>
-      <td className={`py-1.5 text-right font-semibold ${STATE_TEXT[m.estado]}`}>
-        {ESTADO_LABEL[m.estado]}
-      </td>
-    </tr>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Nota de alcance/limitación VISIBLE. Banner discreto pero no escondido: tinte
-// neutral + icono + texto. Accesible: `role="note"` y el icono es decorativo
-// (`aria-hidden`) porque el texto ya lo dice todo (no solo color).
-// -----------------------------------------------------------------------------
-function DisclosureNote({ children }: { children: ReactNode }) {
-  return (
-    <div
-      role="note"
-      className="bg-tint-neutral border-border-main text-text-secondary mb-3 flex items-start gap-2 rounded border px-3 py-2 text-[12px] leading-snug"
-    >
-      <Info size={15} className="text-text-disabled mt-0.5 shrink-0" aria-hidden="true" />
-      <p className="min-w-0">{children}</p>
-    </div>
-  );
+  return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(d);
 }

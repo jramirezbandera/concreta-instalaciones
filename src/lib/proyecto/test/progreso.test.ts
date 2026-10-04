@@ -7,6 +7,7 @@ import type {
   Proyecto,
 } from "../tipos";
 import { justificacionRegistry } from "../../../data/justificacionRegistry";
+import { edificioDeCaso } from "../../edificio/casos";
 
 // =============================================================================
 // progreso.ts — progreso DERIVADO, nunca marcado a mano (feature-6 §A, §3).
@@ -23,16 +24,8 @@ const datosObraNueva: DatosGenerales = {
   municipio: "Cáceres",
   provincia: "Cáceres",
   altitud_m: 459,
-  uso: "vivienda_colectiva",
   intervencion: "obra_nueva",
-  plantasSobreRasante: 4,
-  plantasBajoRasante: 1,
-  tipoCubierta: "plana_no_transitable",
-  numViviendas: 8,
-  tieneGaraje: true,
-  tieneTrasteros: true,
   tienePiscina: true,
-  tieneLocalPB: true,
   zonaRadon: "I",
 };
 
@@ -46,6 +39,8 @@ function proyecto(
     creado: "2026-01-01T00:00:00.000Z",
     modificado: "2026-01-01T00:00:00.000Z",
     datosGenerales: datos,
+    // Plurifamiliar con garaje y trasteros: ninguna regla de atributos desactiva nada.
+    edificio: edificioDeCaso("plurifamiliar"),
     justificaciones,
   };
 }

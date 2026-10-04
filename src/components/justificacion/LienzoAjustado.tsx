@@ -14,8 +14,15 @@ const CAJA_DEFECTO: Caja = { ancho: 640, alto: 520 };
 
 export function LienzoAjustado({
   children,
+  anchoMin,
 }: {
   children: (caja: Caja) => ReactNode;
+  /**
+   * Ancho por debajo del cual el dibujo no se encoge más (feature-14): se pinta
+   * a ese ancho y se desplaza en horizontal dentro del lienzo, no la página.
+   * Así las cifras encima del dibujo no se pisan en el móvil.
+   */
+  anchoMin?: number;
 }): JSX.Element {
   const [caja, setCaja] = useState<Caja>(CAJA_DEFECTO);
   const observerRef = useRef<ResizeObserver | null>(null);
@@ -39,14 +46,22 @@ export function LienzoAjustado({
 
   useEffect(() => () => observerRef.current?.disconnect(), []);
 
+  const estrecho = anchoMin !== undefined && caja.ancho < anchoMin;
   return (
     <div className="canvas-dot-grid bg-bg-primary relative flex min-h-[360px] flex-1 flex-col p-5 max-lg:min-h-[420px]">
       {/* La caja medida no depende del dibujo (va en absoluto dentro): si el SVG
-          la empujara, cada medida agrandaría el dibujo y este a la caja. */}
-      <div ref={ref} className="relative min-h-0 flex-1">
-        <div className="absolute inset-0 flex items-center justify-center">
-          {children(caja)}
-        </div>
+          la empujara, cada medida agrandaría el dibujo y este a la caja. En
+          estrecho solo cuenta el ancho, que no depende del contenido. */}
+      <div ref={ref} className={estrecho ? "relative min-w-0" : "relative min-h-0 flex-1"}>
+        {estrecho ? (
+          <div className="overflow-x-auto pb-2">
+            {children({ ancho: anchoMin, alto: Math.round(anchoMin * 1.6) })}
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            {children(caja)}
+          </div>
+        )}
       </div>
     </div>
   );

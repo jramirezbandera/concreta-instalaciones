@@ -1,13 +1,15 @@
 import { useContext, useEffect, useId, useState } from "react";
 import type { JSX, ReactNode } from "react";
-import { AlertTriangle, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { Topbar } from "../layout/Topbar";
 import { useDrawer } from "../layout/AppShell";
 import { getJustificacion } from "../../data/justificacionRegistry";
 import { ProyectoContext } from "../../lib/proyecto/ProyectoContext";
 import type { JustificacionKey, Veredicto } from "../../lib/proyecto/tipos";
 import type { PdfResult } from "../../lib/pdf/utils";
+import type { MemoriaDoc } from "../../lib/cte/presentacion";
 import { DelProyecto } from "./DelProyecto";
+import { MemoriaTexto } from "./MemoriaTexto";
 import { VistaMemoria } from "./VistaMemoria";
 
 // =============================================================================
@@ -38,6 +40,45 @@ export interface ResumenVeredicto {
   metricas?: string;
   /** Cita normativa; si falta se usa la edición del DB. */
   cita?: string;
+  /**
+   * La frase de la cabecera ya redactada (feature-14). Si está, sustituye a
+   * «sujeto (contexto) · métricas»; esos siguen alimentando la caché del panel.
+   */
+  frase?: string;
+}
+
+/**
+ * Un aviso con identidad (feature-14, REDISENO-V4 §3.4): se puede ver en el
+ * dibujo y marcar como revisado. Revisado, deja de contar como pendiente.
+ */
+export interface AvisoModulo {
+  id: string;
+  /** Lo que pasa, en negrita: «El garaje queda por debajo del alcantarillado.» */
+  titulo: string;
+  detalle: string;
+  revisado: boolean;
+  /** «Ver en el dibujo»: selecciona el elemento y vuelve a Esquema. */
+  onVer?: () => void;
+  /** «Marcar como revisado» / «Deshacer». */
+  onRevisar?: (revisado: boolean) => void;
+  /** Un enlace propio («Indicarla en Datos de la obra»). */
+  accion?: ReactNode;
+  /** Texto del botón de revisar (por defecto «Marcar como revisado»): «Ya está confirmada». */
+  etiquetaRevisar?: string;
+  /** Lo que dice la fila una vez revisado (por defecto, el título). */
+  textoRevisado?: string;
+}
+
+/**
+ * Algo que no cumple, a lo ancho y en rojo (feature-15): con «Ver en el dibujo»
+ * y, si lo hay, el cambio que lo arregla («Añadir grupo de presión»).
+ */
+export interface IncumplimientoModulo {
+  id: string;
+  titulo: string;
+  detalle: string;
+  onVer?: () => void;
+  accion?: { etiqueta: string; onClick: () => void };
 }
 
 /** Binding del contexto heredado del proyecto (lo produce el hook de herencia). */
@@ -71,12 +112,23 @@ export interface ModuleLayoutProps {
     onShare?: () => void;
     onReset?: () => void;
   };
-  /** Avisos del motor (texto): se muestran a lo ancho como «Por revisar». */
-  avisos?: string[];
+  /** Avisos: texto del motor, o avisos con identidad que se revisan (feature-14). */
+  avisos?: (string | AvisoModulo)[];
   /** Errores que impiden calcular o que no cumplen: barra roja. */
   errores?: string[];
+  /** Lo que no cumple, con «Ver en el dibujo» y el cambio que lo arregla (feature-15). */
+  incumplimientos?: IncumplimientoModulo[];
   /** Lo que se introduce en la columna izquierda, bajo «Del proyecto». */
   entradas?: ReactNode;
+  /**
+   * «Qué entra» (feature-14): arriba de la columna izquierda, en lugar de «Del
+   * proyecto», en los módulos que ya leen El edificio.
+   */
+  queEntra?: ReactNode;
+  /** La columna izquierda también en Comprobaciones (lista estrecha, feature-14). */
+  comprobacionesConColumna?: boolean;
+  /** Cuántas comprobaciones hay: la cabecera lo dice cuando no queda nada por revisar. */
+  totalComprobaciones?: number;
   /** El dibujo (ya dentro de su lienzo) y su franja de detalle. */
   dibujo: {
     /** Nombre accesible de la zona: «Esquema de columna», «Esquema»… */
@@ -88,8 +140,16 @@ export interface ModuleLayoutProps {
   };
   /** La lista de comprobaciones (pestaña Comprobaciones). */
   comprobaciones: ReactNode;
-  /** Genera la ficha para la pestaña Memoria. */
-  memoria?: { generar: () => Promise<PdfResult>; valid: boolean };
+  /**
+   * La pestaña Memoria: la ficha PDF (`generar`) o, desde feature-14, el texto
+   * redactado (`texto`), con la ficha a un clic.
+   */
+  memoria?:
+    | { generar: () => Promise<PdfResult>; valid: boolean }
+    | { texto: MemoriaDoc; textoPlano: string; onFichaPdf?: () => void };
+  /** Vista controlada desde el módulo («Ver en el dibujo» vuelve a Esquema). */
+  vista?: VistaModulo;
+  onVista?: (v: VistaModulo) => void;
   /** Lo que no se ve: clon del SVG para el PDF, modal de vista previa. */
   children?: ReactNode;
 }
@@ -111,18 +171,22 @@ const PILL: Record<Veredicto, string> = {
 /** Cuántos avisos se enseñan antes de «Ver N más». */
 const AVISOS_VISIBLES = 2;
 
-function Avisos({
+export function Avisos({
   avisos,
   errores,
+  incumplimientos = [],
 }: {
-  avisos: string[];
+  avisos: (string | AvisoModulo)[];
   errores: string[];
+  incumplimientos?: IncumplimientoModulo[];
 }): JSX.Element | null {
   const [todos, setTodos] = useState(false);
   const listaId = useId();
-  if (avisos.length === 0 && errores.length === 0) return null;
-  const visibles = todos ? avisos : avisos.slice(0, AVISOS_VISIBLES);
-  const ocultos = avisos.length - visibles.length;
+  const textos = avisos.filter((a): a is string => typeof a === "string");
+  const conId = avisos.filter((a): a is AvisoModulo => typeof a !== "string");
+  if (avisos.length === 0 && errores.length === 0 && incumplimientos.length === 0) return null;
+  const visibles = todos ? textos : textos.slice(0, AVISOS_VISIBLES);
+  const ocultos = textos.length - visibles.length;
 
   return (
     <div role="region" aria-label="Avisos" className="shrink-0">
@@ -140,7 +204,100 @@ function Avisos({
           </span>
         </div>
       ))}
-      {avisos.length > 0 && (
+      {incumplimientos.map((k) => (
+        <div
+          key={k.id}
+          role="status"
+          className="border-state-fail/35 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 border-b bg-[color-mix(in_srgb,var(--color-state-fail)_5%,var(--color-bg-primary))] px-6 py-2 text-[12.5px]"
+        >
+          <span className="text-state-fail flex shrink-0 items-center gap-1.5 text-[10px] font-semibold tracking-[0.09em] uppercase">
+            <XCircle size={12} aria-hidden="true" />
+            No cumple
+          </span>
+          <span className="text-text-secondary min-w-0 flex-[1_1_380px] leading-snug">
+            <b className="text-text-primary font-semibold">{k.titulo}</b> {k.detalle}
+          </span>
+          <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+            {k.onVer && (
+              <button
+                type="button"
+                onClick={k.onVer}
+                className="border-border-main bg-bg-primary text-text-secondary hover:text-text-primary h-7 rounded border px-2.5 text-[12px]"
+              >
+                Ver en el dibujo
+              </button>
+            )}
+            {k.accion && (
+              <button
+                type="button"
+                onClick={k.accion.onClick}
+                className="border-accent/50 bg-tint-accent text-accent h-7 rounded border px-2.5 text-[12px] font-medium"
+              >
+                {k.accion.etiqueta}
+              </button>
+            )}
+          </span>
+        </div>
+      ))}
+      {conId.map((a) =>
+        a.revisado ? (
+          <div
+            key={a.id}
+            className="border-border-sub bg-bg-primary text-text-disabled flex flex-wrap items-center gap-x-3.5 gap-y-1.5 border-b px-6 py-2 text-[12.5px]"
+          >
+            <span className="text-state-ok flex shrink-0 items-center gap-1.5 text-[10px] font-semibold tracking-[0.09em] uppercase">
+              <CheckCircle2 size={12} aria-hidden="true" />
+              Revisado
+            </span>
+            <span className="min-w-0 flex-1 leading-snug">{a.textoRevisado ?? a.titulo}</span>
+            {a.onRevisar && (
+              <button
+                type="button"
+                onClick={() => a.onRevisar?.(false)}
+                className="text-accent hover:text-accent-hover text-[12px]"
+              >
+                Deshacer
+              </button>
+            )}
+          </div>
+        ) : (
+          <div
+            key={a.id}
+            role="status"
+            className="border-state-warn/35 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 border-b bg-[color-mix(in_srgb,var(--color-state-warn)_6%,var(--color-bg-primary))] px-6 py-2 text-[12.5px]"
+          >
+            <span className="text-state-warn flex shrink-0 items-center gap-1.5 text-[10px] font-semibold tracking-[0.09em] uppercase">
+              <AlertTriangle size={12} aria-hidden="true" />
+              Por revisar
+            </span>
+            <span className="text-text-secondary min-w-0 flex-[1_1_380px] leading-snug">
+              <b className="text-text-primary font-semibold">{a.titulo}</b> {a.detalle}
+            </span>
+            <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {a.accion}
+              {a.onVer && (
+                <button
+                  type="button"
+                  onClick={a.onVer}
+                  className="border-border-main bg-bg-primary text-text-secondary hover:text-text-primary h-7 rounded border px-2.5 text-[12px]"
+                >
+                  Ver en el dibujo
+                </button>
+              )}
+              {a.onRevisar && (
+                <button
+                  type="button"
+                  onClick={() => a.onRevisar?.(true)}
+                  className="border-accent/50 bg-tint-accent text-accent h-7 rounded border px-2.5 text-[12px] font-medium"
+                >
+                  {a.etiquetaRevisar ?? "Marcar como revisado"}
+                </button>
+              )}
+            </span>
+          </div>
+        ),
+      )}
+      {textos.length > 0 && (
         <div className="border-state-warn/35 flex items-start gap-3 border-b bg-[color-mix(in_srgb,var(--color-state-warn)_6%,var(--color-bg-primary))] px-6 py-2 text-[12.5px]">
           <span className="text-state-warn flex shrink-0 items-center gap-1.5 pt-px text-[10px] font-semibold tracking-[0.09em] uppercase">
             <AlertTriangle size={12} aria-hidden="true" />
@@ -154,7 +311,7 @@ function Avisos({
               <li key={i}>{a}</li>
             ))}
           </ul>
-          {avisos.length > AVISOS_VISIBLES && (
+          {textos.length > AVISOS_VISIBLES && (
             <button
               type="button"
               onClick={() => setTodos((t) => !t)}
@@ -184,10 +341,16 @@ export function ModuleLayout({
   acciones,
   avisos = [],
   errores = [],
+  incumplimientos = [],
   entradas,
+  queEntra,
+  comprobacionesConColumna = false,
+  totalComprobaciones,
   dibujo,
   comprobaciones,
   memoria,
+  vista: vistaControlada,
+  onVista,
   children,
 }: ModuleLayoutProps): JSX.Element {
   const { openDrawer } = useDrawer();
@@ -195,7 +358,12 @@ export function ModuleLayout({
   // NUNCA useProyecto() (que lanza fuera del provider).
   const ctx = useContext(ProyectoContext);
   const entry = getJustificacion(justificacionKey);
-  const [vista, setVista] = useState<VistaModulo>("esquema");
+  const [vistaLocal, setVistaLocal] = useState<VistaModulo>("esquema");
+  const vista = vistaControlada ?? vistaLocal;
+  const setVista = (v: VistaModulo) => {
+    setVistaLocal(v);
+    onVista?.(v);
+  };
   const tabsId = useId();
 
   // Persiste el último veredicto en el proyecto. Solo con proyecto activo y
@@ -216,16 +384,17 @@ export function ModuleLayout({
   const titulo = entry?.label ?? justificacionKey;
   const grupo = (entry?.grupo ?? "").replace(/\s*\(.*\)\s*$/, "");
   const cita = resultado?.cita ?? entry?.edicionDB ?? "";
-  const porRevisar = avisos.length;
+  const porRevisar = avisos.filter((a) => typeof a === "string" || !a.revisado).length;
   const pistas = vista === "memoria" ? [] : avisos;
 
   // En móvil las zonas se apilan con el dibujo (o la lista) primero: lo
   // principal arriba; lo que se introduce, debajo.
   const columnaIzquierda = (
     <div className="scroll-hide border-border-main min-w-0 shrink-0 px-5 pb-6 max-lg:order-last max-lg:border-t lg:w-[300px] lg:shrink-0 lg:overflow-y-auto lg:border-r xl:w-[320px]">
-      {ctx?.proyecto && (
-        <DelProyecto proyectoId={ctx.proyecto.id} herencia={herencia} />
-      )}
+      {queEntra ??
+        (ctx?.proyecto && (
+          <DelProyecto proyectoId={ctx.proyecto.id} herencia={herencia} />
+        ))}
       {entradas}
     </div>
   );
@@ -264,16 +433,26 @@ export function ModuleLayout({
                   ? ETIQUETA_VEREDICTO[resultado.veredicto]
                   : "Sin datos suficientes"}
               </span>
-              {porRevisar > 0 && (
+              {porRevisar > 0 ? (
                 <span className="text-state-warn text-[12.5px] font-medium">
                   {porRevisar === 1
                     ? "1 cosa por revisar"
                     : `${porRevisar} cosas por revisar`}
                 </span>
+              ) : (
+                totalComprobaciones !== undefined &&
+                resultado && (
+                  <span className="text-text-disabled text-[12.5px]">
+                    {totalComprobaciones} comprobaciones
+                    {avisos.length > 0 ? " · todo revisado" : ""}
+                  </span>
+                )
               )}
             </div>
             <p className="text-text-secondary max-w-[880px] text-[13.5px] leading-snug">
-              {resultado ? (
+              {resultado?.frase ? (
+                resultado.frase
+              ) : resultado ? (
                 <>
                   {resultado.sujeto}
                   {resultado.contexto && ` (${resultado.contexto})`}
@@ -322,7 +501,11 @@ export function ModuleLayout({
           </div>
         </header>
 
-        <Avisos avisos={pistas} errores={vista === "memoria" ? [] : errores} />
+        <Avisos
+          avisos={pistas}
+          errores={vista === "memoria" ? [] : errores}
+          incumplimientos={vista === "memoria" ? [] : incumplimientos}
+        />
 
         <div
           id={`${tabsId}-panel`}
@@ -331,7 +514,9 @@ export function ModuleLayout({
           className="flex min-h-0 flex-1 flex-col max-lg:flex-none lg:flex-row"
         >
           {vista === "memoria" ? (
-            memoria ? (
+            memoria && "texto" in memoria ? (
+              <MemoriaTexto doc={memoria.texto} textoPlano={memoria.textoPlano} onFichaPdf={memoria.onFichaPdf} />
+            ) : memoria ? (
               <VistaMemoria generar={memoria.generar} valid={memoria.valid} />
             ) : (
               <p className="text-text-disabled p-6 text-[13px]">
@@ -340,7 +525,7 @@ export function ModuleLayout({
             )
           ) : (
             <>
-              {vista === "esquema" && columnaIzquierda}
+              {(vista === "esquema" || comprobacionesConColumna) && columnaIzquierda}
               {vista === "esquema" ? (
                 <aside
                   aria-label={dibujo.titulo}

@@ -3,7 +3,6 @@ import { CabeceraProyecto } from "../components/proyecto/CabeceraProyecto";
 import { ChecklistJustificaciones } from "../components/proyecto/ChecklistJustificaciones";
 import { TarjetaAnejo } from "../components/proyecto/TarjetaAnejo";
 import { TarjetaDatosProyecto } from "../components/proyecto/TarjetaDatosProyecto";
-import { TarjetaViviendasTipo } from "../components/proyecto/TarjetaViviendasTipo";
 
 // Dashboard del expediente (feature-6 T3.5, UX-RECONCEPT §4.2) — la pieza nueva
 // más importante: responde a "¿por dónde empiezo?" (checklist con estados) y
@@ -22,7 +21,6 @@ export function DashboardPage(): JSX.Element {
           <ChecklistJustificaciones />
           <div className="flex min-w-0 flex-col gap-4">
             <TarjetaAnejo />
-            <TarjetaViviendasTipo />
             <TarjetaDatosProyecto />
           </div>
         </div>

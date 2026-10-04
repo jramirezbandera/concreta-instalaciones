@@ -5,19 +5,15 @@ import { DEMO_ID } from "../../../lib/proyecto/demo";
 import { inicializarStorage } from "../../../lib/proyecto/storage";
 
 // =============================================================================
-// Integración de la zona de trabajo HS5 (feature-7 §C, anatomía v4) sobre el
-// router real: outliner en la pestaña Comprobaciones (filas de tramos y
-// aparatos), presets, teclado (Enter añade) y sincronía tabla → franja de
-// selección, que se ve bajo la lista y bajo el esquema. Mismo patrón que
-// `src/test/rutas.test.tsx` (router de módulo-nivel: hash ANTES de importar App
-// y resetModules; archivo propio para respetar el límite de ~3 routers/jsdom).
-//
-// NO se aserta el detalle del SVG (tiene sus tests propios): aquí se valida el
-// cableado outliner ↔ estado ↔ motor ↔ banda/selección.
+// HS5 v4 (feature-14) sobre el router real y el Demo («Plurifamiliar con
+// locales», cota del alcantarillado −1,20, sin zona pluviométrica): cabecera
+// redactada, «Qué entra», decisiones, cifras del dibujo, franja, avisos que se
+// revisan, lista de comprobaciones, memoria y «Ajustar a mano». Mismo patrón que
+// `src/test/rutas.test.tsx` (hash ANTES de importar App y resetModules).
+// El detalle del SVG y de los textos tiene sus tests propios.
 // =============================================================================
 
-// El módulo es LAZY: el primer render del archivo paga la carga del chunk, así
-// que cada test espera el treegrid con timeout largo (patrón rutas-legacy).
+// El módulo es LAZY: el primer render del archivo paga la carga del chunk.
 const ESPERA_CHUNK = { timeout: 8000 };
 
 async function renderHs5() {
@@ -25,10 +21,7 @@ async function renderHs5() {
   vi.resetModules();
   const { App } = await import("../../../App");
   const utils = render(<App />);
-  // Abre en Esquema (el dibujo manda); la tabla de tramos vive en Comprobaciones.
-  await utils.findByRole("complementary", { name: "Esquema de columna" }, ESPERA_CHUNK);
-  await userEvent.setup().click(utils.getByRole("tab", { name: "Comprobaciones" }));
-  await utils.findByRole("treegrid");
+  await utils.findByRole("complementary", { name: "Esquema de columnas" }, ESPERA_CHUNK);
   return utils;
 }
 
@@ -39,97 +32,96 @@ beforeEach(() => {
   inicializarStorage("2026-08-23T00:00:00.000Z");
 });
 
-describe("HS5 · zona de trabajo feature-7 (outliner + esquema)", () => {
-  it("monta el outliner con las filas del Demo (tramos + aparatos) y la banda del veredicto", async () => {
-    const { findByDisplayValue, findByText } = await renderHs5();
+describe("HS5 · desde El edificio (feature-14)", () => {
+  it("cabecera redactada, qué entra, decisiones y la franja del colector", async () => {
+    const { findAllByText, findByText, getByRole, findByRole } = await renderHs5();
 
-    // Jerarquía del Demo: colector (raíz), bajante, ramales y aparatos como
-    // filas con editor de nombre inline (el treegrid ya lo esperó renderHs5).
-    expect(await findByDisplayValue("colector")).toBeInTheDocument();
-    expect(await findByDisplayValue("bajante")).toBeInTheDocument();
-    expect(await findByDisplayValue("ramal-bano")).toBeInTheDocument();
-    expect(await findByDisplayValue("bano-completo")).toBeInTheDocument();
+    // La frase va en la cabecera (y en la descripción accesible del dibujo).
+    const frases = await findAllByText(/Cuatro bajantes de residuales, dos de pluviales y colector colgado Ø110 al 2 %/);
+    expect(frases.some((f) => f.tagName === "P")).toBe(true);
+    expect(await findByText("2 cosas por revisar")).toBeInTheDocument();
 
-    // La cabecera del módulo refleja el motor sobre el Demo.
-    expect(await findByText(/Red de evacuación/)).toBeInTheDocument();
+    const entra = getByRole("region", { name: "Qué entra" });
+    expect(entra).toHaveTextContent(/Viviendas.*P1–P3 · 6 · A 23 UD · B 22 UD/);
+    expect(entra).toHaveTextContent(/Garaje.*bombeo/);
+    expect(entra).toHaveTextContent(/Local.*previsión/);
+    expect(within(entra).getByRole("link", { name: "Editar el edificio" })).toHaveAttribute("href", `#/p/${DEMO_ID}/edificio`);
+
+    const decisiones = getByRole("region", { name: "Decisiones" });
+    expect(within(decisiones).getByRole("button", { name: "Unitario" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(decisiones).getByRole("button", { name: "Colgados" })).toHaveAttribute("aria-pressed", "true");
+
+    // Sin selección, la franja enseña el colector general.
+    const aside = await findByRole("complementary", { name: "Esquema de columnas" });
+    expect(aside).toHaveTextContent(/Lo que manda.*Las unidades de desagüe\. Con Ø90 solo admitiría 130 UD y le llegan 135\./);
   });
 
-  it("el preset «+ Cocina» crea el ramal con sus 3 aparatos y recalcula", async () => {
+  it("pulsar una cifra del dibujo la explica; cambiar la pendiente cambia lo que manda", async () => {
     const user = userEvent.setup();
-    const { findByRole, findByDisplayValue, findAllByDisplayValue } =
-      await renderHs5();
+    const { getByRole, findByRole } = await renderHs5();
+    const aside = await findByRole("complementary", { name: "Esquema de columnas" });
 
-    await user.click(await findByRole("button", { name: "+ Cocina" }));
+    await user.click(within(aside).getByRole("button", { name: /^Bajante A · cocina: Ø75, cumple$/ }));
+    await waitFor(() => expect(aside).toHaveTextContent(/Cumple justo en el límite de Ø75/));
 
-    // Ramal nuevo con el nombre del preset + fregadero/lavavajillas/lavadora
-    // (los del Demo ya existen: el preset añade una segunda tanda). En selects,
-    // el display value es el TEXTO de la opción seleccionada.
-    expect(await findByDisplayValue("Ramal cocina")).toBeInTheDocument();
-    await waitFor(async () => {
-      expect(await findAllByDisplayValue("Fregadero de cocina")).toHaveLength(
-        2,
-      );
-    });
-
-    // La franja de selección apunta al ramal recién creado.
-    const lista = await findByRole("region", { name: "Comprobaciones" });
-    await waitFor(() => {
-      expect(lista).toHaveTextContent(/Seleccionado: Ramal cocina/);
-    });
-  });
-
-  it("Enter sobre una fila de tramo añade un tramo hermano (teclado primero)", async () => {
-    const user = userEvent.setup();
-    const { findByDisplayValue, findAllByRole } = await renderHs5();
-
-    // Seleccionar la fila del ramal del baño (clic fuera de un editor: en el tr).
-    const inputRamal = await findByDisplayValue("ramal-bano");
-    const fila = inputRamal.closest("tr")!;
-    await user.click(fila);
-    const antes = (await findAllByRole("row")).length;
-
-    await user.keyboard("{Enter}");
-
-    // Aparece el tramo nuevo con id determinista "t1" y una fila más.
-    expect(await findByDisplayValue("t1")).toBeInTheDocument();
-    await waitFor(async () => {
-      expect((await findAllByRole("row")).length).toBe(antes + 1);
-    });
-  });
-
-  it("«Del proyecto» muestra lo heredado y abre las excepciones locales", async () => {
-    const user = userEvent.setup();
-    const { findByRole, getByRole } = await renderHs5();
-
-    // «Del proyecto» vive en la columna izquierda de Esquema.
-    await user.click(getByRole("tab", { name: "Esquema" }));
-    const delProyecto = await findByRole("region", { name: "Del proyecto" });
-    expect(delProyecto).toHaveTextContent(/Nº de plantas\s*4/);
-    expect(within(delProyecto).getByRole("link", { name: "Cambiar en El edificio" })).toHaveAttribute(
-      "href",
-      `#/p/${DEMO_ID}/datos`,
+    const decisiones = getByRole("region", { name: "Decisiones" });
+    await user.click(within(decisiones).getByRole("button", { name: "4 %" }));
+    await user.click(within(aside).getByRole("button", { name: /^Colector general: Ø110 · 4 %/ }));
+    await waitFor(() =>
+      expect(aside).toHaveTextContent(/Las bajantes\. Por unidades bastaría Ø90 \(160 UD\)/),
     );
-
-    await user.click(within(delProyecto).getByRole("button", { name: /Nº de plantas/ }));
-    expect(
-      await findByRole("dialog", { name: "Excepciones locales del contexto heredado" }),
-    ).toBeInTheDocument();
+    expect(within(decisiones).getByText("No es lo habitual.")).toBeInTheDocument();
   });
 
-  it("seleccionar una fila muestra su resumen en la franja, también bajo el esquema", async () => {
+  it("el aviso del garaje se revisa y se deshace", async () => {
     const user = userEvent.setup();
-    const { findByDisplayValue, findByRole, getByRole } = await renderHs5();
+    const { getByRole, findByText } = await renderHs5();
+    const avisos = getByRole("region", { name: "Avisos" });
+    expect(avisos).toHaveTextContent("El garaje queda por debajo del alcantarillado.");
+    expect(avisos).toHaveTextContent("Falta la intensidad de lluvia.");
 
-    const inputBajante = await findByDisplayValue("bajante");
-    await user.click(inputBajante.closest("tr")!);
+    const [revisarGaraje] = within(avisos).getAllByRole("button", { name: "Marcar como revisado" });
+    await user.click(revisarGaraje);
+    expect(await findByText("1 cosa por revisar")).toBeInTheDocument();
+    await user.click(within(avisos).getByRole("button", { name: "Deshacer" }));
+    expect(await findByText("2 cosas por revisar")).toBeInTheDocument();
+  });
 
-    // La selección sobrevive al cambio de pestaña: la franja del esquema la muestra.
+  it("Comprobaciones es la lista; Memoria, el texto con «Copiar texto»", async () => {
+    const user = userEvent.setup();
+    const { getByRole, findByRole } = await renderHs5();
+
+    await user.click(getByRole("tab", { name: "Comprobaciones" }));
+    const lista = await findByRole("list", { name: /^Comprobaciones: 12 · 2 por revisar$/ });
+    expect(within(lista).getByRole("button", { name: /Colector general\s*Ø110 · 42 %\s*cumple/ })).toBeInTheDocument();
+    expect(within(lista).getByRole("button", { name: /Local sin uso\s*Ø110\s*previsto/ })).toBeInTheDocument();
+
+    await user.click(getByRole("tab", { name: "Memoria" }));
+    const memoria = await findByRole("region", { name: "Memoria" });
+    expect(memoria).toHaveTextContent(/La red de evacuación se ha dimensionado conforme a la sección HS 5/);
+    expect(within(memoria).getByRole("button", { name: "Copiar texto" })).toBeInTheDocument();
+  });
+
+  it("«Ajustar a mano» pasa la red a la tabla de tramos y se puede volver", async () => {
+    const user = userEvent.setup();
+    const { getByRole, findByRole, findByDisplayValue, findAllByRole } = await renderHs5();
+
+    await user.click(getByRole("tab", { name: "Comprobaciones" }));
+    const ajustar = await findByRole("button", { name: "Ajustar a mano" });
+    await user.click(ajustar);
+    await user.click(await findByRole("button", { name: "¿Pasar la red a la tabla?" }));
+
+    await findByRole("treegrid");
+    expect(await findByDisplayValue("Colector general")).toBeInTheDocument();
+    expect(await findByDisplayValue("Bajante A · fecales")).toBeInTheDocument();
+    expect((await findAllByRole("row")).length).toBeGreaterThan(20);
+
+    // El dibujo pasa al esquema de columna y la izquierda ofrece volver.
     await user.click(getByRole("tab", { name: "Esquema" }));
-    const aside = await findByRole("complementary", {
-      name: "Esquema de columna",
-    });
-    await waitFor(() => {
-      expect(aside).toHaveTextContent(/Seleccionado: bajante — Ø\d+/);
-    });
+    await findByRole("complementary", { name: "Esquema de columna" });
+    const volver = getByRole("button", { name: "Volver a generar desde El edificio" });
+    await user.click(volver);
+    await user.click(await findByRole("button", { name: "¿Descartar la tabla y volver a generarla?" }));
+    await findByRole("complementary", { name: "Esquema de columnas" });
   });
 });

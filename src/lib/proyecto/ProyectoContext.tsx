@@ -17,12 +17,12 @@ import type {
   DatosGenerales,
   JustificacionEnProyecto,
   JustificacionKey,
+  Edificio,
   Proyecto,
-  RepartoPlanta,
   ResultadoCache,
-  ViviendaTipo,
 } from "./tipos";
 import { derivarContexto } from "./derivar";
+import { resumenEdificio } from "../edificio/derivar";
 import { guardarProyecto } from "./storage";
 
 // =============================================================================
@@ -61,7 +61,7 @@ const DEBOUNCE_MS = 300;
  * barra de contexto en vez de un crash. Constante de módulo → identidad estable
  * entre renders (no rompe memos aguas abajo).
  */
-const DERIVADOS_FALLBACK: ContextoDerivado = {
+const CLIMA_FALLBACK: Omit<ContextoDerivado, "edificio"> = {
   zonaClimatica: {
     valor: "D3",
     procedencia: "provincia no reconocida — revisar Datos generales (fallback de la herramienta)",
@@ -78,7 +78,7 @@ const DERIVADOS_FALLBACK: ContextoDerivado = {
 
 export interface ProyectoContextValue {
   proyecto: Proyecto;
-  /** Contexto derivado de los datos generales (memoizado); ver `DERIVADOS_FALLBACK`. */
+  /** Contexto derivado de la obra y del edificio (memoizado); ver `CLIMA_FALLBACK`. */
   derivados: ContextoDerivado;
   actualizarDatosGenerales(dg: DatosGenerales, nowIso: string): void;
   /** Renombra el expediente (edición del usuario → toca `modificado`). */
@@ -87,19 +87,13 @@ export interface ProyectoContextValue {
   /** Cache del veredicto — coalesce en el mismo tick de persist que los inputs (un solo timer). */
   actualizarResultado(key: JustificacionKey, cache: ResultadoCache): void;
   setOverridesContexto(key: JustificacionKey, campos: string[]): void;
-  /**
-   * Viviendas tipo + reparto por planta (feature-8 §C). Es edición del usuario
-   * → recibe `nowIso` y toca `modificado`. Listas vacías ⇒ campos eliminados
-   * (JSON persistido limpio, mismo criterio que overrides/refExterna).
-   */
-  actualizarViviendasTipo(
-    viviendasTipo: ViviendaTipo[] | undefined,
-    repartoPlantas: RepartoPlanta[] | undefined,
-    nowIso: string,
-  ): void;
+  /** El edificio entero (feature-12). Edición del usuario → toca `modificado`. */
+  actualizarEdificio(edificio: Edificio, nowIso: string): void;
   /** `valor: null` quita el forzado y vuelve a mandar `aplicabilidadBase`. */
   forzarAplicabilidad(key: JustificacionKey, valor: Aplicabilidad | null, nota?: string): void;
   setRefExterna(key: JustificacionKey, ref: string): void;
+  /** Marca (o desmarca) un aviso de una justificación como revisado (feature-14). */
+  marcarRevisado(key: JustificacionKey, avisoId: string, revisado: boolean): void;
 }
 
 export const ProyectoContext = createContext<ProyectoContextValue | null>(null);
@@ -188,8 +182,12 @@ export function ProyectoProvider(props: {
   // Derivados memoizados de los datos generales (la referencia solo cambia si
   // cambia `datosGenerales`, que las mutaciones reemplazan de forma inmutable).
   const derivados = useMemo<ContextoDerivado>(
-    () => derivarContexto(proyecto.datosGenerales) ?? DERIVADOS_FALLBACK,
-    [proyecto.datosGenerales],
+    () =>
+      derivarContexto(proyecto.datosGenerales, proyecto.edificio) ?? {
+        ...CLIMA_FALLBACK,
+        edificio: resumenEdificio(proyecto.edificio),
+      },
+    [proyecto.datosGenerales, proyecto.edificio],
   );
 
   const actualizarDatosGenerales = useCallback((dg: DatosGenerales, nowIso: string) => {
@@ -218,22 +216,9 @@ export function ProyectoProvider(props: {
     );
   }, []);
 
-  const actualizarViviendasTipo = useCallback(
-    (
-      viviendasTipo: ViviendaTipo[] | undefined,
-      repartoPlantas: RepartoPlanta[] | undefined,
-      nowIso: string,
-    ) => {
-      setProyecto((prev) => ({
-        ...prev,
-        viviendasTipo: viviendasTipo && viviendasTipo.length > 0 ? viviendasTipo : undefined,
-        repartoPlantas:
-          repartoPlantas && repartoPlantas.length > 0 ? repartoPlantas : undefined,
-        modificado: nowIso,
-      }));
-    },
-    [],
-  );
+  const actualizarEdificio = useCallback((edificio: Edificio, nowIso: string) => {
+    setProyecto((prev) => ({ ...prev, edificio, modificado: nowIso }));
+  }, []);
 
   const forzarAplicabilidad = useCallback(
     (key: JustificacionKey, valor: Aplicabilidad | null, nota?: string) => {
@@ -251,6 +236,16 @@ export function ProyectoProvider(props: {
     setProyecto((prev) => conJustificacion(prev, key, { refExterna: ref !== "" ? ref : undefined }));
   }, []);
 
+  const marcarRevisado = useCallback((key: JustificacionKey, avisoId: string, revisado: boolean) => {
+    setProyecto((prev) => {
+      const actuales = prev.justificaciones[key]?.revisados ?? [];
+      const sin = actuales.filter((id) => id !== avisoId);
+      const revisados = revisado ? [...sin, avisoId] : sin;
+      // Lista vacía → se elimina el campo (JSON persistido limpio).
+      return conJustificacion(prev, key, { revisados: revisados.length > 0 ? revisados : undefined });
+    });
+  }, []);
+
   const value = useMemo<ProyectoContextValue>(
     () => ({
       proyecto,
@@ -260,9 +255,10 @@ export function ProyectoProvider(props: {
       actualizarInputs,
       actualizarResultado,
       setOverridesContexto,
-      actualizarViviendasTipo,
+      actualizarEdificio,
       forzarAplicabilidad,
       setRefExterna,
+      marcarRevisado,
     }),
     [
       proyecto,
@@ -272,9 +268,10 @@ export function ProyectoProvider(props: {
       actualizarInputs,
       actualizarResultado,
       setOverridesContexto,
-      actualizarViviendasTipo,
+      actualizarEdificio,
       forzarAplicabilidad,
       setRefExterna,
+      marcarRevisado,
     ],
   );
 

@@ -2,12 +2,13 @@
 // DB-HS5 — Evacuación de aguas (saneamiento). Tablas y valores normativos como
 // DATOS versionados con procedencia (SPEC §4/§11, trazabilidad innegociable).
 //
-// Edición: DB-HS Sección HS5, edición 2009 (no modificada). Cada cifra va
-// envuelta en `tablaCTE()` con su `ProcedenciaCTE`. Nunca hardcodear cifras
-// sueltas en la lógica: la procedencia alimenta la cita legal de la ficha.
+// Edición: DB-HS Sección HS5, texto consolidado de 14-06-2022, con las tablas
+// sin cambios desde 2009 (verificado en feature-14). Cada cifra va envuelta en
+// `tablaCTE()` con su `ProcedenciaCTE`. Nunca hardcodear cifras sueltas en la
+// lógica: la procedencia alimenta la cita legal de la ficha.
 //
-// Fuente primaria de valores: research Fase 0 del feature-2 (datos VERIFICADOS).
-// Todas las tablas reproducen literalmente el DB-HS5-2009 (codigotecnico.org).
+// Fuente primaria de valores: research Fase 0 del feature-2 (datos VERIFICADOS)
+// y, para pluviales y arquetas, `research/verificacion-hs5-pluviales.md`.
 //
 // Unidades canónicas (src/lib/units/types.ts): UD (unidades de desagüe),
 // mm (diámetros), % (pendientes), m (longitudes), dm³/s (desagües continuos),
@@ -16,13 +17,17 @@
 
 import { tablaCTE } from "../../lib/cte/tabla";
 
-/** Procedencia base común a todo el DB-HS5 edición 2009 (no modificada). */
+/**
+ * Procedencia base común a todo el DB-HS5. Edición vigente: texto consolidado
+ * de 14-06-2022; articulado y tablas sin cambios desde la versión de
+ * 23-09-2009 (solo cambian las referencias UNE del ap. 6.2 y del apéndice C).
+ * Verificado en `research/verificacion-hs5-pluviales.md` §F (feature-14).
+ */
 const PROC_HS5 = {
   db: "DB-HS5",
-  edicion: "2009",
-  /** Fecha de la edición 2009 del DB-HS (Orden VIV/984/2009, BOE 23/04/2009). */
-  fecha: "2009-04-23",
-  fuente: "codigotecnico.org · DB-HS Sección HS5",
+  edicion: "Consolidado 14-06-2022 (tablas sin cambios desde 23-09-2009)",
+  fecha: "2022-06-14",
+  fuente: "codigotecnico.org · DBHS.pdf, Sección HS 5",
 } as const;
 
 /** Diámetros nominales [mm] usados por las tablas de dimensionado del DB-HS5. */
@@ -447,6 +452,144 @@ export const VALVULAS_AIREACION = tablaCTE(
   {
     maxPlantasUnaValvula: 5,
     plantasPorValvulaSiMas: 4,
+  } as const,
+);
+
+// =============================================================================
+// PLUVIALES — ap. 4.2 y apéndice B (feature-14). Las superficies de las tablas
+// 4.7, 4.8 y 4.9 son en proyección horizontal y para 100 mm/h; con otra
+// intensidad, la superficie servida se multiplica por f = i / 100 (ap. 4.2.2
+// pto 2 y 4.2.3 pto 2; en la 4.9 por criterio, porque el ap. 4.2.4 no lo dice).
+// Verificado celda a celda en `research/verificacion-hs5-pluviales.md` §A.
+// =============================================================================
+
+/** Zona pluviométrica de la Figura B.1. */
+export type ZonaPluviometrica = "A" | "B";
+
+/** Isoyetas de la Tabla B.1 [mm]. */
+export const ISOYETAS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120] as const;
+export type Isoyeta = (typeof ISOYETAS)[number];
+
+// -----------------------------------------------------------------------------
+// Tabla 4.6 — Número de sumideros según la superficie de cubierta.
+// -----------------------------------------------------------------------------
+export const SUMIDEROS_TABLA_4_6 = tablaCTE(
+  { ...PROC_HS5, articulo: "ap. 4.2.1", tabla: "Tabla 4.6" },
+  {
+    /**
+     * Tramos por superficie [m²]: hasta `hasta_m2` (excluido) → `sumideros`.
+     * S = 500 exacto no lo cubre el DB: por criterio va con «1 cada 150 m²»
+     * redondeado hacia arriba (da 4, sin salto).
+     */
+    tramos: [
+      { hasta_m2: 100, sumideros: 2 },
+      { hasta_m2: 200, sumideros: 3 },
+      { hasta_m2: 500, sumideros: 4 },
+    ],
+    /** Por encima del último tramo: un sumidero cada `cada_m2`. */
+    cadaM2PorEncima: 150,
+  } as const,
+);
+
+// -----------------------------------------------------------------------------
+// Tabla 4.7 — Canalones semicirculares: superficie máxima [m²] por Ø y pendiente.
+// -----------------------------------------------------------------------------
+export interface FilaCanalon4_7 {
+  readonly diametro_mm: number;
+  readonly p05: number;
+  readonly p1: number;
+  readonly p2: number;
+  readonly p4: number;
+}
+
+export const CANALONES_TABLA_4_7 = tablaCTE(
+  { ...PROC_HS5, articulo: "ap. 4.2.2", tabla: "Tabla 4.7" },
+  {
+    filas: [
+      { diametro_mm: 100, p05: 35, p1: 45, p2: 65, p4: 95 },
+      { diametro_mm: 125, p05: 60, p1: 80, p2: 115, p4: 165 },
+      { diametro_mm: 150, p05: 90, p1: 125, p2: 175, p4: 255 },
+      { diametro_mm: 200, p05: 185, p1: 260, p2: 370, p4: 520 },
+      { diametro_mm: 250, p05: 335, p1: 475, p2: 670, p4: 930 },
+    ] satisfies readonly FilaCanalon4_7[],
+  },
+);
+
+// -----------------------------------------------------------------------------
+// Tabla 4.8 — Bajantes de pluviales: superficie máxima servida [m²] por Ø.
+// -----------------------------------------------------------------------------
+export const BAJANTES_PLUVIALES_TABLA_4_8 = tablaCTE(
+  { ...PROC_HS5, articulo: "ap. 4.2.3", tabla: "Tabla 4.8" },
+  {
+    filas: [
+      { diametro_mm: 50, superficie_m2: 65 },
+      { diametro_mm: 63, superficie_m2: 113 },
+      { diametro_mm: 75, superficie_m2: 177 },
+      { diametro_mm: 90, superficie_m2: 318 },
+      { diametro_mm: 110, superficie_m2: 580 },
+      { diametro_mm: 125, superficie_m2: 805 },
+      { diametro_mm: 160, superficie_m2: 1544 },
+      { diametro_mm: 200, superficie_m2: 2700 },
+    ],
+  } as const,
+);
+
+// -----------------------------------------------------------------------------
+// Tabla 4.9 — Colectores de pluviales: superficie máxima [m²] por Ø y pendiente.
+// -----------------------------------------------------------------------------
+export const COLECTORES_PLUVIALES_TABLA_4_9 = tablaCTE(
+  { ...PROC_HS5, articulo: "ap. 4.2.4", tabla: "Tabla 4.9" },
+  {
+    filas: [
+      { diametro_mm: 90, p1: 125, p2: 178, p4: 253 },
+      { diametro_mm: 110, p1: 229, p2: 323, p4: 458 },
+      { diametro_mm: 125, p1: 310, p2: 440, p4: 620 },
+      { diametro_mm: 160, p1: 614, p2: 862, p4: 1228 },
+      { diametro_mm: 200, p1: 1070, p2: 1510, p4: 2140 },
+      { diametro_mm: 250, p1: 1920, p2: 2710, p4: 3850 },
+      // 2016 a 1 % es el literal de todas las versiones leídas; por proporción
+      // con las demás filas parece una errata (≈ 3 250). Se usa el literal, que
+      // queda del lado de la seguridad.
+      { diametro_mm: 315, p1: 2016, p2: 4589, p4: 6500 },
+    ] satisfies readonly FilaPendiente[],
+  },
+);
+
+// -----------------------------------------------------------------------------
+// Apéndice B — Tabla B.1: intensidad pluviométrica i [mm/h] por zona e isoyeta.
+// La zona y la isoyeta se leen de la Figura B.1 (mapa).
+// -----------------------------------------------------------------------------
+export const INTENSIDAD_TABLA_B_1 = tablaCTE(
+  { ...PROC_HS5, articulo: "Apéndice B", tabla: "Tabla B.1" },
+  {
+    /** Intensidad de referencia de las tablas 4.7, 4.8 y 4.9 [mm/h]. */
+    referencia_mm_h: 100,
+    porZona: {
+      A: { 10: 30, 20: 65, 30: 90, 40: 125, 50: 155, 60: 180, 70: 210, 80: 240, 90: 275, 100: 300, 110: 330, 120: 365 },
+      B: { 10: 30, 20: 50, 30: 70, 40: 90, 50: 110, 60: 135, 70: 150, 80: 170, 90: 195, 100: 220, 110: 240, 120: 265 },
+    } satisfies Record<ZonaPluviometrica, Record<Isoyeta, number>>,
+  },
+);
+
+// -----------------------------------------------------------------------------
+// Tabla 4.13 — Dimensiones mínimas de las arquetas según el Ø del colector de
+// salida. Las columnas son de 100 en 50 mm; para los Ø de PVC (90, 110, 125,
+// 160) se toma por criterio la primera columna ≥ Ø nominal.
+// -----------------------------------------------------------------------------
+export const ARQUETAS_TABLA_4_13 = tablaCTE(
+  { ...PROC_HS5, articulo: "ap. 4.5 pto 1", tabla: "Tabla 4.13" },
+  {
+    filas: [
+      { diametro_mm: 100, largo_cm: 40, ancho_cm: 40 },
+      { diametro_mm: 150, largo_cm: 50, ancho_cm: 50 },
+      { diametro_mm: 200, largo_cm: 60, ancho_cm: 60 },
+      { diametro_mm: 250, largo_cm: 60, ancho_cm: 70 },
+      { diametro_mm: 300, largo_cm: 70, ancho_cm: 70 },
+      { diametro_mm: 350, largo_cm: 70, ancho_cm: 80 },
+      { diametro_mm: 400, largo_cm: 80, ancho_cm: 80 },
+      { diametro_mm: 450, largo_cm: 80, ancho_cm: 90 },
+      { diametro_mm: 500, largo_cm: 90, ancho_cm: 90 },
+    ],
   } as const,
 );
 

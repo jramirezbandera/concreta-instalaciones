@@ -20,20 +20,21 @@
 // `motivo: string` de cada solución, y un `elementoCriticoId` para que el SVG
 // resalte la medida que falta o el requisito incumplido.
 //
-// QUÉ CALCULA (art. 1/2/3 del DB-HS6):
-//   1) APLICABILIDAD: ámbito (local habitable en contacto con terreno) + zona ≠
-//      sin_exigencia. Si no aplica → veredicto OK/neutral "Sin exigencia HS6".
-//   2) NIVEL DE PROTECCIÓN exigido por la zona (Zona I: 1 medida; Zona II: barrera
-//      obligatoria + 1 adicional). Tabla REQUISITOS_POR_ZONA.
-//   3) ADECUACIÓN de la combinación de soluciones PROPUESTA a la zona (¿suficiente?
-//      barrera presente si es obligatoria; nº de medidas válidas ≥ exigido).
-//   4) CHECKLIST cualitativo de cada solución presente:
-//        · barrera: continuidad sellada + penetraciones selladas + puertas estancas;
-//          vía lámina-tipo (coef. difusión ≤ 1e-11 m²/s y espesor ≥ 2 mm).
-//        · espacio de contención: ventilación natural por el criterio 10 cm²/ml
-//          (área ≥ 10·perímetro) o mecánica (remite a DB-HS3); altura ≥ 5 cm.
-//        · despresurización: presencia de los elementos (captación + extracción +
-//          geotextil).
+// QUÉ CALCULA (ap. 1, 2 y 3 de la HS 6; verificado en feature-15):
+//   1) APLICABILIDAD: ámbito (local habitable sobre el terreno o sobre un local no
+//      habitable cerrado) + zona ≠ sin_exigencia. Si no aplica → «Sin exigencia».
+//   2) NIVEL DE PROTECCIÓN de la zona (ap. 3 pto 1): zona I, una medida; zona II,
+//      barrera + una adicional. Tabla REQUISITOS_POR_ZONA.
+//   3) ADECUACIÓN de la combinación de soluciones PROPUESTA a la zona.
+//   4) CHECKLIST de cada solución:
+//        · barrera (ap. 3.1.1): continua, sellada y sin fisuras; pasos sellados;
+//          puertas estancas y con cierre automático; lámina tipo con espesor
+//          ≥ 2 mm y coeficiente de difusión ESTRICTAMENTE < 1e-11 m²/s;
+//        · espacio de contención (ap. 3.2): una cámara con ventilación natural
+//          (10 cm² por metro) o mecánica (sin caudal en la HS 6), o un local no
+//          habitable, cuya ventilación de HS 3 o RITE se considera suficiente;
+//        · despresurización (ap. 3.3): captación en relleno + extracción mecánica
+//          (el geotextil es un ejemplo, ap. 5.1.4).
 //   5) ELEMENTO CRÍTICO: la medida que falta o el requisito incumplido (peor estado).
 //   6) veredictoGlobal = peor() de todos los estados. warnings en español.
 //
@@ -71,7 +72,7 @@ import {
 // -----------------------------------------------------------------------------
 
 /**
- * Barrera de protección PROPUESTA (art. 3.2). El usuario declara el checklist
+ * Barrera de protección PROPUESTA (ap. 3.1). El usuario declara el checklist
  * cualitativo (sellados/penetraciones/puertas) y, para la vía simplificada
  * `lamina_tipo`, las características de la lámina (coef. de difusión + espesor).
  */
@@ -87,11 +88,11 @@ export interface SolucionBarreraInput {
   readonly continuidadSellada: boolean;
   /** `true` ⇒ las PENETRACIONES (tuberías, arquetas, juntas) están selladas. */
   readonly penetracionesSelladas: boolean;
-  /** `true` ⇒ las puertas de comunicación con el espacio protegido son estancas. */
+  /** `true` ⇒ las puertas que la interrumpen son estancas y con cierre automático. */
   readonly puertasEstancas: boolean;
   /**
    * Coeficiente de difusión del radón de la lámina [m²/s]. Requerido para la vía
-   * `lamina_tipo` (umbral ≤ 1e-11 m²/s). Opcional para `calculo` (DIFERIDO).
+   * `lamina_tipo` (estrictamente < 1e-11 m²/s). Opcional para `calculo` (DIFERIDO).
    */
   readonly coefDifusion_m2_s?: number;
   /**
@@ -101,9 +102,9 @@ export interface SolucionBarreraInput {
 }
 
 /**
- * Espacio de contención ventilado PROPUESTO (art. 3.2). Para ventilación NATURAL,
- * el motor verifica el criterio geométrico (área de aberturas ≥ 10 cm²/ml ·
- * perímetro). Para MECÁNICA, remite a DB-HS3 §3.2.1 (informa, no dimensiona aquí).
+ * Espacio de contención ventilado PROPUESTO (ap. 3.2): una CÁMARA (ventilación
+ * natural con 10 cm² por metro, o mecánica) o un LOCAL NO HABITABLE —el garaje—,
+ * cuya ventilación de HS 3 o del RITE se considera suficiente (ap. 3.2 pto 5).
  */
 export interface SolucionEspacioContencionInput {
   readonly tipo: "espacio_contencion";
@@ -111,6 +112,8 @@ export interface SolucionEspacioContencionInput {
   readonly id: string;
   /** Nombre legible para UI/ficha. */
   readonly nombre?: string;
+  /** Cámara (por defecto) o local no habitable (feature-15). */
+  readonly clase?: "camara" | "local_no_habitable";
   /** Tipo de ventilación de la cámara. */
   readonly ventilacion: TipoVentilacionContencion;
   /** Perímetro de la cámara de contención [m]. Necesario para el criterio natural. */
@@ -120,12 +123,15 @@ export interface SolucionEspacioContencionInput {
    * ventilación natural (se compara con 10 cm²/ml · perímetro).
    */
   readonly areaAberturas_cm2?: number;
-  /** Altura libre de la cámara [mm]. Se compara con el mínimo (≈ 50 mm). */
+  /**
+   * Altura libre de la cámara [mm]. Informativa: los 5 cm del ap. 3.2 pto 6 solo
+   * valen para la cámara que se añade a un edificio existente (feature-15).
+   */
   readonly alturaCamara_mm?: number;
 }
 
 /**
- * Despresurización del terreno PROPUESTA (art. 3.3) — CUALITATIVA. El usuario
+ * Despresurización del terreno PROPUESTA (ap. 3.3) — CUALITATIVA. El usuario
  * declara la presencia de los tres elementos del sistema. Solo válida como medida
  * ADICIONAL en Zona II (no como medida única).
  */
@@ -139,7 +145,7 @@ export interface SolucionDespresurizacionInput {
   readonly redCaptacion: boolean;
   /** `true` ⇒ hay sistema de extracción mecánica conectado a la red de captación. */
   readonly extraccionMecanica: boolean;
-  /** `true` ⇒ hay geotextil de separación. */
+  /** `true` ⇒ hay geotextil que protege el relleno (ejemplo del ap. 5.1.4, no obligatorio). */
   readonly geotextil: boolean;
 }
 
@@ -161,7 +167,7 @@ export interface HS6Inputs {
    */
   municipio?: string;
   /**
-   * Ámbito (art. 1): `true` ⇒ el local es HABITABLE y está en CONTACTO con el
+   * Ámbito (ap. 1): `true` ⇒ el local es HABITABLE y está en CONTACTO con el
    * terreno (planta baja / sótano / semisótano). `false` ⇒ HS6 no exige medidas
    * (local no habitable o sin contacto con el terreno).
    */
@@ -219,7 +225,7 @@ export interface HS6Result {
   municipio: string | null;
   /** Ámbito: `true` si el local es habitable y está en contacto con el terreno. */
   localHabitableEnContactoConTerreno: boolean;
-  /** Nivel de referencia de radón usado [Bq/m³] (art. 2). */
+  /** Nivel de referencia de radón usado [Bq/m³] (ap. 2 pto 1). */
   nivelReferencia_Bq_m3: number;
 
   // --- Aplicabilidad y exigencia ---------------------------------------------
@@ -234,7 +240,7 @@ export interface HS6Result {
   barreraObligatoria: boolean;
   /** Nº mínimo de medidas exigidas por la zona (0/1/2). */
   nMedidasMin: number;
-  /** Descripción legible del nivel de protección exigido (art. 3.1). */
+  /** Descripción legible del nivel de protección exigido (ap. 3 pto 1). */
   nivelProteccion: string;
 
   // --- Adecuación de la combinación propuesta --------------------------------
@@ -330,7 +336,7 @@ function nombreDe(s: SolucionHS6Input): string {
 // requisitos (checks), su `cuenta` (válida para la zona) y su `estado`.
 // -----------------------------------------------------------------------------
 
-/** Evalúa una barrera de protección (art. 3.2). `cuenta` ⇒ válida para la zona. */
+/** Evalúa una barrera de protección (ap. 3.1). `cuenta` ⇒ válida para la zona. */
 function evaluarBarrera(s: SolucionBarreraInput, warnings: string[]): ResultadoMedidaHS6 {
   const p = parametrosBarrera();
   const requisitos: RequisitoEvaluado[] = [];
@@ -341,15 +347,16 @@ function evaluarBarrera(s: SolucionBarreraInput, warnings: string[]): ResultadoM
     const coef = numNoNeg(s.coefDifusion_m2_s);
     const esp = numNoNeg(s.espesor_mm);
 
-    const coefOk = coef !== null && coef <= p.coefDifusionMax_m2_s;
+    // Estrictamente MENOR (ap. 3.1.1 pto 2; verificación de feature-15).
+    const coefOk = coef !== null && coef < p.coefDifusionLimite_m2_s;
     requisitos.push({
       clave: "coef-difusion",
       etiqueta: "Coeficiente de difusión del radón de la lámina",
       estado: coef === null ? "fail" : coefOk ? "ok" : "fail",
       detalle:
         coef === null
-          ? `Falta el coeficiente de difusión de la lámina (vía lámina-tipo exige ≤ ${p.coefDifusionMax_m2_s} m²/s, art. 3.2).`
-          : `${coef} m²/s ${coefOk ? "≤" : ">"} ${p.coefDifusionMax_m2_s} m²/s (art. 3.2) → ${coefOk ? "CUMPLE" : "NO CUMPLE"}.`,
+          ? `Falta el coeficiente de difusión de la lámina (la lámina tipo exige < ${p.coefDifusionLimite_m2_s} m²/s, ap. 3.1.1).`
+          : `${coef} m²/s ${coefOk ? "<" : "≥"} ${p.coefDifusionLimite_m2_s} m²/s (ap. 3.1.1) → ${coefOk ? "CUMPLE" : "NO CUMPLE"}.`,
     });
 
     const espOk = esp !== null && esp >= p.espesorMin_mm;
@@ -359,64 +366,64 @@ function evaluarBarrera(s: SolucionBarreraInput, warnings: string[]): ResultadoM
       estado: esp === null ? "fail" : espOk ? "ok" : "fail",
       detalle:
         esp === null
-          ? `Falta el espesor de la lámina (vía lámina-tipo exige ≥ ${p.espesorMin_mm} mm, art. 3.2).`
-          : `${esp} mm ${espOk ? "≥" : "<"} ${p.espesorMin_mm} mm (art. 3.2) → ${espOk ? "CUMPLE" : "NO CUMPLE"}.`,
+          ? `Falta el espesor de la lámina (la lámina tipo exige ≥ ${p.espesorMin_mm} mm, ap. 3.1.1).`
+          : `${esp} mm ${espOk ? "≥" : "<"} ${p.espesorMin_mm} mm (ap. 3.1.1) → ${espOk ? "CUMPLE" : "NO CUMPLE"}.`,
     });
 
     viaOk = coefOk && espOk;
     if (!viaOk) {
       warnings.push(
-        `Barrera "${s.id}": la lámina-tipo NO cumple la vía simplificada (coef. difusión ≤ ` +
-          `${p.coefDifusionMax_m2_s} m²/s y espesor ≥ ${p.espesorMin_mm} mm, art. 3.2).`,
+        `Barrera "${s.id}": la lámina NO es lámina tipo (coeficiente de difusión < ` +
+          `${p.coefDifusionLimite_m2_s} m²/s y espesor ≥ ${p.espesorMin_mm} mm, ap. 3.1.1).`,
       );
     }
   } else {
-    // Vía "calculo" (E < Elim, Nivel B): DIFERIDA, no soportada por el motor.
+    // Vía "calculo" (E < Elim, ap. 3.1.2): DIFERIDA, no soportada por el motor.
     viaOk = false;
     requisitos.push({
       clave: "via-calculo",
       etiqueta: "Justificación de la barrera por cálculo de difusión (E < Elim)",
       estado: "warn",
       detalle:
-        "Vía por cálculo (Nivel B) DIFERIDA: el motor no evalúa E < Elim (fórmula no " +
-        "verificada literalmente). Justifíquela manualmente o use la vía lámina-tipo.",
+        "Vía por cálculo (ap. 3.1.2) DIFERIDA: el motor no evalúa E < Elim hasta cotejar sus constantes con el PDF. " +
+        "Justifíquela aparte o use la lámina tipo.",
     });
     warnings.push(
-      `Barrera "${s.id}": justificación por cálculo (E < Elim, Nivel B) NO soportada en esta ` +
-        "versión (pendiente). Use la vía lámina-tipo (coef. difusión ≤ 1e-11 m²/s, espesor ≥ 2 mm).",
+      `Barrera "${s.id}": justificación por cálculo (E < Elim, ap. 3.1.2) NO soportada en esta ` +
+        "versión. Use la lámina tipo (espesor ≥ 2 mm y coeficiente de difusión < 1e-11 m²/s).",
     );
   }
 
-  // --- Checklist cualitativo (sellados / penetraciones / puertas) ------------
+  // --- Características (ap. 3.1.1 pto 3) -------------------------------------
   requisitos.push({
     clave: "continuidad-sellada",
     etiqueta: "Continuidad sellada de la barrera",
     estado: s.continuidadSellada ? "ok" : "fail",
     detalle: s.continuidadSellada
-      ? "La barrera forma una capa continua y sellada (art. 3.2)."
-      : "La barrera NO es continua/sellada en toda su superficie (art. 3.2).",
+      ? "La barrera es continua, con juntas y encuentros sellados y sin fisuras (ap. 3.1.1 pto 3 a, b y d)."
+      : "La barrera NO es continua o sellada en toda su superficie (ap. 3.1.1 pto 3 a y b).",
   });
   requisitos.push({
     clave: "penetraciones-selladas",
     etiqueta: "Penetraciones selladas",
     estado: s.penetracionesSelladas ? "ok" : "fail",
     detalle: s.penetracionesSelladas
-      ? "Las penetraciones (tuberías, juntas, arquetas) están selladas (art. 3.2)."
-      : "Hay penetraciones SIN sellar (tuberías/juntas): vía de entrada de radón (art. 3.2).",
+      ? "Los encuentros con los elementos que la atraviesan (tuberías, arquetas, juntas) están sellados (ap. 3.1.1 pto 3 b)."
+      : "Hay encuentros SIN sellar (tuberías, juntas): vía de entrada del radón (ap. 3.1.1 pto 3 b).",
   });
   requisitos.push({
     clave: "puertas-estancas",
-    etiqueta: "Puertas de comunicación estancas",
+    etiqueta: "Puertas estancas y con cierre automático",
     estado: s.puertasEstancas ? "ok" : "fail",
     detalle: s.puertasEstancas
-      ? "Las puertas de comunicación con el espacio protegido son estancas (art. 3.2)."
-      : "Las puertas de comunicación NO son estancas (art. 3.2).",
+      ? "Las puertas que interrumpen la barrera son estancas y con cierre automático (ap. 3.1.1 pto 3 c)."
+      : "Las puertas que interrumpen la barrera NO son estancas o no tienen cierre automático (ap. 3.1.1 pto 3 c).",
   });
 
   if (!s.continuidadSellada || !s.penetracionesSelladas || !s.puertasEstancas) {
     warnings.push(
-      `Barrera "${s.id}": el checklist cualitativo está INCOMPLETO (continuidad/penetraciones/` +
-        "puertas), requisito de la barrera de protección (art. 3.2).",
+      `Barrera "${s.id}": faltan características de la barrera (continuidad, encuentros o ` +
+        "puertas), ap. 3.1.1 pto 3.",
     );
   }
 
@@ -425,23 +432,15 @@ function evaluarBarrera(s: SolucionBarreraInput, warnings: string[]): ResultadoM
   const estado = requisitos.reduce<Veredicto>((acc, r) => peor(acc, r.estado), "ok");
 
   const motivo =
-    `Barrera de protección (art. 3.2), vía ${s.via === "lamina_tipo" ? "lámina-tipo" : "cálculo (DIFERIDA)"}: ` +
+    `Barrera de protección (ap. 3.1), vía ${s.via === "lamina_tipo" ? "lámina tipo" : "cálculo (DIFERIDA)"}: ` +
     `${cuenta ? "VÁLIDA (cuenta como medida)" : "NO válida (no cuenta como medida)"}. ` +
-    `Checklist: continuidad ${s.continuidadSellada ? "OK" : "NO"}, penetraciones ` +
+    `Continuidad ${s.continuidadSellada ? "OK" : "NO"}, encuentros ` +
     `${s.penetracionesSelladas ? "OK" : "NO"}, puertas ${s.puertasEstancas ? "OK" : "NO"}.`;
 
-  return {
-    id: s.id,
-    nombre: nombreDe(s),
-    tipo: "barrera",
-    requisitos,
-    cuenta,
-    estado,
-    motivo,
-  };
+  return { id: s.id, nombre: nombreDe(s), tipo: "barrera", requisitos, cuenta, estado, motivo };
 }
 
-/** Evalúa un espacio de contención ventilado (art. 3.2). */
+/** Evalúa un espacio de contención ventilado (ap. 3.2). */
 function evaluarEspacioContencion(
   s: SolucionEspacioContencionInput,
   warnings: string[],
@@ -449,103 +448,79 @@ function evaluarEspacioContencion(
   const p = parametrosEspacioContencion();
   const requisitos: RequisitoEvaluado[] = [];
 
-  // --- Ventilación: natural (criterio geométrico) o mecánica (remite a HS3) ---
+  // --- Un local no habitable (el garaje): su ventilación basta (pto 5) -------
+  if (s.clase === "local_no_habitable") {
+    requisitos.push({
+      clave: "ventilacion-local",
+      etiqueta: "Ventilación del local no habitable",
+      estado: "ok",
+      detalle: `El local no habitable es el espacio de contención; su ventilación según ${p.ventilacionLocalNoHabitable} (ap. 3.2 ptos 1 y 5).`,
+    });
+    return {
+      id: s.id,
+      nombre: nombreDe(s),
+      tipo: "espacio_contencion",
+      requisitos,
+      cuenta: true,
+      estado: "ok",
+      motivo: "Espacio de contención (ap. 3.2): un local no habitable ventilado, que se considera suficiente (pto 5).",
+    };
+  }
+
+  // --- Cámara: natural (10 cm² por metro) o mecánica (sin caudal en la HS 6) --
   let ventilacionOk: boolean;
   if (s.ventilacion === "natural") {
     const perimetro = numNoNeg(s.perimetro_m);
     const area = numNoNeg(s.areaAberturas_cm2);
-    // Área de aberturas exigida = 10 cm²/ml · perímetro [cm²].
-    const areaExigida_cm2 =
-      perimetro !== null ? p.areaAberturasMin_cm2_ml * perimetro : null;
+    const areaExigida_cm2 = perimetro !== null ? p.areaAberturasMin_cm2_ml * perimetro : null;
     const ventOk = area !== null && areaExigida_cm2 !== null && area >= areaExigida_cm2;
     ventilacionOk = ventOk;
     requisitos.push({
       clave: "ventilacion-natural",
       etiqueta: "Ventilación natural de la cámara (área de aberturas)",
-      estado:
-        perimetro === null || area === null ? "fail" : ventOk ? "ok" : "fail",
+      estado: perimetro === null || area === null ? "fail" : ventOk ? "ok" : "fail",
       detalle:
         perimetro === null
-          ? "Falta el perímetro de la cámara para verificar el criterio 10 cm²/ml (art. 3.2)."
+          ? "Falta el perímetro de la cámara para comprobar los 10 cm² por metro (ap. 3.2 ptos 3 y 4)."
           : area === null
-            ? `Falta el área de aberturas; se exigen ${areaExigida_cm2} cm² (= ${p.areaAberturasMin_cm2_ml} cm²/ml · ${perimetro} m, art. 3.2).`
+            ? `Falta el área de aberturas; se exigen ${areaExigida_cm2} cm² (= ${p.areaAberturasMin_cm2_ml} cm²/m · ${perimetro} m, ap. 3.2).`
             : `${area} cm² ${ventOk ? "≥" : "<"} ${areaExigida_cm2} cm² exigidos ` +
-              `(${p.areaAberturasMin_cm2_ml} cm²/ml · ${perimetro} m, art. 3.2) → ${ventOk ? "CUMPLE" : "NO CUMPLE"}.`,
+              `(${p.areaAberturasMin_cm2_ml} cm²/m · ${perimetro} m, ap. 3.2) → ${ventOk ? "CUMPLE" : "NO CUMPLE"}.`,
     });
     if (!ventOk) {
       warnings.push(
-        `Espacio de contención "${s.id}": ventilación natural INSUFICIENTE (área de aberturas < ` +
-          `${p.areaAberturasMin_cm2_ml} cm²/ml · perímetro, art. 3.2).`,
+        `Espacio de contención "${s.id}": ventilación natural INSUFICIENTE (aberturas < ` +
+          `${p.areaAberturasMin_cm2_ml} cm² por metro de perímetro, ap. 3.2).`,
       );
     }
   } else {
-    // Ventilación mecánica: el dimensionado del caudal remite a DB-HS3 §3.2.1.
+    // Mecánica: la HS 6 no fija caudal (ap. 3.2 pto 8).
     ventilacionOk = true;
     requisitos.push({
       clave: "ventilacion-mecanica",
       etiqueta: "Ventilación mecánica de la cámara",
       estado: "warn",
       detalle:
-        `Ventilación mecánica: el caudal se dimensiona según ${p.remisionMecanica} ` +
-        "(fuera de HS6). Verifíquelo en el módulo HS3.",
+        "La HS 6 no fija caudal: aberturas según la cámara, admisión alejada de la extracción y bocas de expulsión " +
+        `según ${p.remisionBocasExpulsion} (ap. 3.2 pto 8).`,
     });
     warnings.push(
-      `Espacio de contención "${s.id}": ventilación mecánica → el caudal se dimensiona en ` +
-        `${p.remisionMecanica} (DB-HS3), fuera de este módulo.`,
+      `Espacio de contención "${s.id}": ventilación mecánica → la HS 6 no fija caudal; bocas de expulsión ` +
+        `según ${p.remisionBocasExpulsion}.`,
     );
   }
 
-  // --- Altura mínima de la cámara (~5 cm) ------------------------------------
-  const altura = numNoNeg(s.alturaCamara_mm);
-  if (altura !== null) {
-    const alturaOk = altura >= p.alturaMinCamara_mm;
-    requisitos.push({
-      clave: "altura-camara",
-      etiqueta: "Altura libre de la cámara",
-      estado: alturaOk ? "ok" : "fail",
-      detalle: `${altura} mm ${alturaOk ? "≥" : "<"} ${p.alturaMinCamara_mm} mm mínimos (art. 3.2) → ${alturaOk ? "CUMPLE" : "NO CUMPLE"}.`,
-    });
-    if (!alturaOk) {
-      warnings.push(
-        `Espacio de contención "${s.id}": altura de cámara ${altura} mm < ` +
-          `${p.alturaMinCamara_mm} mm mínimos (art. 3.2).`,
-      );
-    }
-  } else {
-    // Altura no aportada: informativo, no bloqueante (warn).
-    requisitos.push({
-      clave: "altura-camara",
-      etiqueta: "Altura libre de la cámara",
-      estado: "warn",
-      detalle: `Altura de cámara no aportada; mínimo recomendado ${p.alturaMinCamara_mm} mm (art. 3.2).`,
-    });
-  }
-
-  // La altura no aportada (warn) NO descalifica la medida; solo descalifica el
-  // incumplimiento de la ventilación o de una altura aportada insuficiente.
-  const alturaDescalifica = altura !== null && altura < p.alturaMinCamara_mm;
-  const cuenta = ventilacionOk && !alturaDescalifica;
+  const cuenta = ventilacionOk;
   const estado = requisitos.reduce<Veredicto>((acc, r) => peor(acc, r.estado), "ok");
-
   const motivo =
-    `Espacio de contención ventilado (art. 3.2), ventilación ${s.ventilacion}: ` +
+    `Espacio de contención ventilado (ap. 3.2), cámara con ventilación ${s.ventilacion}: ` +
     `${cuenta ? "VÁLIDO (cuenta como medida)" : "NO válido (no cuenta como medida)"}.` +
-    (s.ventilacion === "natural"
-      ? ` Criterio geométrico ${p.areaAberturasMin_cm2_ml} cm²/ml · perímetro.`
-      : ` Caudal remitido a ${p.remisionMecanica}.`);
+    (s.ventilacion === "natural" ? ` Aberturas de ${p.areaAberturasMin_cm2_ml} cm² por metro de perímetro.` : "");
 
-  return {
-    id: s.id,
-    nombre: nombreDe(s),
-    tipo: "espacio_contencion",
-    requisitos,
-    cuenta,
-    estado,
-    motivo,
-  };
+  return { id: s.id, nombre: nombreDe(s), tipo: "espacio_contencion", requisitos, cuenta, estado, motivo };
 }
 
-/** Evalúa la despresurización del terreno (art. 3.3) — cualitativa. */
+/** Evalúa la despresurización del terreno (ap. 3.3) — cualitativa. */
 function evaluarDespresurizacion(
   s: SolucionDespresurizacionInput,
   warnings: string[],
@@ -556,50 +531,40 @@ function evaluarDespresurizacion(
       etiqueta: "Red de captación en relleno granular",
       estado: s.redCaptacion ? "ok" : "fail",
       detalle: s.redCaptacion
-        ? "Red de captación embebida en relleno de áridos bajo la solera (art. 3.3)."
-        : "Falta la red de captación en relleno granular bajo la solera (art. 3.3).",
+        ? "Red de captación (arquetas o tubos perforados) en una capa de relleno granular bajo el edificio (ap. 3.3 pto 1)."
+        : "Falta la red de captación en relleno granular bajo el edificio (ap. 3.3 pto 1).",
     },
     {
       clave: "extraccion-mecanica",
-      etiqueta: "Sistema de extracción mecánica",
+      etiqueta: "Conducto y extracción mecánica",
       estado: s.extraccionMecanica ? "ok" : "fail",
       detalle: s.extraccionMecanica
-        ? "Sistema de extracción mecánica conectado a la red de captación (art. 3.3)."
-        : "Falta el sistema de extracción mecánica (art. 3.3).",
+        ? "Conducto de extracción y extracción mecánica, con bocas de expulsión según DB-HS 3 ap. 3.2.1 (ap. 3.3 ptos 1 y 2)."
+        : "Falta el conducto con la extracción mecánica (ap. 3.3 pto 1).",
     },
     {
       clave: "geotextil",
-      etiqueta: "Geotextil de separación",
-      estado: s.geotextil ? "ok" : "fail",
+      etiqueta: "Protección del relleno",
+      estado: "neutral",
       detalle: s.geotextil
-        ? "Geotextil de separación presente (art. 3.3)."
-        : "Falta el geotextil de separación (art. 3.3).",
+        ? "Geotextil que protege el relleno si la solera se vierte sobre él (ejemplo del ap. 5.1.4)."
+        : "Sin geotextil: no es obligatorio; el ap. 5.1.4 lo pone de ejemplo para proteger el relleno.",
     },
   ];
 
-  const cuenta = s.redCaptacion && s.extraccionMecanica && s.geotextil;
+  const cuenta = s.redCaptacion && s.extraccionMecanica;
   if (!cuenta) {
     warnings.push(
-      `Despresurización "${s.id}": el sistema está INCOMPLETO (red de captación + extracción ` +
-        "mecánica + geotextil), requisito del art. 3.3.",
+      `Despresurización "${s.id}": el sistema está INCOMPLETO (red de captación y extracción ` +
+        "mecánica), ap. 3.3 pto 1.",
     );
   }
   const estado = requisitos.reduce<Veredicto>((acc, r) => peor(acc, r.estado), "ok");
-
   const motivo =
-    `Despresurización del terreno (art. 3.3): ${cuenta ? "VÁLIDA (cuenta como medida adicional)" : "NO válida (sistema incompleto)"}. ` +
-    `Captación ${s.redCaptacion ? "OK" : "NO"}, extracción ${s.extraccionMecanica ? "OK" : "NO"}, ` +
-    `geotextil ${s.geotextil ? "OK" : "NO"}.`;
+    `Despresurización del terreno (ap. 3.3): ${cuenta ? "VÁLIDA (cuenta como medida adicional)" : "NO válida (sistema incompleto)"}. ` +
+    `Captación ${s.redCaptacion ? "OK" : "NO"}, extracción ${s.extraccionMecanica ? "OK" : "NO"}.`;
 
-  return {
-    id: s.id,
-    nombre: nombreDe(s),
-    tipo: "despresurizacion",
-    requisitos,
-    cuenta,
-    estado,
-    motivo,
-  };
+  return { id: s.id, nombre: nombreDe(s), tipo: "despresurizacion", requisitos, cuenta, estado, motivo };
 }
 
 /** Despacha la evaluación de una solución según su `tipo` (unión discriminada). */
@@ -625,7 +590,7 @@ export function calcHS6(inp: HS6Inputs): HS6Result {
   const municipio = inp.municipio?.trim() ? inp.municipio.trim() : null;
 
   // ===========================================================================
-  // 1. APLICABILIDAD: ámbito (art. 1) + zona ≠ sin_exigencia (Apéndice B).
+  // 1. APLICABILIDAD: ámbito (ap. 1) + zona ≠ sin_exigencia (Apéndice B).
   // ===========================================================================
   const ambitoAplica = inp.localHabitableEnContactoConTerreno === true;
   const zonaExige = inp.zona !== "sin_exigencia";
@@ -634,10 +599,10 @@ export function calcHS6(inp: HS6Inputs): HS6Result {
   let motivoNoAplica: string | null = null;
   if (!ambitoAplica) {
     motivoNoAplica =
-      "El local no es habitable o no está en contacto con el terreno (art. 1): HS6 no exige medidas.";
+      "El local no es habitable, o está separado del terreno por un espacio abierto ventilado (ap. 1 pto 2): la HS 6 no exige medidas.";
   } else if (!zonaExige) {
     motivoNoAplica =
-      "Municipio no clasificado en el Apéndice B (zona sin exigencia): HS6 no exige medidas.";
+      "Municipio no incluido en el Apéndice B: la Sección HS 6 no se aplica (ap. 1 pto 1).";
   }
 
   // Siempre se evalúan las medidas propuestas (informativo aunque no apliquen),
@@ -676,7 +641,7 @@ export function calcHS6(inp: HS6Inputs): HS6Result {
   }
 
   // ===========================================================================
-  // 2/3. ADECUACIÓN de la combinación PROPUESTA al nivel de la zona (art. 3.1).
+  // 2/3. ADECUACIÓN de la combinación PROPUESTA al nivel de la zona (ap. 3 pto 1).
   //   - Barrera obligatoria (Zona II): debe existir ≥ 1 barrera VÁLIDA.
   //   - Medidas adicionales: las que CUENTAN y están entre las admitidas por la
   //     zona, distintas de la barrera que cubre la obligación.
@@ -697,9 +662,9 @@ export function calcHS6(inp: HS6Inputs): HS6Result {
     elementoCriticoId = barreraPropuesta ? barreraPropuesta.id : HS6_FALTA_MEDIDA;
     elementoCritico = barreraPropuesta
       ? `Barrera de protección OBLIGATORIA (Zona II) presente pero NO válida: "${barreraPropuesta.id}".`
-      : "FALTA la barrera de protección OBLIGATORIA en Zona II (art. 3.1).";
+      : "FALTA la barrera de protección OBLIGATORIA en Zona II (ap. 3 pto 1).";
     warnings.push(
-      "Zona II (art. 3.1): la barrera de protección es OBLIGATORIA y no hay ninguna barrera " +
+      "Zona II (ap. 3 pto 1): la barrera de protección es OBLIGATORIA y no hay ninguna barrera " +
         "válida entre las soluciones propuestas.",
     );
   }
@@ -732,9 +697,9 @@ export function calcHS6(inp: HS6Inputs): HS6Result {
     elementoCriticoId = medidaInvalida ? medidaInvalida.id : HS6_FALTA_MEDIDA;
     elementoCritico = medidaInvalida
       ? `Medida propuesta NO válida: "${medidaInvalida.id}" (${medidaInvalida.motivo}).`
-      : `Faltan medidas: la zona exige ${req.nMedidasMin}, válidas ${nMedidasValidas} (art. 3.1).`;
+      : `Faltan medidas: la zona exige ${req.nMedidasMin}, válidas ${nMedidasValidas} (ap. 3 pto 1).`;
     warnings.push(
-      `Combinación INSUFICIENTE (art. 3.1): la zona ${inp.zona} exige ${req.nMedidasMin} medida(s); ` +
+      `Combinación INSUFICIENTE (ap. 3 pto 1): la zona ${inp.zona} exige ${req.nMedidasMin} medida(s); ` +
         `solo ${nMedidasValidas} válida(s).`,
     );
   }
@@ -745,7 +710,7 @@ export function calcHS6(inp: HS6Inputs): HS6Result {
     if (m.cuenta && !req.medidasAdmitidas.includes(m.tipo) && m.tipo !== "barrera") {
       warnings.push(
         `La medida "${m.id}" (${m.tipo}) no está admitida como medida de la zona ${inp.zona} ` +
-          "(art. 3.1): no cuenta para satisfacer el nivel de protección.",
+          "(ap. 3 pto 1): no cuenta para satisfacer el nivel de protección.",
       );
     }
   }

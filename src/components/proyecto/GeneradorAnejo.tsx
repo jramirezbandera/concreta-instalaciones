@@ -7,7 +7,7 @@ import { justificacionRegistry } from "../../data/justificacionRegistry";
 import { renderAnejo } from "../../lib/pdf/anejo";
 import type { FichaData } from "../../lib/pdf/renderFicha";
 import type { PdfResult } from "../../lib/pdf/utils";
-import type { JustificacionKey } from "../../lib/proyecto/tipos";
+import type { JustificacionKey, Proyecto } from "../../lib/proyecto/tipos";
 import { PdfPreviewModal } from "../ui/PdfPreviewModal";
 import { showToast } from "../ui/Toast";
 
@@ -54,6 +54,7 @@ interface Identificacion {
 type Adaptador = (
   inputs: Record<string, unknown>,
   id: Identificacion,
+  proyecto: Proyecto,
 ) => Promise<{ data: FichaData; nodo: ReactNode }>;
 
 /** Ancho CSS del clon oculto: más resolución que la de pantalla para el raster. */
@@ -76,94 +77,132 @@ function altoClon(data: FichaData): number {
 }
 
 const ADAPTADORES: Partial<Record<JustificacionKey, Adaptador>> = {
-  hs3: async (inputs, id) => {
-    const [calc, ficha, svg] = await Promise.all([
-      import("../../modules/hs3/calc"),
+  hs3: async (inputs, id, proyecto) => {
+    // Desde feature-15 HS3 se deduce de El edificio, como HS5.
+    const [estadoMod, just, ficha, planta, dibujo] = await Promise.all([
+      import("../../modules/hs3/estado"),
+      import("../../modules/hs3/justificacion"),
       import("../../modules/hs3/ficha"),
-      import("../../modules/hs3/svg"),
+      import("../../modules/hs3/planta"),
+      import("../../modules/hs3/PlantaHs3"),
     ]);
-    const inp = { ...calc.hs3Defaults, ...inputs } as Parameters<typeof calc.calcHS3>[0];
-    const result = calc.calcHS3(inp);
-    const data = { ...ficha.toFichaData(inp, result), ...id };
+    const estado = { ...estadoMod.hs3EstadoDefaults, ...inputs } as typeof estadoMod.hs3EstadoDefaults;
+    const revisados = proyecto.justificaciones.hs3?.revisados ?? [];
+    const j = just.justificarHs3(estado, proyecto.edificio);
+    const svg = planta.tamanoDibujoHs3();
+    const base = ficha.toFichaData(j, { estado, edificio: proyecto.edificio, revisados, svg });
+    const data = { ...base, ...id, observaciones: [...(base.observaciones ?? [])] };
     return {
       data,
-      nodo: data.svg ? (
-        <Clon id={data.svg.elementId}>
-          <svg.HS3SVG result={result} mode="pdf" width={CLON_W} height={altoClon(data)} />
+      nodo: (
+        <Clon id={data.svg!.elementId}>
+          <dibujo.DibujoPdfHs3 j={j} parte={j.partes[0]?.id ?? null} revisados={revisados} width={CLON_W} height={altoClon(data)} />
         </Clon>
-      ) : null,
+      ),
     };
   },
-  hs4: async (inputs, id) => {
-    const [calc, ficha, svg] = await Promise.all([
-      import("../../modules/hs4/calc"),
+  hs4: async (inputs, id, proyecto) => {
+    // Desde feature-15 HS4 se deduce de El edificio, como HS5.
+    const [estadoMod, just, ficha, seccion, dibujo] = await Promise.all([
+      import("../../modules/hs4/estado"),
+      import("../../modules/hs4/justificacion"),
       import("../../modules/hs4/ficha"),
-      import("../../modules/hs4/svg"),
+      import("../../modules/hs4/seccion"),
+      import("../../modules/hs4/SeccionHs4"),
     ]);
-    const inp = { ...calc.hs4Defaults, ...inputs } as Parameters<typeof calc.calcHS4>[0];
-    const result = calc.calcHS4(inp);
-    const data = { ...ficha.toFichaData(inp, result), ...id };
+    const estado = { ...estadoMod.hs4EstadoDefaults, ...inputs } as typeof estadoMod.hs4EstadoDefaults;
+    const obra = { presionAcometida_kPa: proyecto.datosGenerales.presionAcometida_kPa };
+    const revisados = proyecto.justificaciones.hs4?.revisados ?? [];
+    const j = just.justificarHs4(estado, proyecto.edificio, obra);
+    const svg = seccion.tamanoDibujoHs4(j, proyecto.edificio);
+    const base = ficha.toFichaData(j, { estado, edificio: proyecto.edificio, obra, revisados, svg });
+    const data = { ...base, ...id, observaciones: [...(base.observaciones ?? [])] };
     return {
       data,
-      nodo: data.svg ? (
-        <Clon id={data.svg.elementId}>
-          <svg.HS4SVG result={result} mode="pdf" width={CLON_W} height={altoClon(data)} />
+      nodo: (
+        <Clon id={data.svg!.elementId}>
+          <dibujo.DibujoPdfHs4 j={j} edificio={proyecto.edificio} revisados={revisados} width={CLON_W} height={altoClon(data)} />
         </Clon>
-      ) : null,
+      ),
     };
   },
-  hs5: async (inputs, id) => {
-    const [calc, ficha, svg] = await Promise.all([
-      import("../../modules/hs5/calc"),
+  hs5: async (inputs, id, proyecto) => {
+    // Desde feature-14 HS5 se deduce de El edificio: además de sus entradas
+    // necesita el edificio, los datos de la obra y los avisos revisados.
+    const [estadoMod, just, ficha, seccion, dibujo] = await Promise.all([
+      import("../../modules/hs5/estado"),
+      import("../../modules/hs5/justificacion"),
       import("../../modules/hs5/ficha"),
-      import("../../modules/hs5/svg"),
+      import("../../modules/hs5/seccion"),
+      import("../../modules/hs5/SeccionHs5"),
     ]);
-    const inp = { ...calc.hs5Defaults, ...inputs } as Parameters<typeof calc.calcHS5>[0];
-    const result = calc.calcHS5(inp);
-    const data = { ...ficha.toFichaData(inp, result), ...id };
+    const estado = { ...estadoMod.hs5EstadoDefaults, ...inputs } as typeof estadoMod.hs5EstadoDefaults;
+    const obra = {
+      pluviometria: proyecto.datosGenerales.pluviometria,
+      cotaAlcantarillado_m: proyecto.datosGenerales.cotaAlcantarillado_m,
+    };
+    const revisados = proyecto.justificaciones.hs5?.revisados ?? [];
+    const j = just.justificarHs5(estado, proyecto.edificio, obra);
+    const svg = seccion.tamanoDibujoHs5(j, proyecto.edificio);
+    const base = ficha.toFichaData(j, { estado, edificio: proyecto.edificio, obra, revisados, svg });
+    // Las excepciones locales solo cuentan con la red ajustada a mano.
+    const data = { ...base, ...id, observaciones: [...(base.observaciones ?? []), ...(j.modo === "manual" ? id.observaciones : [])] };
     return {
       data,
-      nodo: data.svg ? (
-        <Clon id={data.svg.elementId}>
-          <svg.HS5SVG result={result} mode="pdf" width={CLON_W} height={altoClon(data)} />
+      nodo: (
+        <Clon id={data.svg!.elementId}>
+          <dibujo.DibujoPdfHs5 j={j} edificio={proyecto.edificio} revisados={revisados} width={CLON_W} height={altoClon(data)} />
         </Clon>
-      ) : null,
+      ),
     };
   },
-  hs6: async (inputs, id) => {
-    const [calc, ficha, svg] = await Promise.all([
-      import("../../modules/hs6/calc"),
+  hs6: async (inputs, id, proyecto) => {
+    // Desde feature-15 HS6 se deduce de El edificio, como HS5.
+    const [estadoMod, just, ficha, seccion, dibujo] = await Promise.all([
+      import("../../modules/hs6/estado"),
+      import("../../modules/hs6/justificacion"),
       import("../../modules/hs6/ficha"),
-      import("../../modules/hs6/svg"),
+      import("../../modules/hs6/seccion"),
+      import("../../modules/hs6/SeccionHs6"),
     ]);
-    const inp = { ...calc.hs6Defaults, ...inputs } as Parameters<typeof calc.calcHS6>[0];
-    const result = calc.calcHS6(inp);
-    const data = { ...ficha.toFichaData(inp, result), ...id };
+    const estado = { ...estadoMod.hs6EstadoDefaults, ...inputs } as typeof estadoMod.hs6EstadoDefaults;
+    const revisados = proyecto.justificaciones.hs6?.revisados ?? [];
+    const j = just.justificarHs6(estado, proyecto.edificio);
+    const svg = seccion.tamanoDibujoHs6();
+    const base = ficha.toFichaData(j, { estado, edificio: proyecto.edificio, revisados, svg });
+    const data = { ...base, ...id, observaciones: [...(base.observaciones ?? [])] };
     return {
       data,
-      nodo: data.svg ? (
-        <Clon id={data.svg.elementId}>
-          <svg.HS6SVG result={result} mode="pdf" width={CLON_W} height={altoClon(data)} />
+      nodo: (
+        <Clon id={data.svg!.elementId}>
+          <dibujo.DibujoPdfHs6 j={j} edificio={proyecto.edificio} revisados={revisados} width={CLON_W} height={altoClon(data)} />
         </Clon>
-      ) : null,
+      ),
     };
   },
-  he1: async (inputs, id) => {
-    const [calc, ficha, svg] = await Promise.all([
-      import("../../modules/he1/calc"),
+  he1: async (inputs, id, proyecto) => {
+    // Desde feature-15 HE1 se deduce de El edificio, como HS5.
+    const [estadoMod, just, ficha, dibujoGeo, dibujo] = await Promise.all([
+      import("../../modules/he1/estado"),
+      import("../../modules/he1/justificacion"),
       import("../../modules/he1/ficha"),
-      import("../../modules/he1/svg"),
+      import("../../modules/he1/dibujo"),
+      import("../../modules/he1/DibujoHe1"),
     ]);
-    const inp = { ...calc.he1Defaults, ...inputs } as Parameters<typeof calc.calcHE1>[0];
-    const result = calc.calcHE1(inp);
-    const data = { ...ficha.toFichaData(inp, result), ...id };
+    const estado = { ...estadoMod.he1EstadoDefaults, ...inputs } as typeof estadoMod.he1EstadoDefaults;
+    const dg = proyecto.datosGenerales;
+    const revisados = proyecto.justificaciones.he1?.revisados ?? [];
+    const j = just.justificarHe1(estado, proyecto.edificio, { provincia: dg.provincia, altitud_m: dg.altitud_m, municipio: dg.municipio });
+    const svg = dibujoGeo.tamanoDibujoHe1();
+    const base = ficha.toFichaData(j, { estado, edificio: proyecto.edificio, revisados, svg });
+    const data = { ...base, ...id, observaciones: [...(base.observaciones ?? [])] };
     return {
       data,
-      nodo: data.svg ? (
-        <Clon id={data.svg.elementId}>
-          <svg.He1SVG result={result} mode="pdf" width={CLON_W} height={altoClon(data)} />
+      nodo: (
+        <Clon id={data.svg!.elementId}>
+          <dibujo.DibujoPdfHe1 j={j} revisados={revisados} width={CLON_W} height={altoClon(data)} />
         </Clon>
-      ) : null,
+      ),
     };
   },
 };
@@ -213,16 +252,20 @@ export function GeneradorAnejo(): JSX.Element {
       const estado = estadoDe(proyecto, key);
       if (estado.aplicabilidad === "no_aplica" || estado.aplicabilidad === "externo") continue;
       try {
-        const { data, nodo } = await adaptador(inputs, {
-          ...identificacion,
-          observaciones: notasExcepcionesLocales({
-            key,
-            dg: proyecto.datosGenerales,
-            d: derivados,
-            state: inputs,
-            overrides: proyecto.justificaciones[key]?.overridesContexto ?? [],
-          }),
-        });
+        const { data, nodo } = await adaptador(
+          inputs,
+          {
+            ...identificacion,
+            observaciones: notasExcepcionesLocales({
+              key,
+              dg: proyecto.datosGenerales,
+              d: derivados,
+              state: inputs,
+              overrides: proyecto.justificaciones[key]?.overridesContexto ?? [],
+            }),
+          },
+          proyecto,
+        );
         listos.push({ key, data, nodo });
       } catch {
         // Módulo que no calcula con los inputs guardados: se omite su ficha y

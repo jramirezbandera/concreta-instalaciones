@@ -49,11 +49,10 @@ export interface CampoHeredado {
  *     ("α" | "A".."E", he1/tablas.ts) mientras que el derivado del proyecto es
  *     la zona completa ("C4") → la fuente extrae el PRIMER CARÁCTER.
  *   - hs3: `zonaTermica: ZonaTermica` ("W" | "X" | "Y" | "Z", hs3/tablas.ts).
- *   - hs5: `uso: UsoAparato` ("privado" | "publico", hs5/tablas.ts). Hoy el
- *     mapeo es CONSTANTE: los dos usos soportados por el expediente
- *     (vivienda_unifamiliar / vivienda_colectiva) son vivienda ⇒ "privado".
- *     Si algún día entran usos no residenciales, esta fuente deja de ser
- *     constante — por eso vive en el mapa y no inline en la UI.
+ *   - hs5: `uso: UsoAparato` ("privado" | "publico", hs5/tablas.ts), `numPlantas`
+ *     y `cubiertaTransitable` salen de El edificio (feature-12): «privado» si el
+ *     edificio tiene viviendas y «público» si no (oficinas). Los núcleos de
+ *     aseos de oficinas se justifican desde la fase 5.
  *   - hs4: `presionAcometida_kPa` SOLO si el dato de suministro está informado
  *     (opcional en DatosGenerales) — `undefined` ⇒ no se hereda.
  */
@@ -119,8 +118,8 @@ export const MAPA_HERENCIA: Partial<Record<JustificacionKey, CampoHeredado[]>> =
     {
       campo: "uso",
       etiqueta: "Uso de la instalación",
-      // Constante HOY: ambos usos del expediente son vivienda ⇒ "privado".
-      fuente: () => "privado",
+      // Vivienda ⇒ aparatos de uso privado; un edificio sin viviendas, público.
+      fuente: (_dg, d) => (d.edificio.tieneViviendas ? "privado" : "publico"),
       editor: {
         tipo: "select",
         opciones: [
@@ -132,13 +131,13 @@ export const MAPA_HERENCIA: Partial<Record<JustificacionKey, CampoHeredado[]>> =
     {
       campo: "numPlantas",
       etiqueta: "Nº de plantas",
-      fuente: (dg) => dg.plantasSobreRasante,
+      fuente: (_dg, d) => d.edificio.plantasSobreRasante,
       editor: { tipo: "number" },
     },
     {
       campo: "cubiertaTransitable",
       etiqueta: "Cubierta transitable",
-      fuente: (dg) => dg.tipoCubierta === "plana_transitable",
+      fuente: (_dg, d) => d.edificio.cubiertaTransitable,
       editor: { tipo: "boolean" },
     },
   ],

@@ -2,7 +2,9 @@
 // DB-HS3 — Calidad del aire interior. Tablas y valores normativos como DATOS
 // versionados con procedencia (SPEC §4/§11, trazabilidad innegociable).
 //
-// Edición vigente: Orden FOM/588/2017, consolidada por RD 732/2019.
+// Edición vigente: DB-HS consolidado de 14-06-2022; el ap. 2, el 4.1 y los
+// apéndices A y C de la HS 3 son los de la Orden FOM/588/2017. El RD 732/2019 no
+// modifica la HS 3 (research/verificacion-hs3-v4.md, bloque 10).
 // Cada cifra va envuelta en `tablaCTE()` con su `ProcedenciaCTE`. Nunca
 // hardcodear cifras sueltas: la procedencia alimenta la cita legal de la ficha.
 //
@@ -13,13 +15,12 @@
 
 import { tablaCTE } from "../../lib/cte/tabla";
 
-/** Procedencia base común a todo el DB-HS3 vigente (FOM/588/2017 + RD 732/2019). */
+/** Procedencia base común a todo el DB-HS3 vigente (consolidado 14-06-2022). */
 const PROC_HS3 = {
   db: "DB-HS3",
-  edicion: "FOM/588/2017",
-  /** Fecha del RD 732/2019 que consolida (BOE 27/12/2019). */
-  fecha: "2019-12-24",
-  fuente: "codigotecnico.org",
+  edicion: "consolidado 14-06-2022 (ap. 2 según FOM/588/2017)",
+  fecha: "2022-06-14",
+  fuente: "codigotecnico.org · DBHS.pdf, Sección HS 3",
 } as const;
 
 // -----------------------------------------------------------------------------
@@ -50,7 +51,7 @@ export type CategoriaDormitorios = "0-1" | "2" | "3+";
 export type FilaCaudal2_1 = Readonly<Record<CategoriaDormitorios, number | null>>;
 
 export const CAUDALES_LOCALES_HABITABLES = tablaCTE(
-  { ...PROC_HS3, articulo: "ap. 2", tabla: "Tabla 2.1" },
+  { ...PROC_HS3, articulo: "ap. 2 pto 3", tabla: "Tabla 2.1" },
   {
     /** Dormitorio principal: 8 / 8 / 8 l/s. */
     dormitorioPrincipal: { "0-1": 8, "2": 8, "3+": 8 },
@@ -99,7 +100,7 @@ export const NO_OCUPACION_MIN = tablaCTE(
 //   Aparcamientos y garajes:      120 l/s por plaza.
 // -----------------------------------------------------------------------------
 export const CAUDALES_NO_HABITABLES = tablaCTE(
-  { ...PROC_HS3, articulo: "ap. 2", tabla: "Tabla 2.2" },
+  { ...PROC_HS3, articulo: "ap. 2 pto 6", tabla: "Tabla 2.2" },
   {
     trasteros_l_s_m2: 0.7,
     almacenResiduos_l_s_m2: 10,
@@ -124,7 +125,7 @@ export const CAUDALES_NO_HABITABLES = tablaCTE(
 // motor aplica `area = coef * qv` (y el máx con `pasoMin_cm2` para el paso).
 // -----------------------------------------------------------------------------
 export const AREA_EFECTIVA_ABERTURAS = tablaCTE(
-  { ...PROC_HS3, articulo: "ap. 4", tabla: "Tabla 4.1" },
+  { ...PROC_HS3, articulo: "ap. 4.1", tabla: "Tabla 4.1" },
   {
     /** Coeficiente de admisión: área [cm²] = 4 · qv. */
     admision_coef: 4,
@@ -211,7 +212,7 @@ const c = (...conductos: ConductoSeccion[]): CeldaSeccion4_2 => ({
 });
 
 export const SECCION_CONDUCTO_TABLA_4_2 = tablaCTE(
-  { ...PROC_HS3, articulo: "ap. 4.4", tabla: "Tabla 4.2" },
+  { ...PROC_HS3, articulo: "ap. 4.2.1", tabla: "Tabla 4.2" },
   {
     /**
      * Tramos ORDENADOS por `qvtMax_l_s` ascendente. El motor selecciona el
@@ -287,7 +288,7 @@ export interface ZonaProvincia {
 }
 
 export const ZONAS_TERMICAS_TABLA_4_4 = tablaCTE(
-  { ...PROC_HS3, articulo: "ap. 4.4", tabla: "Tabla 4.4" },
+  { ...PROC_HS3, articulo: "ap. 4.2.1", tabla: "Tabla 4.4" },
   {
     /** Umbrales de temperatura media (Tm, °C) que definen cada zona. */
     umbralesTm: { W: "Tm<=14", X: "14<Tm<=16", Y: "16<Tm<=18", Z: "Tm>18" },
@@ -417,3 +418,98 @@ export function claseTiroDe(numPlantas: number, zona: ZonaTermica): ClaseTiro {
   const matriz = TIRO_TABLA_4_3.datos.matriz as Readonly<Record<number, FilaTiro4_3>>;
   return matriz[n][zona];
 }
+
+// =============================================================================
+// Feature-15 (v4), verificado en research/verificacion-hs3-v4.md: el conducto de
+// la ventilación MECÁNICA, el diseño de la vivienda, los conductos de la
+// HÍBRIDA, el garaje y los trasteros. Las desigualdades estrictas van anotadas.
+// =============================================================================
+
+/**
+ * Ap. 4.2.2: sección de los conductos de extracción con ventilación MECÁNICA,
+ * S [cm²] ≥ coef · qvt [l/s]. Las Tablas 4.2 a 4.4 solo valen para la híbrida.
+ */
+export const SECCION_CONDUCTO_MECANICA = tablaCTE(
+  { ...PROC_HS3, articulo: "ap. 4.2.2", tabla: "Fórmulas 4.1 y 4.2" },
+  {
+    /** Fórm. 4.1: conducto contiguo a un local habitable. */
+    contiguoHabitable_cm2_por_l_s: 2.5,
+    /** Fórm. 4.2: conducto dispuesto en la cubierta. */
+    cubierta_cm2_por_l_s: 1.5,
+  } as const,
+);
+
+/** Ap. 3.1.1: la vivienda se ventila con un sistema híbrido o mecánico (no natural). */
+export const VIVIENDA_DISENO = tablaCTE(
+  { ...PROC_HS3, articulo: "ap. 3.1.1" },
+  { sistemasGenerales: ["hibrida", "mecanica"] as const } as const,
+);
+
+/** Ap. 3.2.3 pto 3 y 4.2.1 pto 2: conductos colectivos de la ventilación HÍBRIDA. */
+export const HIBRIDA_CONDUCTOS = tablaCTE(
+  { ...PROC_HS3, articulo: "ap. 3.2.3 pto 3; ap. 4.2.1 pto 2" },
+  {
+    /** Un colectivo no sirve a más de 6 plantas. */
+    colectivoMaxPlantas: 6,
+    /** Las dos últimas plantas, con conducto individual. */
+    ultimasPlantasIndividuales: 2,
+  } as const,
+);
+
+/** Ap. 3.1.4: aparcamientos y garajes de cualquier edificio. */
+export const GARAJE_HS3 = tablaCTE(
+  { ...PROC_HS3, articulo: "ap. 3.1.4" },
+  {
+    /** Natural o mecánica; nunca híbrida. */
+    sistemas: ["natural", "mecanica"] as const,
+    /** Natural: ningún punto a más de 25 m de una abertura, por recorrido libre. */
+    natDistMaxAbertura_m: 25,
+    /** Mecánica: 1 admisión y 1 extracción por cada 100 m² (3.1.4.2). */
+    mecSuperficiePorParAberturas_m2: 100,
+    /** Mecánica: separación entre aberturas de extracción, estrictamente menor de 10 m. */
+    mecSeparacionExtracciones_m: 10,
+    /** Mecánica: con 15 plazas o más, al menos dos redes de extracción por planta. */
+    mecPlazasDosRedes: 15,
+    /** Detección de CO si se superan 5 plazas O 100 m² (cualquiera de los dos). */
+    coUmbralPlazas: 5,
+    coUmbralSuperficie_m2: 100,
+    coPpmConEmpleados: 50,
+    coPpmSinEmpleados: 100,
+    /** Natural: aberturas mixtas de 8·qv en cada fachada opuesta (Tabla 4.1, nota 1). */
+    mixtasPorFachada_cm2_por_plaza: 960,
+  } as const,
+);
+
+/** Ap. 3.1.3 y 3.1.4.2 pto 1: trasteros (solo en edificios de viviendas, ap. 1.1). */
+export const TRASTEROS_HS3 = tablaCTE(
+  { ...PROC_HS3, articulo: "ap. 3.1.3; ap. 3.1.4.2 pto 1" },
+  {
+    sistemas: ["natural", "hibrida", "mecanica"] as const,
+    /** Pueden ventilar con el garaje solo si este es mecánico y están en su recinto. */
+    conjuntaConGarajeMecanico: true,
+  } as const,
+);
+
+/**
+ * Criterios de proyecto de la v4 (NO son CTE: la ficha los rotula así). Ver
+ * research/verificacion-hs3-v4.md, «Pendientes», 4.
+ */
+export const CRITERIOS_HS3 = {
+  origen: "criterio de proyecto (no exigencia CTE)",
+  /**
+   * El caudal que falta para igualar admisión y extracción se reparte en
+   * proporción a la Tabla 2.1 (lo propone el comentario del Ministerio) o se
+   * suma a un local (el salón; la cocina si sobra admisión).
+   */
+  hipotesisCirculacion: ["proporcional", "salon"] as const,
+  /** El caudal de paso de cada puerta es el del local al que sirve. */
+  qvpPorPuerta: "caudal del local",
+  /** Conductos en patinillo: se aplica la fórmula 4.1 (2,5·qvt), del lado seguro. */
+  patinilloConFormula41: true,
+  /** Garaje mecánico: pares de aberturas = superficie / 100 redondeado hacia arriba. */
+  aberturasGarajeRedondeo: "ceil",
+  /** Trasteros dentro del garaje mecánico: su caudal se suma al del garaje. */
+  garajeMasTrasteros: "suma",
+  /** Serie de conductos circulares para proponer un Ø a la sección (mm). */
+  serieConductos_mm: [100, 110, 125, 150, 160, 200, 250, 315, 400] as const,
+} as const;

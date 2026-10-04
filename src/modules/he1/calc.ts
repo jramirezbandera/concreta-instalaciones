@@ -11,6 +11,17 @@
 // Todas las cifras normativas provienen de ./tablas.ts (envueltas en TablaCTE
 // con procedencia). Nunca se hardcodean cifras dispersas en esta lógica.
 //
+// feature-15 (verificación v4, research/verificacion-he1-v4.md):
+//   - HUECOS por la ec. (10) del DA DB-HE/1 (`hueco`: Ug, Uf, Ψ, fracción de
+//     marco y hojas) — ya no una «capa ficticia»; a un hueco no se le aplican
+//     fRsi ni Glaser (no proceden, §6);
+//   - PARTICIONES INTERIORES (`particion_interior`, Tabla 3.2-HE1);
+//   - U = UP·b en el contacto con no habitables (DA/1 ec. 6; b = 1 por defecto);
+//   - fRsi es una comprobación complementaria (DA/2) y se puede declarar exenta
+//     (`fRsiExento`: terreno o no habitable de escasa producción de vapor);
+//   - sin clima de enero, cota del lado seguro (0 °C, 100 %) con aviso: el DA no
+//     da un valor típico.
+//
 // FORMA POR-ELEMENTO (cf. HS3, NO árbol/grafo): la entrada es un array de
 // cerramientos INDEPENDIENTES (muro, cubierta, hueco, …), cada uno por CAPAS de
 // interior a exterior. El motor NO usa src/lib/cte/grafo.ts (no hay topología de
@@ -85,6 +96,8 @@ import type {
   DireccionFlujo,
   MaterialDifusion,
   MaterialReferencia,
+  OrientacionParticion,
+  RelacionParticion,
   TipoElemento,
   TipoEncuentroPT,
   ZonaClimatica,
@@ -99,7 +112,9 @@ import {
   PSAT_MAGNUS,
   rsiRseDe,
   RSI_CONDENSACION_m2K_W,
+  UF_REFERENCIA_CEC,
   ulimDe,
+  ulimParticionDe,
 } from "./tablas";
 
 // -----------------------------------------------------------------------------
@@ -169,6 +184,18 @@ export interface CerramientoInput {
   caraInterior?: boolean;
   /** Capas del cerramiento, de INTERIOR a EXTERIOR. */
   capas: CapaInput[];
+  /** Hueco por la ec. (10) del DA DB-HE/1 (solo `tipoElemento: "hueco"`). */
+  hueco?: HuecoInput;
+  /** Partición interior: relación y orientación (Tabla 3.2-HE1). */
+  particion?: { relacion: RelacionParticion; orientacion: OrientacionParticion };
+  /** Coeficiente de reducción b del contacto con no habitables (DA/1 ec. 6); 1 por defecto. */
+  b?: number;
+  /**
+   * fRsi exenta (DA DB-HE/2 §4.1.1): contacto con el terreno o con no habitables
+   * de escasa producción de vapor. Huecos, puertas y particiones interiores lo
+   * están siempre.
+   */
+  fRsiExento?: boolean;
   /**
    * Encuentros (puentes térmicos lineales) asociados al cerramiento, para el
    * H_PT informativo. ψ §10 PENDIENTE de verificación literal (confianza BAJA).
@@ -177,6 +204,40 @@ export interface CerramientoInput {
 }
 
 /** Un encuentro lineal (puente térmico) asociado a un cerramiento. */
+/**
+ * Un hueco de una pieza: W×H, con una o dos hojas, por la ec. (10) del DA DB-HE/1
+ * sin panel ni cajón: UH = (Ag·Ug + Af·Uf + lg·Ψ) / (Ag + Af).
+ */
+export interface HuecoInput {
+  ancho_m: number;
+  alto_m: number;
+  /** Hojas: con dos, un montante central de doble ancho de marco. */
+  hojas: 1 | 2;
+  ug_W_m2K: number;
+  uf_W_m2K: number;
+  /** Ψ de la junta vidrio-marco (Tabla 10). */
+  psi_W_mK: number;
+  /** Fracción de marco; 0,25 por defecto (DB-HE Anejo A, simplificado). */
+  fraccionMarco?: number;
+  /** Longitud de la junta, si se conoce (si no, de la geometría). */
+  lg_m?: number;
+}
+
+export interface ResultadoHuecoHE1 {
+  aw_m2: number;
+  ag_m2: number;
+  af_m2: number;
+  /** Ancho de marco equivalente [m] (el que da la fracción de marco). */
+  anchoMarco_m: number;
+  lg_m: number;
+  ug_W_m2K: number;
+  uf_W_m2K: number;
+  psi_W_mK: number;
+  fraccionMarco: number;
+  hojas: 1 | 2;
+  uh_W_m2K: number;
+}
+
 export interface PuenteInput {
   /** Tipo de encuentro (DA DB-HE/3, ψ orientativo). */
   tipo: TipoEncuentroPT;
@@ -312,6 +373,15 @@ export interface ResultadoCerramientoHE1 {
   /** H_PT = Σ(ψ·L) del cerramiento [W/K]; `null` si no se declararon puentes. */
   hPuentes_W_K: number | null;
 
+  /** fRsi se comprueba (no en huecos, puertas, particiones ni exentos). */
+  fRsiAplica: boolean;
+  /** Glaser se comprueba (no en huecos, puertas ni particiones interiores). */
+  glaserAplica: boolean;
+  /** El hueco por la ec. (10), si lo es. */
+  hueco: ResultadoHuecoHE1 | null;
+  /** Coeficiente b aplicado (U = UP·b); 1 salvo contacto con no habitables. */
+  b: number;
+
   /** Peor veredicto de las verificaciones REALES del cerramiento (U + fRsi + Glaser). */
   estado: Veredicto;
   /** Motivo/justificación de la base de cálculo (RT/U vs Ulim, fRsi, Glaser). */
@@ -357,9 +427,9 @@ export interface HE1Result {
 export const he1Defaults: HE1Inputs = {
   zonaClimatica: "D",
   claseHigrometria: "clase_3_o_inferior",
-  // θe/φe de enero: dato climático orientativo de una localidad de zona D.
-  tempExteriorEnero_C: 5,
-  hrExterior_pct: 85,
+  // θe/φe de enero: Madrid (zona D3), DA DB-HE/2 Apéndice C, Tabla C.1.
+  tempExteriorEnero_C: 6.2,
+  hrExterior_pct: 71,
   cerramientos: [
     {
       id: "muro-fachada",
@@ -402,22 +472,13 @@ export const he1Defaults: HE1Inputs = {
     },
     {
       id: "ventana-salon",
-      nombre: "Ventana de salón (doble acristalamiento)",
+      nombre: "Ventana de salón (PVC, bajo emisivo, borde cálido)",
       tipoElemento: "hueco",
       direccionFlujo: "horizontal",
-      // El hueco se predimensiona por su U declarada (marco+vidrio): una sola
-      // "capa" con R directa que reproduce la U del conjunto (1/U − Rsi − Rse).
-      // Con U≈1,4: R_capa = 1/1,4 − 0,13 − 0,04 = 0,5443 m²K/W. fRsi = 1 −
-      // 1,4·0,25 = 0,65 ≥ fRsi,min(D)=0,61 → CUMPLE también la superficial.
-      capas: [
-        {
-          id: "ventana-conjunto",
-          nombre: "Acristalamiento bajo emisivo + marco (U declarada ≈ 1,4 W/m²K)",
-          espesor_m: 0.024,
-          resistencia_m2K_W: 0.5443,
-          mu: 1_000_000, // vidrio/marco: prácticamente impermeable al vapor.
-        },
-      ],
+      // Ec. (10) del DA DB-HE/1: 1,20 × 1,40 de dos hojas, Ug 1,4 (ε ≤ 0,03),
+      // PVC de tres cámaras Uf 1,8 y Ψ 0,06 (separador mejorado). UH ≈ 1,75.
+      capas: [],
+      hueco: { ancho_m: 1.2, alto_m: 1.4, hojas: 2, ug_W_m2K: 1.4, uf_W_m2K: UF_REFERENCIA_CEC.datos.uf_W_m2K.pvc_tres_camaras, psi_W_mK: 0.06 },
       puentes: [{ tipo: "contorno_hueco", longitud_m: 6 }],
     },
   ],
@@ -512,6 +573,58 @@ function resolverCapa(c: CapaInput): ResultadoCapaHE1 {
 }
 
 /**
+ * UH de un hueco por la ec. (10) del DA DB-HE/1, sin panel ni cajón. El ancho de
+ * marco equivalente sale de la fracción de marco: con una hoja,
+ * (W−2b)(H−2b) = (1−FF)·W·H; con dos, (W−4b)(H−2b) = (1−FF)·W·H (montante de 2b).
+ * La junta: el perímetro de los vidrios (lg editable).
+ */
+export function uHueco(h: HuecoInput): ResultadoHuecoHE1 {
+  const W = Math.max(0, h.ancho_m);
+  const H = Math.max(0, h.alto_m);
+  const ff = Math.min(0.9, Math.max(0, h.fraccionMarco ?? UF_REFERENCIA_CEC.datos.fraccionMarcoDefecto));
+  const aw = W * H;
+  let b: number;
+  if (h.hojas === 2) {
+    const k = 4 * H + 2 * W;
+    b = (k - Math.sqrt(Math.max(0, k * k - 32 * ff * aw))) / 16;
+  } else {
+    const k = W + H;
+    b = (k - Math.sqrt(Math.max(0, k * k - 4 * ff * aw))) / 4;
+  }
+  const lgGeo = h.hojas === 2 ? 2 * Math.max(0, W - 4 * b) + 4 * Math.max(0, H - 2 * b) : 2 * Math.max(0, W - 2 * b) + 2 * Math.max(0, H - 2 * b);
+  const lg = Number.isFinite(h.lg_m) && (h.lg_m as number) >= 0 ? (h.lg_m as number) : lgGeo;
+  const ag = (1 - ff) * aw;
+  const af = ff * aw;
+  const uh = aw > 0 ? (ag * h.ug_W_m2K + af * h.uf_W_m2K + lg * h.psi_W_mK) / aw : 0;
+  return {
+    aw_m2: aw,
+    ag_m2: ag,
+    af_m2: af,
+    anchoMarco_m: b,
+    lg_m: lg,
+    ug_W_m2K: h.ug_W_m2K,
+    uf_W_m2K: h.uf_W_m2K,
+    psi_W_mK: h.psi_W_mK,
+    fraccionMarco: ff,
+    hojas: h.hojas,
+    uh_W_m2K: uh,
+  };
+}
+
+/**
+ * Espesor mínimo de una capa [m] para que el cerramiento no pase de `uObjetivo`
+ * (invierte U = b/RT con el resto de capas iguales). `null` si la capa no tiene λ.
+ * 0 si ya cumple sin ella.
+ */
+export function espesorMinimoCapa_m(r: ResultadoCerramientoHE1, capaId: string, uObjetivo: number): number | null {
+  const capa = r.capas.find((c) => c.id === capaId);
+  if (!capa || capa.lambda_W_mK === null || capa.lambda_W_mK <= 0 || !(uObjetivo > 0)) return null;
+  const rtNecesaria = r.b / uObjetivo;
+  const resto = r.rt_m2K_W - capa.resistencia_m2K_W;
+  return Math.max(0, (rtNecesaria - resto) * capa.lambda_W_mK);
+}
+
+/**
  * Mapea una clave de material térmico (CEC) a su clave de difusión equivalente
  * cuando coinciden por nombre; `null` si no hay correspondencia directa (el
  * usuario debe dar `materialDifusion` o `mu`/`sd_m`). Conservador: solo mapea
@@ -564,26 +677,26 @@ export function calcHE1(inp: HE1Inputs): HE1Result {
     ? (inp.hrInterior_pct as number)
     : cd.hrInterior_pct[inp.claseHigrometria];
 
-  // θe/φe de ENERO son DATO CLIMÁTICO de entrada (Anejo DB-HE), no del DA.
+  // θe/φe de ENERO: DA DB-HE/2, Apéndice C, Tabla C.1 (entrada del motor). Sin
+  // dato, una cota del lado seguro, con aviso: el DA no da un valor típico.
   let tempExteriorEnero_C: number;
   if (Number.isFinite(inp.tempExteriorEnero_C)) {
     tempExteriorEnero_C = inp.tempExteriorEnero_C as number;
   } else {
-    // Sin dato climático: 0 °C conservador (mes frío) con aviso explícito.
-    tempExteriorEnero_C = 0;
+    tempExteriorEnero_C = cd.sinDatoExterior.temp_C;
     warnings.push(
-      "Temperatura exterior de enero no aportada: se usa 0 °C (valor conservador). " +
-        "Es un DATO CLIMÁTICO de la localidad (Anejo del DB-HE); aporta el valor real.",
+      `Temperatura exterior de enero no aportada: se usa ${cd.sinDatoExterior.temp_C} °C (cota del lado seguro). ` +
+        "Es un dato climático: DA DB-HE/2, Apéndice C, Tabla C.1.",
     );
   }
   let hrExterior_pct: number;
   if (Number.isFinite(inp.hrExterior_pct)) {
     hrExterior_pct = inp.hrExterior_pct as number;
   } else {
-    hrExterior_pct = cd.hrExteriorDefecto_pct;
+    hrExterior_pct = cd.sinDatoExterior.hr_pct;
     warnings.push(
-      `HR exterior de enero no aportada: se usa ${cd.hrExteriorDefecto_pct} % (default informativo, ` +
-        "confianza media). Es un DATO CLIMÁTICO de la localidad; aporta el valor real.",
+      `HR exterior de enero no aportada: se usa ${cd.sinDatoExterior.hr_pct} % (cota del lado seguro). ` +
+        "Es un dato climático: DA DB-HE/2, Apéndice C, Tabla C.1.",
     );
   }
 
@@ -672,14 +785,20 @@ function calcularCerramiento(
   const rsi_m2K_W = sup.rsi_m2K_W;
   const rse_m2K_W = sup.rse_m2K_W;
 
-  // --- Transmitancia U = 1/RT (RT = Rsi + ΣRi + Rse) -------------------------
+  // --- Transmitancia U = b/RT (RT = Rsi + ΣRi + Rse) -------------------------
+  // Un hueco con `hueco` va por la ec. (10) del DA DB-HE/1: su RT es 1/UH.
+  const hueco = cer.tipoElemento === "hueco" && cer.hueco ? uHueco(cer.hueco) : null;
   const sumaRi = capas.reduce((acc, c) => acc + c.resistencia_m2K_W, 0);
-  const rt_m2K_W = rsi_m2K_W + sumaRi + rse_m2K_W;
+  const rt_m2K_W = hueco && hueco.uh_W_m2K > 0 ? 1 / hueco.uh_W_m2K : rsi_m2K_W + sumaRi + rse_m2K_W;
+  const b = cer.tipoElemento === "contacto_no_habitable_terreno" && Number.isFinite(cer.b) && (cer.b as number) > 0 ? Math.min(1, cer.b as number) : 1;
   // RT siempre ≥ Rsi+Rse > 0; U finita y positiva.
-  const u_W_m2K = rt_m2K_W > 0 ? 1 / rt_m2K_W : Number.POSITIVE_INFINITY;
+  const u_W_m2K = rt_m2K_W > 0 ? b / rt_m2K_W : Number.POSITIVE_INFINITY;
 
-  // --- Veredicto de transmitancia vs Ulim (Tabla 3.1.1.a) --------------------
-  const ulim_W_m2K = ulimDe(cer.tipoElemento, zona);
+  // --- Veredicto de transmitancia vs Ulim (Tabla 3.1.1.a o 3.2) ----------------
+  const ulim_W_m2K =
+    cer.tipoElemento === "particion_interior"
+      ? ulimParticionDe(cer.particion?.relacion ?? "distinto_uso", cer.particion?.orientacion ?? "horizontal", zona)
+      : ulimDe(cer.tipoElemento, zona);
   let margenU: number | null = null;
   let cumpleU: boolean;
   let estadoU: Veredicto;
@@ -701,15 +820,26 @@ function calcularCerramiento(
 
   // --- Condensación superficial: fRsi = 1 − U·0,25 (Rsi=0,25 FIJO) -----------
   // ⚠️ 0,25 es el Rsi FIJO de la comprobación de fRsi, NO el Rsi de la U.
+  // No procede en huecos ni puertas (criterio de moho de opacos, §6.2), ni en las
+  // particiones interiores ni en lo declarado exento (DA/2 §4.1.1).
+  const fRsiAplica =
+    cer.fRsiExento !== true &&
+    cer.tipoElemento !== "hueco" &&
+    cer.tipoElemento !== "puerta" &&
+    cer.tipoElemento !== "particion_interior";
   const fRsi = 1 - u_W_m2K * RSI_CONDENSACION_m2K_W;
   const fRsiMin = fRsiMinDe(clase, zona);
-  const cumpleFRsi = fRsi >= fRsiMin;
-  const estadoFRsi: Veredicto = cumpleFRsi ? "ok" : "fail";
+  const cumpleFRsi = !fRsiAplica || fRsi >= fRsiMin;
+  const estadoFRsi: Veredicto = !fRsiAplica ? "neutral" : cumpleFRsi ? "ok" : "fail";
   // U máxima por condensación superficial: U_max_fRsi = (1 − fRsi,min)/0,25.
   const uMaxFRsi_W_m2K = (1 - fRsiMin) / RSI_CONDENSACION_m2K_W;
 
   // --- Condensación intersticial (Glaser, mes de enero, binario) -------------
-  const glaser = calcularGlaser(
+  // No procede en huecos ni puertas (sin capas que difundan, §6.1); en las
+  // particiones interiores no es exigible (el ap. 3.3 habla de la envolvente).
+  const glaserAplica =
+    cer.tipoElemento !== "hueco" && cer.tipoElemento !== "puerta" && cer.tipoElemento !== "particion_interior";
+  const glaserCalc = calcularGlaser(
     capas,
     rsi_m2K_W,
     rt_m2K_W,
@@ -718,9 +848,12 @@ function calcularCerramiento(
     tempExteriorEnero_C,
     hrExterior_pct,
   );
+  const glaser: ResultadoGlaserHE1 = glaserAplica
+    ? glaserCalc
+    : { ...glaserCalc, condensa: glaserCalc.condensa.map(() => false), condensaIntersticial: false };
   // SIN condensación → ok; CON condensación → warn (revisar), NUNCA fail tajante
   // (el balance anual de evaporación excede el predimensionado por elemento).
-  const estadoGlaser: Veredicto = glaser.condensaIntersticial ? "warn" : "ok";
+  const estadoGlaser: Veredicto = !glaserAplica ? "neutral" : glaser.condensaIntersticial ? "warn" : "ok";
   if (glaser.condensaIntersticial) {
     warnings.push(
       `Cerramiento "${cer.id}": posible condensación intersticial en enero (Glaser). ` +
@@ -752,14 +885,20 @@ function calcularCerramiento(
   estado = peor(estado, estadoGlaser);
 
   // --- Motivo (justificación de la base de cálculo) --------------------------
-  const ulimTxt = ulim_W_m2K === null ? "no aplica (medianería)" : `${ulim_W_m2K} W/m²K`;
+  const ulimTxt = ulim_W_m2K === null ? "no aplica" : `${ulim_W_m2K} W/m²K`;
+  const base = hueco
+    ? `UH = (Ag·Ug + Af·Uf + lg·Ψ)/Aw = ${u_W_m2K.toFixed(3)} W/m²K (DA DB-HE/1 ec. 10)`
+    : `RT = Rsi(${rsi_m2K_W}) + ΣRi(${sumaRi.toFixed(3)}) + Rse(${rse_m2K_W}) = ` +
+      `${rt_m2K_W.toFixed(3)} m²K/W → U = ${b === 1 ? "" : `${b}·`}1/RT = ${u_W_m2K.toFixed(3)} W/m²K`;
   const motivo =
-    `RT = Rsi(${rsi_m2K_W}) + ΣRi(${sumaRi.toFixed(3)}) + Rse(${rse_m2K_W}) = ` +
-    `${rt_m2K_W.toFixed(3)} m²K/W → U = ${u_W_m2K.toFixed(3)} W/m²K · Ulim ${ulimTxt}` +
+    `${base} · Ulim ${ulimTxt}` +
     (ulim_W_m2K !== null ? ` (${cumpleU ? "CUMPLE" : "NO CUMPLE"})` : "") +
-    ` · fRsi = 1 − U·0,25 = ${fRsi.toFixed(3)} ≥ fRsi,min ${fRsiMin} ` +
-    `(${cumpleFRsi ? "CUMPLE" : "NO CUMPLE"}) · Glaser enero: ` +
-    `${glaser.condensaIntersticial ? "posible condensación (REVISAR)" : "sin condensación"}.`;
+    (fRsiAplica
+      ? ` · fRsi = 1 − U·0,25 = ${fRsi.toFixed(3)} ≥ fRsi,min ${fRsiMin} (${cumpleFRsi ? "CUMPLE" : "NO CUMPLE"})`
+      : " · fRsi: no aplica") +
+    (glaserAplica
+      ? ` · Glaser enero: ${glaser.condensaIntersticial ? "posible condensación (REVISAR)" : "sin condensación"}.`
+      : " · Glaser: no aplica.");
 
   return {
     id: cer.id,
@@ -780,6 +919,10 @@ function calcularCerramiento(
     uMaxFRsi_W_m2K,
     glaser,
     hPuentes_W_K,
+    fRsiAplica,
+    glaserAplica,
+    hueco,
+    b,
     estado,
     motivo,
     notas,

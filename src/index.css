@@ -127,6 +127,11 @@ html.theme-switching *::after {
   --color-chart-dim: #64748b;
   --color-chart-dim-text: #475569;
   --color-chart-label: #0f172a;
+  /* Sección de los dibujos v4 (feature-14): tinta de las redes, forjados y
+     terreno — los de las maquetas de Concreta. */
+  --color-ink: #475569;
+  --color-slab: #e2e8f0;
+  --color-earth: #c3cbd6;
   --color-dot-grid: #e2e8f0;
   --color-scrollbar: #94a3b8;
   --color-scrollbar-hover: #64748b;
@@ -179,6 +184,9 @@ html[data-theme="dark"] {
   --color-chart-dim: #9a9ea7;
   --color-chart-dim-text: #9a9ea7;
   --color-chart-label: #e6e7ea;
+  --color-ink: #9a9ea7;
+  --color-slab: #2c2c34;
+  --color-earth: #3a3a44;
   --color-dot-grid: #1f1f26;
   --color-scrollbar: #34343c;
   --color-scrollbar-hover: #4b4f59;

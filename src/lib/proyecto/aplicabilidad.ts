@@ -1,19 +1,48 @@
 import type {
   Aplicabilidad,
   DatosGenerales,
+  Edificio,
+  Intervencion,
   JustificacionKey,
   Proyecto,
 } from "./tipos";
 import { justificacionRegistry } from "../../data/justificacionRegistry";
+import { resumenEdificio } from "../edificio/derivar";
 
 // Motor de aplicabilidad — Fase A, obra nueva (feature-6 §A, UX-RECONCEPT §2.3 y §5).
-// Lib PURA: sin React/DOM/Date.now. Dado `DatosGenerales` propone, por justificación,
-// una aplicabilidad CON párrafo redactado y cita de ámbito (los "no aplica" que hoy se
-// copian con errores de memorias anteriores). El motor de reformas por DB llega en
-// Fase E; aquí la intervención ≠ obra nueva solo añade el aviso de alcance pendiente.
+// Lib PURA: sin React/DOM/Date.now. Dados los atributos del proyecto propone, por
+// justificación, una aplicabilidad CON párrafo redactado y cita de ámbito (los "no aplica"
+// que hoy se copian con errores de memorias anteriores). El motor de reformas por DB llega
+// en Fase E; aquí la intervención ≠ obra nueva solo añade el aviso de alcance pendiente.
 // Principio §5: la herramienta propone con cita; el proyectista dispone (forzado).
 //
+// Desde feature-12 los atributos ya no se teclean: salen de El edificio (`atributosDe`),
+// salvo la piscina y la intervención, que son datos de la obra.
+//
 // Citas a nivel de sección/ámbito, nunca números de artículo inventados (SPEC §11).
+
+/** Lo que leen las reglas de aplicabilidad. */
+export interface AtributosProyecto {
+  intervencion: Intervencion;
+  tienePiscina: boolean;
+  esUnifamiliar: boolean;
+  tieneViviendas: boolean;
+  tieneGaraje: boolean;
+  tieneTrasteros: boolean;
+}
+
+/** Atributos del proyecto: la piscina y la intervención de la obra; el resto, del edificio. */
+export function atributosDe(dg: DatosGenerales, edificio: Edificio): AtributosProyecto {
+  const r = resumenEdificio(edificio);
+  return {
+    intervencion: dg.intervencion,
+    tienePiscina: dg.tienePiscina,
+    esUnifamiliar: r.esUnifamiliar,
+    tieneViviendas: r.tieneViviendas,
+    tieneGaraje: r.tieneGaraje,
+    tieneTrasteros: r.tieneTrasteros,
+  };
+}
 
 /** Aplicabilidad propuesta por el motor para una justificación, con su redacción. */
 export interface AplicabilidadCalculada {
@@ -24,11 +53,11 @@ export interface AplicabilidadCalculada {
   cita?: string;
 }
 
-/** Regla de atributos: si `cuando(dg)` es true, la justificación `key` toma `resultado`. */
+/** Regla de atributos: si `cuando(a)` es true, la justificación `key` toma `resultado`. */
 export interface ReglaAtributo {
   key: JustificacionKey;
   /** true ⇒ se aplica la regla. */
-  cuando: (dg: DatosGenerales) => boolean;
+  cuando: (a: AtributosProyecto) => boolean;
   resultado: Aplicabilidad;
   /** Párrafo REDACTADO listo para la memoria. */
   nota: string;
@@ -44,7 +73,7 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
   // ── SUA 6 · Piscinas ───────────────────────────────────────────────────────
   {
     key: "sua6",
-    cuando: (dg) => !dg.tienePiscina,
+    cuando: (a) => !a.tienePiscina,
     resultado: "no_aplica",
     nota:
       "SUA 6 Seguridad frente al riesgo de ahogamiento: no es de aplicación — " +
@@ -59,7 +88,7 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
     // "Piscina" en una unifamiliar exigía justificar una sección que no le es
     // de aplicación.
     key: "sua6",
-    cuando: (dg) => dg.uso === "vivienda_unifamiliar",
+    cuando: (a) => a.esUnifamiliar,
     resultado: "no_aplica",
     nota:
       "SUA 6 Seguridad frente al riesgo de ahogamiento: no es de aplicación — " +
@@ -71,7 +100,7 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
   // ── SUA 7 · Aparcamientos ──────────────────────────────────────────────────
   {
     key: "sua7",
-    cuando: (dg) => !dg.tieneGaraje,
+    cuando: (a) => !a.tieneGaraje,
     resultado: "no_aplica",
     nota:
       "SUA 7 Seguridad frente al riesgo causado por vehículos en movimiento: " +
@@ -85,7 +114,7 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
     // Solo se evalúa cuando la anterior no casa (⇒ tieneGaraje): el ámbito de
     // SUA 7 excluye los aparcamientos de las viviendas unifamiliares.
     key: "sua7",
-    cuando: (dg) => dg.uso === "vivienda_unifamiliar",
+    cuando: (a) => a.esUnifamiliar,
     resultado: "no_aplica",
     nota:
       "SUA 7 Seguridad frente al riesgo causado por vehículos en movimiento: " +
@@ -94,10 +123,28 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
       "viviendas unifamiliares).",
     cita: "DB-SUA 7, ámbito de aplicación",
   },
+  // ── DB-HS 3 · Calidad del aire interior (feature-12) ───────────────────────
+  {
+    // Ámbito verificado el 2026-10-03 (research/verificacion-edificio-usos.md,
+    // bloque C): interior de las viviendas, almacenes de residuos y trasteros de
+    // los edificios de viviendas, y aparcamientos y garajes de cualquier uso. Un
+    // edificio sin viviendas ni garaje (oficinas) queda fuera: RITE.
+    key: "hs3",
+    cuando: (a) => !a.tieneViviendas && !a.tieneGaraje,
+    resultado: "no_aplica",
+    nota:
+      "DB-HS 3 Calidad del aire interior: no es de aplicación — el edificio no " +
+      "tiene viviendas ni aparcamientos o garajes (el ámbito de la Sección HS 3 " +
+      "se limita al interior de las viviendas, a los almacenes de residuos y " +
+      "trasteros de los edificios de viviendas y a los aparcamientos y garajes " +
+      "de cualquier edificio). En los demás locales las exigencias de calidad " +
+      "del aire interior se consideran cumplidas con las condiciones del RITE.",
+    cita: "DB-HS 3, ámbito de aplicación",
+  },
   // ── DB-HR · Protección frente al ruido ─────────────────────────────────────
   {
     key: "hr",
-    cuando: (dg) => dg.uso === "vivienda_unifamiliar",
+    cuando: (a) => a.esUnifamiliar,
     resultado: "no_aplica",
     nota:
       "DB-HR Protección frente al ruido: no es de aplicación — vivienda " +
@@ -126,10 +173,10 @@ const KEYS_EXPEDIENTE: readonly JustificacionKey[] = justificacionRegistry
  *  2. `REGLAS_ATRIBUTOS` en orden — para cada key gana la primera que casa.
  *  3. Resto → `aplica`; si la intervención no es obra nueva, con el aviso de
  *     alcance pendiente (motor de reformas en Fase E).
- * Función pura y determinista: mismo `dg` ⇒ mismo resultado.
+ * Función pura y determinista: mismos atributos ⇒ mismo resultado.
  */
 export function aplicabilidadBase(
-  dg: DatosGenerales,
+  a: AtributosProyecto,
 ): Record<JustificacionKey, AplicabilidadCalculada> {
   const resultado = {} as Record<JustificacionKey, AplicabilidadCalculada>;
   for (const key of KEYS_EXPEDIENTE) {
@@ -144,7 +191,7 @@ export function aplicabilidadBase(
       continue;
     }
     // 2. Reglas de atributos: primera que casa gana.
-    const regla = REGLAS_ATRIBUTOS.find((r) => r.key === key && r.cuando(dg));
+    const regla = REGLAS_ATRIBUTOS.find((r) => r.key === key && r.cuando(a));
     if (regla) {
       resultado[key] = {
         aplicabilidad: regla.resultado,
@@ -155,7 +202,7 @@ export function aplicabilidadBase(
     }
     // 3. Resto: aplica (obra nueva); intervención existente ⇒ aviso de alcance.
     resultado[key] =
-      dg.intervencion === "obra_nueva"
+      a.intervencion === "obra_nueva"
         ? { aplicabilidad: "aplica" }
         : {
             aplicabilidad: "aplica",
@@ -179,5 +226,5 @@ export function aplicabilidadEfectiva(
   if (forzada) {
     return { aplicabilidad: forzada.valor, nota: forzada.nota, forzada: true };
   }
-  return { ...aplicabilidadBase(p.datosGenerales)[key], forzada: false };
+  return { ...aplicabilidadBase(atributosDe(p.datosGenerales, p.edificio))[key], forzada: false };
 }

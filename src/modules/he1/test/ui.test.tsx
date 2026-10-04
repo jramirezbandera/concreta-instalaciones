@@ -5,67 +5,23 @@ import { DEMO_ID } from "../../../lib/proyecto/demo";
 import { inicializarStorage } from "../../../lib/proyecto/storage";
 
 // =============================================================================
-// Integración de la zona de trabajo HE1 (feature-8 §B) sobre el router real:
-// outliner cerramiento → capas → puentes, cableado outliner ↔ estado ↔ motor
-// (editar el espesor de una capa mueve la U del cerramiento), teclado (Enter
-// añade una capa hermana en el MISMO cerramiento) y sincronía tabla → pie de
-// selección (franja bajo la lista y bajo el esquema) y lista de cerramientos de
-// la izquierda. Anatomía v4: la tabla vive en Comprobaciones. Mismo patrón que `hs5/test/ui.test.tsx` y
-// `hs3/test/ui.test.tsx` (router de módulo-nivel: hash ANTES de importar App y
-// resetModules; archivo propio para respetar el límite de ~3 routers/jsdom).
-//
-// NO se aserta el detalle del SVG (tiene su propio contrato en svg-meta): aquí
-// se valida el cableado outliner ↔ estado ↔ motor ↔ banda/selección.
+// HE1 v4 (feature-15) sobre el router real y el Demo («Plurifamiliar con
+// locales», Cáceres, zona C): cabecera redactada, «Qué entra» con los
+// cerramientos, decisiones, el dibujo por cerramiento con su franja, el
+// incumplimiento con su arreglo, la lista y la memoria. Mismo patrón que HS5
+// (hash ANTES de importar App y resetModules).
 // =============================================================================
 
-// El módulo es LAZY: el primer render del archivo paga la carga del chunk, así
-// que cada test espera el treegrid con timeout largo (patrón rutas-legacy).
 const ESPERA_CHUNK = { timeout: 8000 };
+const FACHADA = "Sección de la fachada · a escala";
 
-// Nombres sembrados por el Demo (he1Defaults + zona climática del expediente).
-const MURO = "Muro de fachada (½ pie + XPS + cámara + tabique)";
-const CUBIERTA = "Cubierta plana invertida";
-const VENTANA = "Ventana de salón (doble acristalamiento)";
-const CAPA_XPS = "Aislante XPS (60 mm)";
-const CAPA_CAMARA = "Cámara de aire sin ventilar (30 mm)";
-
-/** Monta HE1 en Esquema (su vista inicial), sin abrir Comprobaciones. */
-async function renderHe1Esquema() {
+async function renderHe1() {
   window.location.hash = `#/p/${DEMO_ID}/he/envolvente`;
   vi.resetModules();
   const { App } = await import("../../../App");
   const utils = render(<App />);
-  await utils.findByRole("complementary", { name: "Esquema del cerramiento" }, ESPERA_CHUNK);
+  await utils.findByRole("complementary", { name: FACHADA }, ESPERA_CHUNK);
   return utils;
-}
-
-/** Monta HE1 y abre Comprobaciones, donde vive la tabla de cerramientos. */
-async function renderHe1() {
-  const utils = await renderHe1Esquema();
-  await userEvent.setup().click(utils.getByRole("tab", { name: "Comprobaciones" }));
-  await utils.findByRole("treegrid");
-  return utils;
-}
-
-/** Fila (tr) del outliner cuya celda-nombre muestra el valor dado. */
-async function filaPorNombre(
-  utils: Awaited<ReturnType<typeof renderHe1>>,
-  nombre: string,
-) {
-  const input = await utils.findByDisplayValue(nombre);
-  return input.closest("tr")!;
-}
-
-/**
- * U [W/m²K] leída de la celda "U / R" de una fila de cerramiento ("U 0,38 ≤
- * 0,49"). Se re-consulta el DOM en cada llamada (la fila es el mismo nodo entre
- * renders, su contenido no).
- */
-function uDe(fila: HTMLElement): number {
-  const texto = (within(fila).getByText(/^U /).textContent ?? "").trim();
-  const m = /^U\s+([\d,]+)/.exec(texto);
-  expect(m).not.toBeNull();
-  return Number(m![1].replace(",", "."));
 }
 
 beforeEach(() => {
@@ -75,140 +31,59 @@ beforeEach(() => {
   inicializarStorage("2026-08-23T00:00:00.000Z");
 });
 
-describe("HE1 · zona de trabajo feature-8 (outliner + esquema)", () => {
-  it("monta el outliner con los cerramientos del Demo, sus capas y la banda del veredicto", async () => {
-    const utils = await renderHe1();
-    const { findByDisplayValue, findByText } = utils;
+describe("HE1 · desde El edificio (feature-15)", () => {
+  it("cabecera, qué entra, decisiones y la franja de la fachada", async () => {
+    const { findAllByText, getByRole, findByRole } = await renderHe1();
+    const frases = await findAllByText(/Todos los elementos de la envolvente están por debajo de los límites de zona C/);
+    expect(frases.some((f) => f.tagName === "P")).toBe(true);
 
-    // Cerramientos del Demo (depth 0) con editor de nombre inline.
-    expect(await findByDisplayValue(MURO)).toBeInTheDocument();
-    expect(await findByDisplayValue(CUBIERTA)).toBeInTheDocument();
-    expect(await findByDisplayValue(VENTANA)).toBeInTheDocument();
+    const entra = getByRole("region", { name: "Qué entra" });
+    expect(entra).toHaveTextContent(/Zona climática.*Cáceres, 459 m.*C4/);
+    expect(entra).toHaveTextContent(/Forjado sobre el local.*0,45 \/ 0,70/);
 
-    // Capas (depth 1) del muro, en orden interior→exterior; la cámara sin
-    // material y el XPS con material del CEC.
-    const filaCamara = await filaPorNombre(utils, CAPA_CAMARA);
-    const filaXps = await filaPorNombre(utils, CAPA_XPS);
-    expect(filaCamara).toHaveAttribute("aria-level", "2");
-    expect(filaXps).toHaveAttribute("aria-level", "2");
-    // El select de material de la capa muestra el TEXTO de la opción elegida.
-    expect(
-      within(filaCamara).getByRole("combobox"),
-    ).toHaveDisplayValue("— personalizado (λ / R manual)");
-    // Resultado en línea de la capa: su R calculada.
-    expect(filaXps).toHaveTextContent(/^.*R \d+,\d+/);
+    const decisiones = getByRole("region", { name: "Decisiones" });
+    expect(within(decisiones).getByRole("group", { name: "Aislante de la fachada" })).toHaveTextContent("60");
+    expect(within(decisiones).getByRole("button", { name: "No habitable" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(decisiones).getByRole("button", { name: "Bajo emisivo" })).toHaveAttribute("aria-pressed", "true");
 
-    // La fila del cerramiento trae el resultado en línea: U vs límite efectivo.
-    const filaMuro = await filaPorNombre(utils, MURO);
-    expect(filaMuro).toHaveTextContent(/U \d+,\d+ ≤ \d+,\d+/);
-    expect(uDe(filaMuro)).toBeGreaterThan(0);
-
-    // Puentes térmicos del muro (depth 1, kind "puente"): el Demo siembra dos.
-    expect(
-      await utils.findAllByText("Puente térmico"),
-    ).toHaveLength(4); // 2 del muro + 1 de la cubierta + 1 de la ventana
-
-    // La banda de veredicto del shell refleja el motor sobre el Demo (zona
-    // climática heredada del expediente: Cáceres, 459 m → C4 → letra C).
-    expect(
-      await findByText(/Envolvente térmica \(zona C\)/),
-    ).toBeInTheDocument();
+    const aside = await findByRole("complementary", { name: FACHADA });
+    expect(aside).toHaveTextContent(/El aislante: con 60 mm se lleva el 68 % de la resistencia del muro\. Cumple desde 50 mm\./);
   });
 
-  it("editar el espesor de una capa cambia la U del cerramiento (outliner → estado → motor)", async () => {
+  it("bajar el aislante a 40 mm no cumple; «Poner 50 mm» lo arregla", async () => {
     const user = userEvent.setup();
-    const utils = await renderHe1();
-
-    const filaMuro = await filaPorNombre(utils, MURO);
-    const uAntes = uDe(filaMuro);
-
-    // Numéricos de la fila de capa, en orden de columna: e · λ · R · µ · Sd
-    // (comparten aria-label "Valor": la unidad vive en la cabecera).
-    const filaXps = await filaPorNombre(utils, CAPA_XPS);
-    const espesor = within(filaXps).getAllByLabelText("Valor")[0];
-    expect(espesor).toHaveValue(0.06);
-
-    // Engordar el aislante baja la transmitancia del cerramiento entero. El
-    // estado es DIFERIDO (useDeferredValue) → waitFor.
-    await user.clear(espesor);
-    await user.type(espesor, "1");
-
-    await waitFor(() => {
-      expect(uDe(filaMuro)).toBeLessThan(uAntes);
-    });
-    // …y la R de la propia capa sube con ella (el resultado por capa también).
-    await waitFor(() => {
-      expect(filaXps).toHaveTextContent(/R \d\d+,\d+/);
-    });
+    const { getByRole, findByText, findByRole } = await renderHe1();
+    const paso = within(getByRole("region", { name: "Decisiones" })).getByRole("group", { name: "Aislante de la fachada" });
+    await user.click(within(paso).getByRole("button", { name: "Bajar 10 mm" }));
+    await user.click(within(paso).getByRole("button", { name: "Bajar 10 mm" }));
+    expect(await findByText("La fachada no cumple")).toBeInTheDocument();
+    await user.click(getByRole("button", { name: "Poner 50 mm" }));
+    const aside = await findByRole("complementary", { name: FACHADA });
+    await waitFor(() => expect(aside).toHaveTextContent(/con 50 mm se lleva/));
   });
 
-  it("Enter sobre una fila de capa añade otra capa en el mismo cerramiento (teclado primero)", async () => {
+  it("el local como otra unidad cambia el límite del forjado; la ventana se ve en alzado", async () => {
     const user = userEvent.setup();
-    const utils = await renderHe1();
-    const { findByDisplayValue, findAllByRole } = utils;
+    const { getByRole, findByRole } = await renderHe1();
+    await user.click(within(getByRole("region", { name: "Decisiones" })).getByRole("button", { name: "Otra unidad" }));
+    await user.click(within(getByRole("region", { name: "Qué entra" })).getByRole("button", { name: /Forjado sobre el local/ }));
+    const suelo = await findByRole("complementary", { name: "Sección del forjado sobre el local" });
+    await waitFor(() => expect(suelo).toHaveTextContent(/partición entre usos distintos: límite 0,95/));
 
-    // Seleccionar la fila del XPS (clic fuera de un editor: en el tr).
-    const filaXps = await filaPorNombre(utils, CAPA_XPS);
-    await user.click(filaXps);
-    const antes = (await findAllByRole("row")).length;
-
-    await user.keyboard("{Enter}");
-
-    // Capa nueva con id determinista del cerramiento, insertada JUSTO DESPUÉS
-    // de la fila de referencia (el orden del array es la física del muro).
-    const nueva = await findByDisplayValue("muro-fachada-cap-1");
-    const filaNueva = nueva.closest("tr")!;
-    expect(filaXps.nextElementSibling).toBe(filaNueva);
-    expect(filaNueva).toHaveAttribute("aria-level", "2");
-    await waitFor(async () => {
-      expect((await findAllByRole("row")).length).toBe(antes + 1);
-    });
+    await user.click(within(getByRole("region", { name: "Qué entra" })).getByRole("button", { name: /Ventanas/ }));
+    const ventana = await findByRole("complementary", { name: "Alzado de la ventana tipo" });
+    expect(ventana).toHaveTextContent(/Junta vidrio-marco/);
   });
 
-  it("seleccionar una fila muestra su resumen en la franja y dibuja su cerramiento", async () => {
+  it("Comprobaciones es la lista; Memoria, el texto", async () => {
     const user = userEvent.setup();
-    const utils = await renderHe1();
-    const { findByRole, getByRole } = utils;
+    const { getByRole, findByRole } = await renderHe1();
+    await user.click(getByRole("tab", { name: "Comprobaciones" }));
+    const lista = await findByRole("list", { name: /^Comprobaciones: 7/ });
+    expect(within(lista).getByRole("button", { name: /Ventanas\s*1,99 ≤ 2,10\s*cumple/ })).toBeInTheDocument();
 
-    // Fila de capa → nombre, espesor y R, en la franja bajo la lista.
-    await user.click(await filaPorNombre(utils, CAPA_XPS));
-    const lista = await findByRole("region", { name: "Comprobaciones" });
-    await waitFor(() => {
-      expect(lista).toHaveTextContent(
-        /Seleccionado: Aislante XPS \(60 mm\) — e 0,06 m · R \d+,\d+/,
-      );
-    });
-
-    // Fila de cerramiento → U vs límite efectivo y veredicto en texto. La
-    // selección sobrevive al cambio de pestaña: el esquema dibuja la cubierta.
-    await user.click(await filaPorNombre(utils, CUBIERTA));
-    await user.click(getByRole("tab", { name: "Esquema" }));
-    const aside = await findByRole("complementary", {
-      name: "Esquema del cerramiento",
-    });
-    await waitFor(() => {
-      expect(aside).toHaveTextContent(
-        /Seleccionado: Cubierta plana invertida — U \d+,\d+ ≤ \d+,\d+ · (Cumple|Aviso|No cumple|Informativo)/,
-      );
-    });
-
-    // …y el panel pinta SOLO ese cerramiento (`soloCerramientoId`): el <title>
-    // del SVG nombra la cubierta y el muro ya no aparece en el aside.
-    expect(aside).toHaveTextContent("Cerramiento Cubierta plana invertida");
-    expect(aside).not.toHaveTextContent("Muro de fachada");
-  });
-
-  it("la lista de cerramientos de la izquierda cambia el que se dibuja", async () => {
-    const user = userEvent.setup();
-    const { findByRole } = await renderHe1Esquema();
-
-    const lista = await findByRole("region", { name: "Cerramientos" });
-    await user.click(within(lista).getByRole("button", { name: new RegExp(CUBIERTA) }));
-
-    const aside = await findByRole("complementary", { name: "Esquema del cerramiento" });
-    await waitFor(() => {
-      expect(aside).toHaveTextContent("Cerramiento Cubierta plana invertida");
-    });
-    expect(aside).not.toHaveTextContent("Muro de fachada");
+    await user.click(getByRole("tab", { name: "Memoria" }));
+    const memoria = await findByRole("region", { name: "Memoria" });
+    expect(memoria).toHaveTextContent(/Esta comprobación es un predimensionado por elementos/);
   });
 });

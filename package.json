@@ -16,9 +16,13 @@
     "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.111.0",
+    "@google/genai": "2.11.0",
     "@tailwindcss/vite": "^4.2.2",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.7.0",
+    "openai": "6.46.0",
+    "pdfjs-dist": "6.3.289",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-helmet-async": "^3.0.0",

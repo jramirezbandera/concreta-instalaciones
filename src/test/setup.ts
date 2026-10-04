@@ -25,8 +25,9 @@ if (typeof globalThis.IntersectionObserver === "undefined") {
 }
 
 // jsdom doesn't implement scrollIntoView — the municipality combobox calls it
-// to keep the keyboard-highlighted option in view.
-if (typeof Element.prototype.scrollIntoView !== "function") {
+// to keep the keyboard-highlighted option in view. (Without DOM — the live
+// tests run in node — there is no Element to patch.)
+if (typeof Element !== "undefined" && typeof Element.prototype.scrollIntoView !== "function") {
   Element.prototype.scrollIntoView = function scrollIntoView() {};
 }
 

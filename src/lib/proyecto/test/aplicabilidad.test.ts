@@ -3,15 +3,14 @@ import { test, fc } from "@fast-check/vitest";
 import {
   aplicabilidadBase,
   aplicabilidadEfectiva,
+  atributosDe,
   REGLAS_ATRIBUTOS,
+  type AtributosProyecto,
 } from "../aplicabilidad";
-import type {
-  DatosGenerales,
-  Intervencion,
-  JustificacionKey,
-  Proyecto,
-  Uso,
-} from "../tipos";
+import { edificioDeCaso } from "../../edificio/casos";
+import type { DatosGenerales, Intervencion, JustificacionKey, Proyecto } from "../tipos";
+
+type Uso = "vivienda_unifamiliar" | "vivienda_colectiva";
 
 // =============================================================================
 // Motor de aplicabilidad Fase A (obra nueva + reglas de atributos + externas).
@@ -29,29 +28,28 @@ const TODAS_LAS_KEYS: JustificacionKey[] = [
 
 const KEYS_EXTERNAS: JustificacionKey[] = ["he0he1_global", "dbse"];
 
-/** Colectiva de obra nueva "completa" (garaje, trasteros, piscina, local). */
-function dg(overrides: Partial<DatosGenerales> = {}): DatosGenerales {
+/**
+ * Atributos de una colectiva de obra nueva "completa" (garaje, trasteros, piscina).
+ * `uso` es un atajo de los tests: «vivienda_unifamiliar» ⇒ `esUnifamiliar`.
+ */
+function dg(
+  o: Partial<Omit<AtributosProyecto, "esUnifamiliar">> & { uso?: Uso } = {},
+): AtributosProyecto {
+  const { uso = "vivienda_colectiva", ...resto } = o;
   return {
-    municipio: "Cáceres",
-    provincia: "Cáceres",
-    altitud_m: 459,
-    uso: "vivienda_colectiva",
     intervencion: "obra_nueva",
-    plantasSobreRasante: 4,
-    plantasBajoRasante: 1,
-    tipoCubierta: "plana_no_transitable",
-    numViviendas: 8,
+    tienePiscina: true,
+    tieneViviendas: true,
     tieneGaraje: true,
     tieneTrasteros: true,
-    tienePiscina: true,
-    tieneLocalPB: false,
-    zonaRadon: "I",
-    ...overrides,
+    ...resto,
+    esUnifamiliar: uso === "vivienda_unifamiliar",
   };
 }
 
+/** Proyecto real: plurifamiliar con garaje y trasteros (caso de partida). */
 function proyecto(
-  datosGenerales: DatosGenerales,
+  obra: Partial<DatosGenerales> = {},
   justificaciones: Proyecto["justificaciones"] = {},
 ): Proyecto {
   return {
@@ -59,7 +57,16 @@ function proyecto(
     nombre: "Proyecto de prueba",
     creado: "2026-01-01T00:00:00.000Z",
     modificado: "2026-01-01T00:00:00.000Z",
-    datosGenerales,
+    datosGenerales: {
+      municipio: "Cáceres",
+      provincia: "Cáceres",
+      altitud_m: 459,
+      intervencion: "obra_nueva",
+      tienePiscina: true,
+      zonaRadon: "I",
+      ...obra,
+    },
+    edificio: edificioDeCaso("plurifamiliar"),
     justificaciones,
   };
 }
@@ -74,7 +81,7 @@ describe("aplicabilidadBase — cobertura del expediente", () => {
     expect(Object.keys(base).sort()).toEqual([...TODAS_LAS_KEYS].sort());
   });
 
-  it("es determinista: mismos datos generales ⇒ mismo resultado", () => {
+  it("es determinista: mismos atributos ⇒ mismo resultado", () => {
     const datos = dg({ tienePiscina: false, intervencion: "reforma" });
     expect(aplicabilidadBase(datos)).toEqual(aplicabilidadBase(datos));
   });
@@ -205,7 +212,7 @@ describe("aplicabilidadBase — intervención ≠ obra nueva (aviso Fase E)", ()
 
 describe("aplicabilidadEfectiva — el proyectista dispone", () => {
   it("sin forzado ⇒ devuelve la base con forzada:false", () => {
-    const p = proyecto(dg({ tienePiscina: false }));
+    const p = proyecto({ tienePiscina: false });
     const r = aplicabilidadEfectiva(p, "sua6");
     expect(r.aplicabilidad).toBe("no_aplica");
     expect(r.forzada).toBe(false);
@@ -213,7 +220,7 @@ describe("aplicabilidadEfectiva — el proyectista dispone", () => {
   });
 
   it("forzado gana: no_aplica forzado sobre un aplica de la base, con forzada:true", () => {
-    const p = proyecto(dg(), {
+    const p = proyecto({}, {
       hs4: {
         aplicabilidadForzada: {
           valor: "no_aplica",
@@ -221,7 +228,7 @@ describe("aplicabilidadEfectiva — el proyectista dispone", () => {
         },
       },
     });
-    expect(aplicabilidadBase(p.datosGenerales).hs4.aplicabilidad).toBe("aplica");
+    expect(aplicabilidadBase(atributosDe(p.datosGenerales, p.edificio)).hs4.aplicabilidad).toBe("aplica");
     const r = aplicabilidadEfectiva(p, "hs4");
     expect(r.aplicabilidad).toBe("no_aplica");
     expect(r.forzada).toBe(true);
@@ -229,7 +236,7 @@ describe("aplicabilidadEfectiva — el proyectista dispone", () => {
   });
 
   it("forzado sin nota ⇒ valor forzado con nota undefined", () => {
-    const p = proyecto(dg(), {
+    const p = proyecto({}, {
       sua6: { aplicabilidadForzada: { valor: "aplica" } },
     });
     const r = aplicabilidadEfectiva(p, "sua6");
@@ -239,7 +246,7 @@ describe("aplicabilidadEfectiva — el proyectista dispone", () => {
   });
 
   it("otros campos de la justificación (inputs, cache) NO fuerzan nada", () => {
-    const p = proyecto(dg(), { hs5: { inputs: { x: 1 }, schemaVersion: "1" } });
+    const p = proyecto({}, { hs5: { inputs: { x: 1 }, schemaVersion: "1" } });
     const r = aplicabilidadEfectiva(p, "hs5");
     expect(r.aplicabilidad).toBe("aplica");
     expect(r.forzada).toBe(false);
@@ -255,7 +262,7 @@ describe("propiedades generales del motor", () => {
     tieneGaraje: fc.boolean(),
     tieneTrasteros: fc.boolean(),
     tienePiscina: fc.boolean(),
-    tieneLocalPB: fc.boolean(),
+    tieneViviendas: fc.boolean(),
   });
 
   test.prop([arbDg])(
@@ -279,5 +286,43 @@ describe("propiedades generales del motor", () => {
       expect(regla.nota.length).toBeGreaterThan(20);
       expect(regla.cita).toMatch(/ámbito de aplicación/);
     }
+  });
+});
+
+describe("atributos derivados de El edificio (feature-12)", () => {
+  const obra: DatosGenerales = {
+    municipio: "Madrid",
+    provincia: "Madrid",
+    altitud_m: 657,
+    intervencion: "obra_nueva",
+    tienePiscina: false,
+    zonaRadon: "I",
+  };
+
+  it("unifamiliar: el garaje privado cuenta como garaje y SUA7 no aplica por el ámbito", () => {
+    const a = atributosDe(obra, edificioDeCaso("unifamiliar"));
+    expect(a).toMatchObject({ esUnifamiliar: true, tieneGaraje: true, tieneViviendas: true });
+    const r = aplicabilidadBase(a);
+    expect(r.sua7.aplicabilidad).toBe("no_aplica");
+    expect(r.sua7.nota).toContain("vivienda unifamiliar");
+    expect(r.hr.aplicabilidad).toBe("no_aplica");
+  });
+
+  it("oficinas con garaje: HS3 aplica (los garajes entran en cualquier uso)", () => {
+    const a = atributosDe(obra, edificioDeCaso("oficinas"));
+    expect(a.tieneViviendas).toBe(false);
+    expect(aplicabilidadBase(a).hs3.aplicabilidad).toBe("aplica");
+  });
+
+  it("sin viviendas ni garaje: HS3 no aplica, con párrafo que remite al RITE", () => {
+    const r = aplicabilidadBase(dg({ tieneViviendas: false, tieneGaraje: false }));
+    expect(r.hs3.aplicabilidad).toBe("no_aplica");
+    expect(r.hs3.nota).toContain("RITE");
+    expect(r.hs3.cita).toBe("DB-HS 3, ámbito de aplicación");
+  });
+
+  it("los trasteros solos no hacen aplicable el HS3 fuera de un edificio de viviendas", () => {
+    const r = aplicabilidadBase(dg({ tieneViviendas: false, tieneGaraje: false, tieneTrasteros: true }));
+    expect(r.hs3.aplicabilidad).toBe("no_aplica");
   });
 });

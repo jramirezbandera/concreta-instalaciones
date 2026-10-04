@@ -10,7 +10,7 @@ import { ExcepcionesLocales } from "./ExcepcionesLocales";
 // expediente, arriba de la columna izquierda. Sustituye a la barra de contexto
 // horizontal. Cada dato muestra su valor efectivo; si difiere del proyecto
 // (excepción local) lleva lápiz. Pulsar abre el popover de excepciones.
-// Se convertirá en «Qué entra» cuando exista El edificio (fase 2).
+// Se convertirá en «Qué entra» con el contrato de resultado de las fases 4 y 5.
 // =============================================================================
 
 type Campo = HerenciaBinding["campos"][number];
@@ -47,7 +47,7 @@ export function DelProyecto({
       <div className="text-text-disabled flex items-baseline justify-between gap-2 pt-4 pb-1.5 text-[10px] font-semibold tracking-[0.09em] uppercase">
         Del proyecto
         <Link
-          to={`/p/${proyectoId}/datos`}
+          to={`/p/${proyectoId}/edificio`}
           className="text-accent hover:text-accent-hover text-[11.5px] font-medium tracking-normal normal-case"
         >
           Cambiar en El edificio

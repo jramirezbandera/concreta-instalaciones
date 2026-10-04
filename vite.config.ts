@@ -18,6 +18,32 @@ export default defineConfig(({ mode }) => {
   const base = mode === "production" ? "/concreta-instalaciones/" : "/";
   return {
     base,
+    build: {
+      rolldownOptions: {
+        output: {
+          // La capa de IA (feature-13, portada de Concreta) solo se alcanza por
+          // `import()`: los SDK desde src/lib/ai/providers/* y pdf.js desde
+          // src/lib/ai/pdfPrep.ts, dentro de la ventana «Leer el cuadro de
+          // superficies», que también va por `lazy`. Cada uno en su chunk con
+          // nombre estable para poder sacarlos del precache (globIgnores).
+          codeSplitting: {
+            groups: [
+              // El helper de `import()` de Vite DEBE ir aparte. Si no, rolldown
+              // lo mete en `ai-vendor`, el entry lo importa estáticamente y el
+              // arranque arrastra los SDK (o se queda en blanco tras un deploy,
+              // al pedir un `ai-vendor` viejo que ya no está). Mismo arreglo que
+              // en Concreta.
+              { name: "vite-preload-helper", test: /preload-helper/ },
+              {
+                name: "ai-vendor",
+                test: /node_modules[\\/](@anthropic-ai[\\/]sdk|openai|@google[\\/]genai)[\\/]/,
+              },
+              { name: "pdfjs-vendor", test: /node_modules[\\/]pdfjs-dist[\\/]/ },
+            ],
+          },
+        },
+      },
+    },
     plugins: [
       react(),
       babel({ presets: [reactCompilerPreset()] }),
@@ -28,6 +54,11 @@ export default defineConfig(({ mode }) => {
         workbox: {
           globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico}"],
           runtimeCaching: [], // offline-first: the whole app-shell is precached
+          // Los SDK de IA y pdf.js no se precachean: sin red no hay lectura con
+          // IA, así que tenerlos en caché no sirve de nada y engordaría el SW.
+          // Seguro solo porque el helper de `import()` va en su propio chunk
+          // (arriba); sin ese grupo, excluirlos dejaría la app en blanco.
+          globIgnores: ["**/ai-vendor-*.js", "**/pdfjs-vendor-*.js"],
           maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         },
         manifest: {

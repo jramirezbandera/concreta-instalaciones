@@ -10,20 +10,23 @@ import {
   setProyectoActivo,
   exportarProyecto,
   importarProyecto,
-  migrarLegacy,
   inicializarStorage,
+  contarProyectosV1,
   EXPORT_SCHEMA,
-  NOMBRE_PROYECTO_IMPORTADO,
+  ERROR_VERSION_1,
 } from "../storage";
 import {
   LS_ACTIVO,
   LS_INDICE,
+  LS_INDICE_V1,
   LS_PROYECTO_PREFIX,
   PROYECTO_SCHEMA_VERSION,
   type DatosGenerales,
+  type Edificio,
   type Proyecto,
 } from "../tipos";
-import { getModuleSchemaVersion } from "../../../data/justificacionRegistry";
+import { edificioDeCaso } from "../../edificio/casos";
+import { inputsFingerprint } from "../../pdf/utils";
 
 // =============================================================================
 // storage — feature-6 T2.4. Patrón del repo: SIN vi.mock. Toda la API recibe
@@ -66,19 +69,15 @@ function dg(sobre?: Partial<DatosGenerales>): DatosGenerales {
     municipio: "Cáceres",
     provincia: "Cáceres",
     altitud_m: 459,
-    uso: "vivienda_colectiva",
     intervencion: "obra_nueva",
-    plantasSobreRasante: 4,
-    plantasBajoRasante: 1,
-    tipoCubierta: "plana_no_transitable",
-    numViviendas: 8,
-    tieneGaraje: true,
-    tieneTrasteros: true,
     tienePiscina: false,
-    tieneLocalPB: false,
     zonaRadon: "I",
     ...sobre,
   };
+}
+
+function ed(): Edificio {
+  return edificioDeCaso("plurifamiliar");
 }
 
 /** Demo sintética para inicializarStorage (evita depender de ./demo en tests). */
@@ -89,6 +88,7 @@ function demoSintetica(nowIso: string): Proyecto {
     creado: nowIso,
     modificado: nowIso,
     datosGenerales: dg(),
+    edificio: ed(),
     justificaciones: {},
   };
 }
@@ -107,7 +107,7 @@ beforeEach(() => {
 
 describe("storage — CRUD de proyectos", () => {
   it("crearProyecto persiste, indexa y devuelve el proyecto con fechas nowIso", () => {
-    const p = crearProyecto("Bloque A", dg(), NOW, genId, s);
+    const p = crearProyecto("Bloque A", dg(), ed(), NOW, genId, s);
     expect(p.id).toBe("id-1");
     expect(p.creado).toBe(NOW);
     expect(p.modificado).toBe(NOW);
@@ -117,7 +117,7 @@ describe("storage — CRUD de proyectos", () => {
   });
 
   it("guardarProyecto actualiza sin duplicar la entrada del índice", () => {
-    const p = crearProyecto("Bloque A", dg(), NOW, genId, s);
+    const p = crearProyecto("Bloque A", dg(), ed(), NOW, genId, s);
     guardarProyecto({ ...p, nombre: "Bloque A bis", modificado: DESPUES }, s);
     expect(listarProyectos(s)).toHaveLength(1);
     expect(cargarProyecto(p.id, s)?.nombre).toBe("Bloque A bis");
@@ -129,7 +129,7 @@ describe("storage — CRUD de proyectos", () => {
   });
 
   it("listarProyectos ignora entradas corruptas del índice sin romper el resto", () => {
-    const p = crearProyecto("Sano", dg(), NOW, genId, s);
+    const p = crearProyecto("Sano", dg(), ed(), NOW, genId, s);
     // Se indexa un id cuya clave contiene basura no-JSON
     s.setItem(LS_INDICE, JSON.stringify([p.id, "roto"]));
     s.setItem(`${LS_PROYECTO_PREFIX}roto`, "esto no es JSON{{{");
@@ -137,7 +137,7 @@ describe("storage — CRUD de proyectos", () => {
   });
 
   it('duplicarProyecto crea "<nombre> (copia)" con id nuevo, fechas nuevas y contenido igual', () => {
-    const p = crearProyecto("Bloque A", dg(), NOW, genId, s);
+    const p = crearProyecto("Bloque A", dg(), ed(), NOW, genId, s);
     guardarProyecto(
       { ...p, justificaciones: { hs5: { inputs: { plantas: 4 }, schemaVersion: "1" } } },
       s,
@@ -158,8 +158,8 @@ describe("storage — CRUD de proyectos", () => {
   });
 
   it("eliminarProyecto borra clave, índice y el activo si era él", () => {
-    const a = crearProyecto("A", dg(), NOW, genId, s);
-    const b = crearProyecto("B", dg(), NOW, genId, s);
+    const a = crearProyecto("A", dg(), ed(), NOW, genId, s);
+    const b = crearProyecto("B", dg(), ed(), NOW, genId, s);
     setProyectoActivo(a.id, s);
     eliminarProyecto(a.id, s);
     expect(cargarProyecto(a.id, s)).toBeNull();
@@ -169,8 +169,8 @@ describe("storage — CRUD de proyectos", () => {
   });
 
   it("eliminarProyecto NO toca el activo si era otro", () => {
-    const a = crearProyecto("A", dg(), NOW, genId, s);
-    const b = crearProyecto("B", dg(), NOW, genId, s);
+    const a = crearProyecto("A", dg(), ed(), NOW, genId, s);
+    const b = crearProyecto("B", dg(), ed(), NOW, genId, s);
     setProyectoActivo(b.id, s);
     eliminarProyecto(a.id, s);
     expect(proyectoActivoId(s)).toBe(b.id);
@@ -190,7 +190,7 @@ describe("storage — CRUD de proyectos", () => {
 
 describe("storage — versionado de schema", () => {
   it("un proyecto guardado con versión vieja simulada → cargarProyecto null y listar lo omite", () => {
-    const p = crearProyecto("Viejo", dg(), NOW, genId, s);
+    const p = crearProyecto("Viejo", dg(), ed(), NOW, genId, s);
     // Simula un guardado de una versión anterior del schema
     s.setItem(LS_PROYECTO_PREFIX + p.id, JSON.stringify({ v: "0", proyecto: p }));
     expect(cargarProyecto(p.id, s)).toBeNull();
@@ -198,7 +198,7 @@ describe("storage — versionado de schema", () => {
   });
 
   it("el envoltorio persistido lleva v = PROYECTO_SCHEMA_VERSION", () => {
-    const p = crearProyecto("Nuevo", dg(), NOW, genId, s);
+    const p = crearProyecto("Nuevo", dg(), ed(), NOW, genId, s);
     const raw = s.getItem(LS_PROYECTO_PREFIX + p.id);
     expect(JSON.parse(raw!)).toMatchObject({ v: PROYECTO_SCHEMA_VERSION });
   });
@@ -210,7 +210,7 @@ describe("storage — versionado de schema", () => {
 
 describe("storage — exportarProyecto / importarProyecto", () => {
   function proyectoConEstado(): Proyecto {
-    const p = crearProyecto("Exportable", dg(), NOW, genId, s);
+    const p = crearProyecto("Exportable", dg(), ed(), NOW, genId, s);
     const conInputs: Proyecto = {
       ...p,
       justificaciones: { hs5: { inputs: { b: 2, a: 1 }, schemaVersion: "1" } },
@@ -285,69 +285,97 @@ describe("storage — exportarProyecto / importarProyecto", () => {
 });
 
 // -----------------------------------------------------------------------------
-// Migración legacy
+// Schema 2 sin migración (feature-12)
 // -----------------------------------------------------------------------------
 
-describe("storage — migrarLegacy", () => {
-  const INPUTS_HS5 = { plantas: 4, aparatosPorPlanta: 12 };
-
-  it('con hs5 + hs5-version vigente → proyecto "Importado" con esos inputs; las claves legacy SIGUEN', () => {
-    s.setItem("hs5", JSON.stringify(INPUTS_HS5));
-    s.setItem("hs5-version", getModuleSchemaVersion("hs5")); // "1" vigente
-    const p = migrarLegacy(NOW, genId, s);
-    expect(p).not.toBeNull();
-    expect(p!.nombre).toBe(NOMBRE_PROYECTO_IMPORTADO);
-    expect(p!.creado).toBe(NOW);
-    expect(p!.justificaciones.hs5).toEqual({
-      inputs: INPUTS_HS5,
-      schemaVersion: getModuleSchemaVersion("hs5"),
+describe("storage — schema 2, sin migración", () => {
+  /** Un export de la versión 1, tal como lo escribía la app antes de feature-12. */
+  function exportV1(): string {
+    const proyecto = {
+      id: "v1",
+      nombre: "Expediente antiguo",
+      creado: NOW,
+      modificado: NOW,
+      datosGenerales: { ...dg(), uso: "vivienda_colectiva", plantasSobreRasante: 4 },
+      justificaciones: {},
+    };
+    return JSON.stringify({
+      schema: EXPORT_SCHEMA,
+      version: "1",
+      fingerprint: inputsFingerprint(proyecto),
+      proyecto,
     });
-    // Datos generales por defecto razonables (el usuario los revisa después)
-    expect(p!.datosGenerales.municipio).toBe("");
-    expect(p!.datosGenerales.uso).toBe("vivienda_colectiva");
-    expect(p!.datosGenerales.intervencion).toBe("obra_nueva");
-    expect(p!.datosGenerales.plantasSobreRasante).toBe(1);
-    // Persistido e indexado
-    expect(listarProyectos(s).map((x) => x.id)).toEqual([p!.id]);
-    // Rollback barato: las claves legacy se conservan
-    expect(s.getItem("hs5")).toBe(JSON.stringify(INPUTS_HS5));
-    expect(s.getItem("hs5-version")).toBe(getModuleSchemaVersion("hs5"));
+  }
+
+  it("importar un .json de la versión 1 se rechaza con el mensaje claro", () => {
+    const res = importarProyecto(exportV1());
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error).toBe(ERROR_VERSION_1);
+    expect(res.error).toContain("versión anterior");
   });
 
-  it("una clave con <k>-version distinta a la vigente se IGNORA", () => {
-    s.setItem("hs5", JSON.stringify(INPUTS_HS5));
-    s.setItem("hs5-version", "0"); // versión vieja
-    s.setItem("hs3", JSON.stringify({ zonaTermica: "Z" }));
-    s.setItem("hs3-version", getModuleSchemaVersion("hs3"));
-    const p = migrarLegacy(NOW, genId, s);
-    expect(p).not.toBeNull();
-    expect(p!.justificaciones.hs5).toBeUndefined();
-    expect(p!.justificaciones.hs3).toEqual({
-      inputs: { zonaTermica: "Z" },
-      schemaVersion: getModuleSchemaVersion("hs3"),
+  it("un v2 sin edificio con forma válida se rechaza", () => {
+    const p = crearProyecto("Sin edificio", dg(), ed(), NOW, genId, s);
+    const roto = { ...p, edificio: { cubierta: {}, grupos: "no" } };
+    const json = JSON.stringify({
+      schema: EXPORT_SCHEMA,
+      version: PROYECTO_SCHEMA_VERSION,
+      fingerprint: inputsFingerprint(roto),
+      proyecto: roto,
     });
+    const res = importarProyecto(json);
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error).toContain("edificio");
   });
 
-  it("si la única clave presente tiene versión vieja → null (nada que migrar)", () => {
-    s.setItem("hs5", JSON.stringify(INPUTS_HS5));
-    s.setItem("hs5-version", "0");
-    expect(migrarLegacy(NOW, genId, s)).toBeNull();
+  it("cargarProyecto con un edificio mal formado → null (no rompe la lista)", () => {
+    const p = crearProyecto("Roto", dg(), ed(), NOW, genId, s);
+    s.setItem(
+      LS_PROYECTO_PREFIX + p.id,
+      JSON.stringify({ v: PROYECTO_SCHEMA_VERSION, proyecto: { ...p, edificio: null } }),
+    );
+    expect(cargarProyecto(p.id, s)).toBeNull();
     expect(listarProyectos(s)).toEqual([]);
   });
 
-  it("sin claves legacy → null", () => {
-    expect(migrarLegacy(NOW, genId, s)).toBeNull();
+  it("las claves de la v1 no se leen ni se borran; solo se cuentan para avisar", () => {
+    s.setItem(LS_INDICE_V1, JSON.stringify(["a", "b"]));
+    s.setItem("concreta-inst-proyecto-a", "{}");
+    expect(contarProyectosV1(s)).toBe(2);
+    inicializarStorage(NOW, genId, demoSintetica, s);
+    expect(listarProyectos(s).map((x) => x.id)).toEqual(["demo-id"]);
+    expect(s.getItem(LS_INDICE_V1)).toBe(JSON.stringify(["a", "b"]));
+    expect(s.getItem("concreta-inst-proyecto-a")).toBe("{}");
   });
 
-  it("una clave legacy corrupta (no-JSON) se ignora sin romper la migración de las demás", () => {
-    s.setItem("hs4", "basura{{{");
-    s.setItem("hs4-version", getModuleSchemaVersion("hs4"));
-    s.setItem("he1", JSON.stringify({ um: 0.4 }));
-    s.setItem("he1-version", getModuleSchemaVersion("he1"));
-    const p = migrarLegacy(NOW, genId, s);
-    expect(p).not.toBeNull();
-    expect(p!.justificaciones.hs4).toBeUndefined();
-    expect(p!.justificaciones.he1?.inputs).toEqual({ um: 0.4 });
+  it("sin claves de la v1 → 0", () => {
+    expect(contarProyectosV1(s)).toBe(0);
+  });
+
+  it("el origen de una zona leída del cuadro viaja en el export; uno sin forma se quita sin rechazar", () => {
+    const e = ed();
+    const origen = { documento: "cuadro.pdf", paginas: [2], filas: ["Portal · 20,00 m²"] };
+    e.grupos[0]!.zonas[0] = { ...e.grupos[0]!.zonas[0]!, origen };
+    const p = crearProyecto("Con cuadro", dg(), e, NOW, genId, s);
+    const ida = importarProyecto(exportarProyecto(p));
+    expect(ida.ok && ida.proyecto.edificio.grupos[0]!.zonas[0]!.origen).toEqual(origen);
+
+    const roto = structuredClone(p);
+    (roto.edificio.grupos[0]!.zonas[0] as unknown as Record<string, unknown>).origen = { documento: 3 };
+    s.setItem(LS_PROYECTO_PREFIX + p.id, JSON.stringify({ v: PROYECTO_SCHEMA_VERSION, proyecto: roto }));
+    const cargado = cargarProyecto(p.id, s);
+    expect(cargado).not.toBeNull();
+    expect(cargado!.edificio.grupos[0]!.zonas[0]).not.toHaveProperty("origen");
+  });
+
+  it("las claves de módulo sueltas de antes de los expedientes ya no se migran", () => {
+    s.setItem("hs5", JSON.stringify({ plantas: 4 }));
+    s.setItem("hs5-version", "1");
+    inicializarStorage(NOW, genId, demoSintetica, s);
+    expect(listarProyectos(s).map((x) => x.nombre)).toEqual(["Demo"]);
+    expect(s.getItem("hs5")).toBe(JSON.stringify({ plantas: 4 }));
   });
 });
 
@@ -370,21 +398,8 @@ describe("storage — inicializarStorage", () => {
     expect(listarProyectos(s)).toHaveLength(1);
   });
 
-  it('con estado legacy: corre migrarLegacy, NO crea Demo y activa el "Importado"', () => {
-    s.setItem("hs5", JSON.stringify({ plantas: 2 }));
-    s.setItem("hs5-version", getModuleSchemaVersion("hs5"));
-    const r = inicializarStorage(NOW, genId, demoSintetica, s);
-    const proyectos = listarProyectos(s);
-    expect(proyectos).toHaveLength(1);
-    expect(proyectos[0].nombre).toBe(NOMBRE_PROYECTO_IMPORTADO);
-    expect(r.activo).toBe(proyectos[0].id);
-    // Repetir no vuelve a migrar ni crea Demo
-    expect(inicializarStorage(DESPUES, genId, demoSintetica, s)).toEqual(r);
-    expect(listarProyectos(s)).toHaveLength(1);
-  });
-
   it("si el índice ya existe con proyectos pero no hay activo, fija el primero", () => {
-    const p = crearProyecto("Suelto", dg(), NOW, genId, s);
+    const p = crearProyecto("Suelto", dg(), ed(), NOW, genId, s);
     const r = inicializarStorage(DESPUES, genId, demoSintetica, s);
     expect(r.activo).toBe(p.id);
     // No se creó Demo: el índice ya existía
@@ -392,8 +407,8 @@ describe("storage — inicializarStorage", () => {
   });
 
   it("si el activo apunta a un proyecto eliminado, se re-fija a uno existente", () => {
-    const a = crearProyecto("A", dg(), NOW, genId, s);
-    crearProyecto("B", dg(), NOW, genId, s);
+    const a = crearProyecto("A", dg(), ed(), NOW, genId, s);
+    crearProyecto("B", dg(), ed(), NOW, genId, s);
     setProyectoActivo(a.id, s);
     eliminarProyecto(a.id, s);
     const r = inicializarStorage(DESPUES, genId, demoSintetica, s);

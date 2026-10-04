@@ -30,9 +30,9 @@ import type {
   Intervencion,
   JustificacionKey,
   Proyecto,
-  Uso,
   ZonaRadon,
 } from "../proyecto/tipos";
+import { etiquetaEdificio, procedenciaEdificio } from "../edificio/derivar";
 import { justificacionRegistry, type JustificacionEntry } from "../../data/justificacionRegistry";
 import { ENGINE_VERSION } from "../version";
 
@@ -72,11 +72,6 @@ export interface AnejoResult extends PdfResult {
 // ─────────────────────────────────────────────────────────────────────────────
 // Etiquetas legibles (es-ES)
 // ─────────────────────────────────────────────────────────────────────────────
-
-const USO_LABEL: Record<Uso, string> = {
-  vivienda_unifamiliar: "Vivienda unifamiliar",
-  vivienda_colectiva: "Vivienda colectiva",
-};
 
 const INTERVENCION_LABEL: Record<Intervencion, string> = {
   obra_nueva: "Obra nueva",
@@ -192,7 +187,7 @@ function drawPortada(doc: jsPDF, entrada: EntradaAnejo, fingerprint: string): vo
   setGray(doc, 90);
   doc.text(pdfStr(`${dg.municipio} · ${dg.provincia}`), cx, 88, { align: "center" });
   doc.text(
-    pdfStr(`${USO_LABEL[dg.uso]} · ${INTERVENCION_LABEL[dg.intervencion]}`),
+    pdfStr(`${etiquetaEdificio(derivados.edificio)} · ${INTERVENCION_LABEL[dg.intervencion]}`),
     cx,
     94,
     { align: "center" },
@@ -215,6 +210,12 @@ function drawPortada(doc: jsPDF, entrada: EntradaAnejo, fingerprint: string): vo
       valor: `${String(derivados.alturaEvacuacion_m.valor).replace(".", ",")} m`,
       procedencia: derivados.alturaEvacuacion_m.procedencia,
     },
+    {
+      // Trazabilidad del edificio (feature-13): leído del cuadro o tecleado.
+      etiqueta: "Superficie útil",
+      valor: `${derivados.edificio.superficieUtilTotal_m2.toLocaleString("es-ES", { maximumFractionDigits: 2 })} m²`,
+      procedencia: procedenciaEdificio(proyecto.edificio),
+    },
   ];
   let y = 116;
   setGray(doc, 200);
@@ -228,8 +229,11 @@ function drawPortada(doc: jsPDF, entrada: EntradaAnejo, fingerprint: string): vo
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     setGray(doc, 130);
-    doc.text(pdfStr(f.procedencia), cx, y + 3.8, { align: "center" });
-    y += 12;
+    // La procedencia del edificio lleva el nombre del fichero aportado, que
+    // puede ser largo: se parte en líneas en vez de salirse de la página.
+    const lineas = doc.splitTextToSize(pdfStr(f.procedencia), CW - 40) as string[];
+    lineas.forEach((ln, k) => doc.text(ln, cx, y + 3.8 + k * 3.2, { align: "center" }));
+    y += 12 + (lineas.length - 1) * 3.2;
   }
   setGray(doc, 200);
   doc.line(M + 20, y - 5, PAGE_W - M - 20, y - 5);

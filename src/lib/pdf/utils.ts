@@ -27,10 +27,13 @@ export function setGray(doc: jsPDF, g: number): void {
  */
 export function pdfStr(s: string): string {
   return s
+    // Potencias negativas en superíndice («10⁻¹¹», feature-15) → «10^-11».
+    .replace(/⁻([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (_m, d: string) => `^-${[...d].map((c) => "⁰¹²³⁴⁵⁶⁷⁸⁹".indexOf(c)).join("")}`)
     // Superscripts
     .replace(/⁴/g, "^4")
-    .replace(/³/g, "^3")
-    .replace(/²/g, "2")
+    // ² y ³ (U+00B2, U+00B3) son Latin-1 y la Helvetica estándar de jsPDF
+    // (WinAnsi) los pinta: se conservan, como «m²» (feature-14) y «dm³/s»
+    // (feature-15).
     // Subscripts
     .replace(/₁/g, "1")
     .replace(/₂/g, "2")
@@ -38,6 +41,7 @@ export function pdfStr(s: string): string {
     .replace(/Φ/g, "Phi")
     .replace(/Σ/g, "Sum")
     .replace(/Δ/g, "Delta")
+    .replace(/Ψ/g, "Psi")
     // Greek lowercase
     .replace(/λ̄/g, "lam")
     .replace(/λ/g, "lam")
@@ -56,13 +60,14 @@ export function pdfStr(s: string): string {
     .replace(/≤/g, "<=")
     .replace(/≥/g, ">=")
     .replace(/√/g, "sqrt")
-    .replace(/·/g, "x")
+    // «·» (U+00B7) y «Ø» (U+00D8) son Latin-1 y van tal cual (feature-14): en
+    // instalaciones «Ø110» es la notación, y «ph110» no la entiende nadie.
     .replace(/°/g, "deg")
-    .replace(/Ø/g, "ph")
     .replace(/'/g, "'")
     // Dashes
     .replace(/—/g, " - ") // em dash —
     .replace(/–/g, "-") // en dash –
+    .replace(/−/g, "-") // signo menos U+2212 (cotas «−3,00», feature-14)
     // Catch-all: strip any remaining non-Latin-1 character. The NUL bound
     // is intentional — Latin-1 spans U+0000..U+00FF and we keep the whole
     // range (control codes included) for any rare embedded \n or \t.

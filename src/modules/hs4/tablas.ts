@@ -2,8 +2,9 @@
 // DB-HS4 — Suministro de agua (fontanería). Tablas y valores normativos como
 // DATOS versionados con procedencia (SPEC §4/§11, trazabilidad innegociable).
 //
-// Edición: DB-HS Sección HS4, edición 2009 (Orden VIV/984/2009, BOE 23/04/2009;
-// la Sección HS4 no ha sido modificada después). Cada cifra va envuelta en
+// Edición: DB-HS Sección HS4, consolidado de 14-06-2022. El RD 450/2022 solo
+// tocó el ap. 3.2.2.1 pto 2, el 6.2 y el Apéndice C: los valores de cálculo no
+// han cambiado desde 2009 (research/verificacion-hs4-v4.md, bloque E). Cada cifra va envuelta en
 // `tablaCTE()` con su `ProcedenciaCTE`. Nunca hardcodear cifras sueltas en la
 // lógica: la procedencia alimenta la cita legal de la ficha.
 //
@@ -20,21 +21,24 @@
 //  - (A1-08) Corrección/adición de la corrección de errores del DB-HS (BOE,
 //    25/01/2008): se señalan en comentario las celdas tocadas.
 //  - El coeficiente de simultaneidad K NO es exigencia del DB-HS4 (el DB remite
-//    a "un criterio adecuado"); la fórmula K = 1/√(n−1) procede de UNE 149201.
-//    Se modela con procedencia APARTE (criterio externo, no exigencia CTE).
-//  - La estimación "pérdidas localizadas ≈ 20–30 % de las longitudinales" NO es
-//    cifra del DB: es heurística de buena práctica (procedencia aparte).
+//    a "un criterio adecuado", ap. 4.2.1 pto 2 b). K = 1/√(n−1) es el método
+//    tradicional: criterio de proyecto, con procedencia APARTE. Su atribución a
+//    UNE 149201 no está verificada y se ha retirado (feature-15).
+//  - Las pérdidas localizadas como 20–30 % de las longitudinales SÍ son una
+//    opción del DB (ap. 4.2.2 pto 1 a), verificación de feature-15).
 // =============================================================================
 
 import { tablaCTE } from "../../lib/cte/tabla";
 import type { ProcedenciaCTE } from "../../lib/cte/tabla";
 
-/** Procedencia base común a todo el DB-HS4 edición 2009 (no modificada). */
+/**
+ * Procedencia base del DB-HS4: consolidado 14-06-2022, con los valores de
+ * cálculo sin cambios desde 2009 (Orden VIV/984/2009).
+ */
 const PROC_HS4 = {
   db: "DB-HS4",
-  edicion: "2009",
-  /** Orden VIV/984/2009, BOE 23/04/2009. HS4 no modificada después. */
-  fecha: "2009-04-23",
+  edicion: "consolidado 14-06-2022",
+  fecha: "2022-06-14",
   fuente: "codigotecnico.org · DB-HS Sección HS4",
 } as const;
 
@@ -92,7 +96,7 @@ export interface FilaCaudal2_1 {
 }
 
 export const CAUDAL_INSTANTANEO_TABLA_2_1 = tablaCTE(
-  { ...PROC_HS4, articulo: "ap. 2.1.3", tabla: "Tabla 2.1" },
+  { ...PROC_HS4, articulo: "ap. 2.1.3 pto 1", tabla: "Tabla 2.1" },
   {
     aparatos: {
       lavamanos: { af_dm3_s: 0.05, acs_dm3_s: 0.03 }, // [A1-08] FILA AÑADIDA por la corrección de errores.
@@ -149,7 +153,7 @@ export interface FilaDerivacion4_2 {
 }
 
 export const DERIVACIONES_TABLA_4_2 = tablaCTE(
-  { ...PROC_HS4, articulo: "ap. 4.3", tabla: "Tabla 4.2" },
+  { ...PROC_HS4, articulo: "ap. 4.3 pto 1", tabla: "Tabla 4.2" },
   {
     /**
      * Subconjunto de `TipoAparatoHS4` tabulado en la 4.2. Los aparatos ausentes
@@ -212,7 +216,7 @@ export interface FilaAlimentacion4_3 {
 }
 
 export const ALIMENTACION_TABLA_4_3 = tablaCTE(
-  { ...PROC_HS4, articulo: "ap. 4.3", tabla: "Tabla 4.3" },
+  { ...PROC_HS4, articulo: "ap. 4.3 pto 2", tabla: "Tabla 4.3" },
   {
     tramos: {
       cuarto_humedo_privado: {
@@ -221,7 +225,7 @@ export const ALIMENTACION_TABLA_4_3 = tablaCTE(
         acero_pulgadas: "¾",
       },
       derivacion_particular: {
-        descripcion: "Derivación particular (vivienda/apartamento/local)",
+        descripcion: "Derivación particular (vivienda, apartamento, local comercial)",
         diametro_mm: 20,
         acero_pulgadas: "¾",
       },
@@ -260,16 +264,13 @@ export const ALIMENTACION_TABLA_4_3 = tablaCTE(
 );
 
 // -----------------------------------------------------------------------------
-// Velocidades de cálculo — ap. 4.2 d). [VERIFICADO Fase 0 — triangulación de
-// fuentes oficiales, auditoría literal de PDF pendiente]
-// Rango RECOMENDADO [m/s] según el material de la tubería.
+// Velocidades de cálculo — ap. 4.2.1 pto 2 d). [VERIFICADO feature-15]
+// Intervalo [m/s] según el material de la tubería.
 //
-// DICTAMEN normativo (cte-normativa, DB-HS4 2009): este intervalo de velocidad
-// (0,50–2,00 metálicas / 0,50–3,50 m/s termoplásticas) es CRITERIO DE ELECCIÓN /
-// buena práctica del paso d) del ap. 4.2, NO un límite prestacional del CTE.
-// Salir del rango NO incumple (no degrada a `fail`): el motor lo trata como
-// `warn` informativo. El numeral "4.2.1.3" NO existe en el DB-HS4: la velocidad
-// se fija en el paso d) del ap. 4.2.
+// Es TEXTO DEL DB, pero un paso del procedimiento de dimensionado («elección de
+// una velocidad de cálculo comprendida dentro de los intervalos…»), no una
+// exigencia de cumplimiento: salir del intervalo NO incumple (no degrada a
+// `fail`); el motor lo trata como `warn` informativo y la v4, como `criterio`.
 // -----------------------------------------------------------------------------
 
 /** Material de la tubería a efectos del rango de velocidad admisible. */
@@ -282,7 +283,7 @@ export interface RangoVelocidad {
 }
 
 export const VELOCIDADES_CALCULO = tablaCTE(
-  { ...PROC_HS4, articulo: "ap. 4.2 d)" },
+  { ...PROC_HS4, articulo: "ap. 4.2.1 pto 2 d)" },
   {
     porMaterial: {
       metalica: { min_m_s: 0.5, max_m_s: 2.0 },
@@ -292,7 +293,7 @@ export const VELOCIDADES_CALCULO = tablaCTE(
 );
 
 // -----------------------------------------------------------------------------
-// Presiones — ap. 2.1.3. Temperatura de ACS — ap. 2.3.
+// Presiones — ap. 2.1.3 ptos 2 y 3. Temperatura de ACS — ap. 2.1.3 pto 4.
 // [VERIFICADO Fase 0 — triangulación de fuentes oficiales, auditoría literal de
 // PDF pendiente]
 //
@@ -301,13 +302,13 @@ export const VELOCIDADES_CALCULO = tablaCTE(
 //  - Presión máxima en cualquier punto de consumo: 500 kPa.
 //  - Temperatura de ACS en los puntos de consumo: 50–65 °C.
 // -----------------------------------------------------------------------------
-export const PRESIONES = tablaCTE({ ...PROC_HS4, articulo: "ap. 2.1.3" }, {
+export const PRESIONES = tablaCTE({ ...PROC_HS4, articulo: "ap. 2.1.3 ptos 2 y 3" }, {
   presionMinGrifosComunes_kPa: 100,
   presionMinFluxorCalentador_kPa: 150,
   presionMaxConsumo_kPa: 500,
 } as const);
 
-export const TEMPERATURA_ACS = tablaCTE({ ...PROC_HS4, articulo: "ap. 2.3" }, {
+export const TEMPERATURA_ACS = tablaCTE({ ...PROC_HS4, articulo: "ap. 2.1.3 pto 4" }, {
   /** Temperatura de preparación/consumo de ACS en los puntos de consumo [°C]. */
   consumoMin_C: 50,
   consumoMax_C: 65,
@@ -331,10 +332,11 @@ export interface ProcedenciaCriterioExterno extends ProcedenciaCTE {
 }
 
 // -----------------------------------------------------------------------------
-// Coeficiente de simultaneidad K — ap. 4.2.1.
-// EL DB-HS4 NO PRESCRIBE FÓRMULA: remite a "un coeficiente de simultaneidad de
-// acuerdo con un criterio adecuado". La fórmula clásica K = 1/√(n−1) procede de
-// UNE 149201 → CRITERIO EXTERNO, NO exigencia CTE.
+// Coeficiente de simultaneidad K — ap. 4.2.1 pto 2 b).
+// EL DB-HS4 NO PRESCRIBE FÓRMULA: pide establecer «los coeficientes de
+// simultaneidad de cada tramo de acuerdo con un criterio adecuado». K = 1/√(n−1)
+// es el método tradicional → CRITERIO DE PROYECTO, NO exigencia CTE. Su
+// atribución a UNE 149201 no está verificada y se ha retirado (feature-15).
 //
 // `n` = nº de aparatos (suministros) del tramo. Para n < 2 la fórmula no aplica
 // (división por cero / raíz de 0); el motor (Fase 2) decidirá K = 1 en ese caso.
@@ -347,36 +349,34 @@ export const SIMULTANEIDAD_K = tablaCTE<{
   formula: string;
 }>(
   {
-    db: "DB-HS4",
-    edicion: "2009",
-    articulo: "ap. 4.2.1",
-    fuente: "UNE 149201",
+    ...PROC_HS4,
+    articulo: "ap. 4.2.1 pto 2 b)",
+    fuente: "método tradicional (criterio de proyecto)",
   },
   {
     procedencia: {
-      db: "DB-HS4",
-      edicion: "2009",
-      articulo: "ap. 4.2.1",
-      norma: "UNE 149201",
-      naturaleza: "criterio externo — no exigencia CTE",
+      ...PROC_HS4,
+      articulo: "ap. 4.2.1 pto 2 b)",
+      norma: "método tradicional",
+      naturaleza: "criterio de proyecto — no exigencia CTE",
       prescribeFormulaCTE: false,
       textoCTE:
-        "…coeficiente de simultaneidad de acuerdo con un criterio adecuado.",
-      fuente: "UNE 149201",
+        "…establecimiento de los coeficientes de simultaneidad de cada tramo de acuerdo con un criterio adecuado.",
+      fuente: "método tradicional (criterio de proyecto)",
     },
     nMinAplicable: 2,
-    formula: "K = 1 / sqrt(n - 1)  (UNE 149201; n = nº de aparatos)",
+    formula: "K = 1 / sqrt(n - 1)  (método tradicional; n = nº de aparatos del tramo)",
   },
 );
 
 // -----------------------------------------------------------------------------
-// Heurística de pérdidas LOCALIZADAS — ap. 4.2 / 4.5 (grupo de presión).
-// La estimación "localizadas ≈ 20–30 % de las longitudinales" NO ES CIFRA DEL
-// DB: es buena práctica de cálculo. Se modela como heurística con su rango.
+// Pérdidas LOCALIZADAS — ap. 4.2.2 pto 1 a). Es una opción del DB: «podrán
+// estimarse en un 20% al 30% de la producida sobre la longitud real del tramo o
+// evaluarse a partir de los elementos de la instalación» (feature-15).
 //
-// Criterio de grupo de presión (citable, esto SÍ es del DB): es necesario si la
-// presión disponible en el punto de consumo más desfavorable, descontadas las
-// pérdidas, es menor que la presión mínima exigida (ver `PRESIONES`).
+// Grupo de presión — ap. 4.2.2 pto 1 b): es necesario si la presión disponible
+// en el punto de consumo más desfavorable, descontadas las pérdidas, es menor
+// que la mínima exigida (ver `PRESIONES`).
 // -----------------------------------------------------------------------------
 export const PERDIDAS_LOCALIZADAS = tablaCTE<{
   procedencia: ProcedenciaCriterioExterno;
@@ -385,20 +385,13 @@ export const PERDIDAS_LOCALIZADAS = tablaCTE<{
   /** Fracción máxima de las pérdidas longitudinales [%]. */
   fraccionLongitudinalesMax_pct: number;
 }>(
-  {
-    db: "DB-HS4",
-    edicion: "2009",
-    articulo: "ap. 4.2 / 4.5",
-    fuente: "buena práctica de cálculo (no DB)",
-  },
+  { ...PROC_HS4, articulo: "ap. 4.2.2 pto 1 a)" },
   {
     procedencia: {
-      db: "DB-HS4",
-      edicion: "2009",
-      articulo: "ap. 4.2 / 4.5",
-      naturaleza: "buena práctica — no exigencia CTE",
+      ...PROC_HS4,
+      articulo: "ap. 4.2.2 pto 1 a)",
+      naturaleza: "opción del DB para estimar las pérdidas localizadas",
       prescribeFormulaCTE: false,
-      fuente: "buena práctica de cálculo (no DB)",
     },
     fraccionLongitudinalesMin_pct: 20,
     fraccionLongitudinalesMax_pct: 30,
@@ -448,7 +441,7 @@ export function diametroAlimentacion_mm(tramo: TramoAlimentacionHS4): number {
   return ALIMENTACION_TABLA_4_3.datos.tramos[tramo].diametro_mm;
 }
 
-/** Rango de velocidad recomendado [m/s] según el material (ap. 4.2 d), buena práctica). */
+/** Intervalo de velocidad de cálculo [m/s] según el material (ap. 4.2.1 pto 2 d)). */
 export function rangoVelocidad(material: MaterialTuberia): RangoVelocidad {
   return VELOCIDADES_CALCULO.datos.porMaterial[material];
 }
@@ -462,3 +455,50 @@ export function presionMinExigida_kPa(esFluxorOCalentador: boolean): number {
     ? PRESIONES.datos.presionMinFluxorCalentador_kPa
     : PRESIONES.datos.presionMinGrifosComunes_kPa;
 }
+
+// =============================================================================
+// Control de la presión (feature-15, research/verificacion-hs4-v4.md bloque D).
+// =============================================================================
+
+/**
+ * Grupo de presión: necesario si la presión disponible en el punto más
+ * desfavorable es menor que la mínima (ap. 4.2.2 pto 1 b); las plantas a las que
+ * llega la red no deben depender de él (ap. 3.2.1.5.1 pto 1); en un grupo
+ * convencional la presión de parada es la de arranque más 2 a 3 bar
+ * (ap. 4.5.2.3 pto 1). El equipo no se dimensiona aquí.
+ */
+export const GRUPO_PRESION = tablaCTE(
+  { ...PROC_HS4, articulo: "ap. 4.2.2 pto 1 b); 3.2.1.5.1; 4.5.2.3 pto 1" },
+  {
+    margenParadaSobreArranqueMin_kPa: 200,
+    margenParadaSobreArranqueMax_kPa: 300,
+  } as const,
+);
+
+/** Válvulas limitadoras de presión donde se superarían los 500 kPa (ap. 3.2.1.5.2). */
+export const LIMITACION_PRESION = tablaCTE(
+  { ...PROC_HS4, articulo: "ap. 3.2.1.5.2; 4.5.3" },
+  { obligatoriaSiSuperaMax_kPa: 500 } as const,
+);
+
+/** Contadores y retorno de ACS (ap. 2.3 ptos 1 y 2; 3.2.2.1 pto 3). */
+export const AHORRO_AGUA = tablaCTE({ ...PROC_HS4, articulo: "ap. 2.3 ptos 1 y 2; 3.2.2.1 pto 3" }, {
+  /** Contador de AF y ACS por unidad de consumo individualizable. */
+  contadorPorUnidad: true,
+  /** Retorno de ACS si la ida al punto más alejado es igual o mayor que 15 m. */
+  retornoACSDesdeLongitudIda_m: 15,
+} as const);
+
+/**
+ * Criterios de proyecto de la v4 (NO son CTE: la ficha los rotula así). Ver
+ * research/verificacion-hs4-v4.md, «Para el código».
+ */
+export const CRITERIOS_PROYECTO_HS4 = {
+  origen: "criterio de proyecto (no exigencia CTE)",
+  /** La batería en planta baja la pide la compañía suministradora, no el DB. */
+  bateriaEnPlantaBaja: true,
+  /** Local sin uso: posición en la batería y derivación de al menos 20 mm, cerrada y vacía. */
+  localSinUso: "posición en la batería y derivación ≥ 20 mm con llave, cerrada y vacía (ap. 7.1 pto 1)",
+  /** El grupo se supone de presión constante a su salida (velocidad variable). */
+  grupoPresionConstante: true,
+} as const;

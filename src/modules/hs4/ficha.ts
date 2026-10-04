@@ -1,372 +1,235 @@
 // =============================================================================
-// DB-HS4 — Ficha justificativa. Transforma (inputs, result) del motor de cálculo
-// en el `FichaData` que pinta la plantilla ÚNICA `renderFicha` (lib/pdf). Este
-// módulo NO sabe de jsPDF: es una función PURA de transformación (sin React/DOM).
+// DB-HS4 — Ficha justificativa (feature-15). Transforma la JUSTIFICACIÓN (la red
+// deducida de El edificio, dimensionada por el motor) en el `FichaData` que
+// pinta la plantilla ÚNICA `renderFicha`. Función PURA (sin React/DOM).
 //
-// Cumple el innegociable de TRAZABILIDAD (SPEC §4/§8): cada dato declara su
-// ORIGEN y cada verificación cita su referencia normativa (DB-HS4 + tabla/art. +
-// EDICIÓN 2009), construida desde la `.procedencia` de las tablas de ./tablas.ts —
-// nunca cifras/citas sueltas. Veredicto CUMPLE/NO CUMPLE resaltado por renderFicha.
-//
-// CRITERIOS EXTERNOS (innegociable de §8 — NO confundir con exigencia CTE):
-//  - El coeficiente de simultaneidad K = 1/√(n−1) procede de UNE 149201; el
-//    DB-HS4 sólo remite a "un criterio adecuado". Se etiqueta como criterio
-//    externo en datos de partida y observaciones (usa `result.kEsCriterioExterno`
-//    / `result.normaCriterioK`).
-//  - La estimación de pérdidas localizadas (≈20–30 % de las longitudinales) es
-//    buena práctica de cálculo, NO cifra del DB. Se etiqueta en observaciones.
+// Trazabilidad (SPEC §4/§8): cada dato declara su ORIGEN (El edificio, Datos de
+// la obra, decisión del proyectista o criterio de proyecto) y cada verificación
+// cita su apartado, desde la `.procedencia` de las tablas. Los criterios que no
+// son CTE (simultaneidad por el método tradicional, longitudes tipo, batería en
+// planta baja, grupo de presión constante) se rotulan como tales.
 // =============================================================================
 
-import type {
-  CitaNormativa,
-  FichaData,
-  FilaDato,
-  FilaVerificacion,
-} from "../../lib/pdf/renderFicha";
+import { VEREDICTO_FICHA } from "../../lib/cte/estados";
+import { textoParrafo } from "../../lib/cte/memoria";
 import { citaDe } from "../../lib/cte/tabla";
+import { procedenciaEdificio } from "../../lib/edificio/derivar";
+import type { Edificio } from "../../lib/edificio/tipos";
+import type { CitaNormativa, FichaData, FilaDato, FilaVerificacion } from "../../lib/pdf/renderFicha";
 import { fmt } from "../../lib/units/format";
 import { ENGINE_VERSION } from "../../lib/version";
-import type {
-  HS4Inputs,
-  HS4Result,
-  ResultadoTramoHS4,
-  TipoTramoHS4,
-} from "./calc";
-import { SERIE_DIAMETROS_COMERCIALES_mm } from "./calc";
-import type { MaterialTuberia, TipoAparatoHS4 } from "./tablas";
+import type { Hs4Estado } from "./estado";
+import type { ElementoHs4, JustificacionHs4, ObraHs4 } from "./justificacion";
+import { memoriaHs4 } from "./memoria";
+import { ALTURA_PUNTO_CONSUMO_M, LONGITUDES_M, NOMBRE_TUBERIA } from "./red";
+import { HS4_PDF_SVG_ID } from "./svg-meta";
 import {
+  AHORRO_AGUA,
   ALIMENTACION_TABLA_4_3,
   CAUDAL_INSTANTANEO_TABLA_2_1,
+  CRITERIOS_PROYECTO_HS4,
   DERIVACIONES_TABLA_4_2,
+  GRUPO_PRESION,
   PERDIDAS_LOCALIZADAS,
   PRESIONES,
   SIMULTANEIDAD_K,
   VELOCIDADES_CALCULO,
-  rangoVelocidad,
 } from "./tablas";
-import { HS4_PDF_SVG_ID, hs4NativeSize } from "./svg-meta";
+import { textoAviso, valorCorto } from "./textos";
 
-// -----------------------------------------------------------------------------
-// CONTRATO DE INTEGRACIÓN con svg-meta.ts (se hace EN PARALELO):
-//  - El id del contenedor del clon oculto del SVG (modo 'pdf') que renderFicha
-//    busca en el DOM se IMPORTA de ./svg-meta (`HS4_PDF_SVG_ID`), única fuente de
-//    verdad. ui.tsx DEBE montar el clon oculto del HS4SVG con ESE mismo id.
-//  - El tamaño nativo (`nativeW/H`) se IMPORTA de ./svg-meta (`hs4NativeSize`),
-//    única fuente de verdad, para que `scale = CW / nativeW` de renderFicha no
-//    deforme el raster.
-//  (HS4_PDF_SVG_ID y hs4NativeSize se han movido de ./svg a ./svg-meta para que
-//   la ficha —transformación pura, sin React/DOM— no dependa del módulo de SVG.)
-// -----------------------------------------------------------------------------
+const ORIGEN_EDIFICIO = "El edificio";
+const ORIGEN_OBRA = "Datos de la obra";
+const ORIGEN_DECISION = "Decisión del proyectista";
+const ORIGEN_CRITERIO = "Criterio de proyecto (no CTE)";
 
-// -----------------------------------------------------------------------------
-// Etiquetas legibles de cada tipo de aparato (Tabla 2.1) para conceptos de ficha.
-// -----------------------------------------------------------------------------
-const ETIQUETA_APARATO: Record<TipoAparatoHS4, string> = {
-  lavamanos: "Lavamanos",
-  lavabo: "Lavabo",
-  ducha: "Ducha",
-  banera_ge_140: "Bañera (≥ 1,40 m)",
-  banera_lt_140: "Bañera (< 1,40 m)",
-  bide: "Bidé",
-  inodoro_cisterna: "Inodoro con cisterna",
-  inodoro_fluxor: "Inodoro con fluxor",
-  urinario_temporizado: "Urinario temporizado",
-  urinario_cisterna: "Urinario con cisterna",
-  fregadero_domestico: "Fregadero doméstico",
-  fregadero_no_domestico: "Fregadero no doméstico",
-  lavavajillas_domestico: "Lavavajillas doméstico",
-  lavavajillas_industrial: "Lavavajillas industrial",
-  lavadero: "Lavadero",
-  lavadora_domestica: "Lavadora doméstica",
-  lavadora_industrial: "Lavadora industrial",
-  grifo_aislado: "Grifo aislado",
-  grifo_garaje: "Grifo de garaje",
-  vertedero: "Vertedero",
-};
-
-/** Etiquetas legibles de cada tipo de tramo de la red de suministro. */
-const ETIQUETA_TRAMO: Record<TipoTramoHS4, string> = {
-  derivacion_aparato: "Derivación de aparato",
-  derivacion_particular: "Derivación particular",
-  columna_montante: "Columna / montante",
-  tubo_alimentacion: "Tubo de alimentación",
-  acometida: "Acometida",
-};
-
-/** Etiquetas legibles de cada material de tubería (para datos de partida). */
-const ETIQUETA_MATERIAL: Record<MaterialTuberia, string> = {
-  metalica: "Metálica",
-  termoplastico_multicapa: "Termoplástico / multicapa",
-};
-
-const CRITERIO_K_LABEL: Record<HS4Inputs["criterioK"], string> = {
-  une149201: "K = 1/√(n−1) (UNE 149201)",
-  sin_simultaneidad: "K = 1 (sin simultaneidad)",
-};
-
-/** Nombre de presentación de un aparato: tipo + id, p.ej. "Lavabo (bano-lavabo)". */
-function nombreAparato(tipo: TipoAparatoHS4, id: string): string {
-  return `${ETIQUETA_APARATO[tipo] ?? tipo} (${id})`;
+function kpa(v: number): string {
+  return fmt(v, "kPa", 0);
 }
 
-/** Nombre de presentación de un tramo: tipo + id, p.ej. "Columna / montante (montante)". */
-function nombreTramo(t: Pick<ResultadoTramoHS4, "tipo" | "id">): string {
-  return `${ETIQUETA_TRAMO[t.tipo] ?? t.tipo} (${t.id})`;
+/** Valor y límite de un elemento, para las columnas de la ficha. */
+function cuentas(el: ElementoHs4): { valor: string; limite: string } {
+  const det = el.detalle;
+  const v = valorCorto(el);
+  switch (det.clase) {
+    case "red":
+      return { valor: kpa(det.presion_kPa), limite: det.necesaria_kPa === null ? "—" : `≥ ${kpa(det.necesaria_kPa)} sin grupo` };
+    case "planta":
+      return {
+        valor: kpa(det.punto.aparato.presionResidual_kPa),
+        limite: `≥ ${kpa(det.punto.aparato.presionMinExigida_kPa)}`,
+      };
+    case "maxima":
+      return { valor: kpa(det.punto.aparato.presionResidual_kPa), limite: `≤ ${kpa(det.maxima_kPa)}` };
+    case "grupo":
+      return {
+        valor: det.puesto ? `Sí · ${kpa(det.presionGrupo_kPa)}` : "No",
+        limite: det.necesario ? "necesario" : "no necesario",
+      };
+    case "montante":
+      return {
+        valor: `${v} · ${fmt(det.tramo.velocidad_m_s ?? 0, "m/s", 1)}`,
+        limite: (() => {
+          const m = el.manda.tipo === "velocidad" ? el.manda : null;
+          return m ? `${fmt(m.min_m_s, undefined, 1)}–${fmt(m.max_m_s, "m/s", 1)} (criterio)` : "—";
+        })(),
+      };
+    case "caudal":
+      return { valor: `${fmt(det.tramo.caudalCalculo_dm3_s, "dm³/s", 2)} · K ${fmt(det.tramo.k, undefined, 2)}`, limite: "criterio" };
+    case "acometida":
+      return { valor: `${v} · ${fmt(det.acometida.caudalCalculo_dm3_s, "dm³/s", 2)}`, limite: "criterio" };
+    case "local":
+      return { valor: `${v} previsto`, limite: "criterio de proyecto" };
+  }
 }
 
-/** Referencia compacta de una tabla/artículo para la columna "Ref." / "Origen". */
-function refDe(proc: { db: string; tabla?: string; articulo?: string }): string {
-  return `${proc.db} ${proc.tabla ?? proc.articulo ?? ""}`.trim();
+export interface OpcionesFichaHs4 {
+  estado: Hs4Estado;
+  edificio: Edificio;
+  obra: ObraHs4;
+  /** Ids de los avisos que el proyectista marcó como revisados. */
+  revisados: readonly string[];
+  /** Tamaño nativo del dibujo que se rasteriza. */
+  svg: { nativeW: number; nativeH: number };
 }
 
-const REF_TABLA_2_1 = refDe(CAUDAL_INSTANTANEO_TABLA_2_1.procedencia); // "DB-HS4 Tabla 2.1"
-const REF_TABLA_4_2 = refDe(DERIVACIONES_TABLA_4_2.procedencia); // "DB-HS4 Tabla 4.2"
-const REF_TABLA_4_3 = refDe(ALIMENTACION_TABLA_4_3.procedencia); // "DB-HS4 Tabla 4.3"
-const REF_VELOCIDAD = refDe(VELOCIDADES_CALCULO.procedencia); // "DB-HS4 ap. 4.2 d)"
-const REF_PRESIONES = refDe(PRESIONES.procedencia); // "DB-HS4 ap. 2.1.3"
+/** Convierte la justificación de HS4 en el FichaData que renderFicha pinta. */
+export function toFichaData(j: JustificacionHs4, o: OpcionesFichaHs4): FichaData {
+  const d = j.red.decisiones;
+  const manual = j.modo === "manual";
 
-/** Ø mínimo del tramo por tabla (4.2 derivación de aparato / 4.3 alimentación). */
-function refTramoMin(tipo: TipoTramoHS4): string {
-  return tipo === "derivacion_aparato" ? REF_TABLA_4_2 : REF_TABLA_4_3;
-}
-
-// OV-7: la serie de Ø comerciales (SERIE_DIAMETROS_COMERCIALES_mm, en calc.ts) NO
-// es del DB-HS4: es un CRITERIO DE PROYECTO de predimensionado (igual que K /
-// pérdidas localizadas). Se etiqueta como tal en la ficha (origen del Ø y obs.).
-const SERIE_DIAMETROS_LABEL = SERIE_DIAMETROS_COMERCIALES_mm.join("/");
-const REF_SERIE_DIAMETROS =
-  "Serie de Ø comerciales: criterio de proyecto, no exigencia CTE";
-
-// -----------------------------------------------------------------------------
-// TRANSFORMACIÓN: (inputs, result) → FichaData
-// -----------------------------------------------------------------------------
-
-/** Convierte (inputs, result) de HS4 en el FichaData que renderFicha pinta. */
-export function toFichaData(inputs: HS4Inputs, result: HS4Result): FichaData {
-  // ── Normativa de referencia (citas desde las procedencias) ────────────────
-  // Las cifras VINCULANTES del DB-HS4 (edición 2009) primero; los CRITERIOS
-  // EXTERNOS (UNE 149201, pérdidas localizadas) al final, etiquetados aparte.
+  // ── Normativa de referencia ───────────────────────────────────────────────
   const normativa: CitaNormativa[] = [
-    citaDe(CAUDAL_INSTANTANEO_TABLA_2_1.procedencia), // Tabla 2.1 — caudal instantáneo
-    citaDe(DERIVACIONES_TABLA_4_2.procedencia), // Tabla 4.2 — Ø mín. derivaciones
-    citaDe(ALIMENTACION_TABLA_4_3.procedencia), // Tabla 4.3 — Ø mín. alimentación
-    citaDe(VELOCIDADES_CALCULO.procedencia), // ap. 4.2 d) — velocidades
-    citaDe(PRESIONES.procedencia), // ap. 2.1.3 — presiones mín./máx.
-    // Criterios EXTERNOS (no exigencia CTE): se citan con su norma de origen en
-    // `exigencia` para que la ficha NO los presente como prescripción del DB.
-    {
-      ...citaDe(SIMULTANEIDAD_K.datos.procedencia),
-      exigencia: `${SIMULTANEIDAD_K.datos.procedencia.norma ?? "UNE 149201"} — criterio externo (no exigencia CTE)`,
-    },
-    {
-      ...citaDe(PERDIDAS_LOCALIZADAS.datos.procedencia),
-      exigencia: "Pérdidas localizadas — buena práctica de cálculo (no exigencia CTE)",
-    },
+    citaDe(CAUDAL_INSTANTANEO_TABLA_2_1.procedencia),
+    citaDe(PRESIONES.procedencia),
+    citaDe(DERIVACIONES_TABLA_4_2.procedencia),
+    citaDe(ALIMENTACION_TABLA_4_3.procedencia),
+    citaDe(VELOCIDADES_CALCULO.procedencia),
+    citaDe(PERDIDAS_LOCALIZADAS.procedencia),
+    citaDe(AHORRO_AGUA.procedencia),
   ];
+  if (d.grupoPresion || j.elementos.some((e) => e.detalle.clase === "grupo" && e.detalle.necesario)) {
+    normativa.push(citaDe(GRUPO_PRESION.procedencia));
+  }
+  normativa.push({
+    ...citaDe(SIMULTANEIDAD_K.procedencia),
+    exigencia: "Coeficiente de simultaneidad: criterio de proyecto (método tradicional), no exigencia CTE",
+  });
 
-  // ── Datos de partida (cada dato declara su ORIGEN) ────────────────────────
+  // ── Datos de partida ──────────────────────────────────────────────────────
   const datosPartida: FilaDato[] = [
+    { concepto: "Descripción del edificio", valor: procedenciaEdificio(o.edificio), origen: ORIGEN_EDIFICIO },
     {
-      // ARCH-2: alcance de esta versión. Se dimensiona solo la red de AGUA FRÍA.
-      // La red de ACS NO se dimensiona en esta versión: el usuario no debe
-      // asumir cobertura de ACS (los caudales de ACS de la Tabla 2.1 no entran
-      // en el cálculo). Se declara aquí, en cabecera de los datos de partida.
-      concepto: "Alcance del dimensionado",
-      valor: "Solo agua fría (AF)",
-      origen: "Criterio de versión — la red de ACS no se dimensiona (ver observaciones)",
+      concepto: "Presión de la red en la acometida",
+      valor: j.presionSinDato ? `${kpa(j.presionRed_kPa)} (supuesta)` : kpa(j.presionRed_kPa),
+      origen: j.presionSinDato
+        ? "Supuesta: no consta en la obra"
+        : `${ORIGEN_OBRA} · ${o.revisados.includes("presion-red-supuesta") ? "confirmada por el proyectista" : "pendiente de confirmar con la compañía"}`,
     },
     {
-      concepto: "Presión disponible en la acometida",
-      valor: fmt(result.presionAcometida_kPa, "kPa"),
-      origen: "Entrada del usuario",
+      concepto: "Contadores",
+      valor: j.red.unifamiliar
+        ? "Contador general"
+        : d.contadores === "bateria"
+          ? `Batería de ${j.red.contadores.total} en planta baja`
+          : "En cada planta, con montante general",
+      origen: j.red.unifamiliar ? ORIGEN_EDIFICIO : ORIGEN_DECISION,
+    },
+    { concepto: "Tubería", valor: NOMBRE_TUBERIA[d.tuberia], origen: ORIGEN_DECISION },
+    { concepto: "Agua caliente", valor: d.aguaCaliente === "individual" ? "Individual (HE 4)" : "Central (red de ACS aparte)", origen: ORIGEN_DECISION },
+    {
+      concepto: "Grupo de presión",
+      valor: d.grupoPresion ? `Sí · ${kpa(d.presionGrupo_kPa)} a su salida` : "No",
+      origen: d.grupoPresion ? `${ORIGEN_DECISION} · presión constante supuesta` : ORIGEN_DECISION,
     },
     {
-      concepto: "Criterio de simultaneidad",
-      valor: CRITERIO_K_LABEL[inputs.criterioK],
-      origen: result.kEsCriterioExterno
-        ? `${result.normaCriterioK ?? "UNE 149201"} — criterio externo (no exigencia CTE)`
-        : "Suma directa (K = 1)",
+      concepto: "Simultaneidad",
+      valor: j.inputs.criterioK === "une149201" ? "K = 1/√(n−1) por tramo" : "K = 1 (sin simultaneidad)",
+      origen: `${ORIGEN_CRITERIO} · método tradicional`,
     },
     {
-      concepto: "Presión mínima exigida en grifos comunes",
-      valor: fmt(PRESIONES.datos.presionMinGrifosComunes_kPa, "kPa"),
-      origen: REF_PRESIONES,
-    },
-    {
-      concepto: "Presión mínima exigida en fluxores / calentadores",
-      valor: fmt(PRESIONES.datos.presionMinFluxorCalentador_kPa, "kPa"),
-      origen: REF_PRESIONES,
-    },
-    {
-      concepto: "Presión máxima admisible en puntos de consumo",
-      valor: fmt(PRESIONES.datos.presionMaxConsumo_kPa, "kPa"),
-      origen: REF_PRESIONES,
+      concepto: "Pérdidas localizadas",
+      valor: `${fmt((j.inputs.fraccionPerdidasLocalizadas ?? 0.25) * 100, "%", 0)} de las longitudinales`,
+      origen: "DB-HS4 ap. 4.2.2 pto 1 a)",
     },
   ];
-
-  // Una fila por aparato: tipo + caudal instantáneo de AF (origen Tabla 2.1).
-  for (const a of result.porAparato) {
-    const flux = a.esFluxorOCalentador ? " · fluxor/calentador" : "";
+  if (!manual) {
+    const tipos = new Map<string, (typeof j.red.unidades)[number]>();
+    for (const u of j.red.unidades) if (!tipos.has(u.tipoId + u.clase)) tipos.set(u.tipoId + u.clase, u);
+    for (const u of tipos.values()) {
+      datosPartida.push({
+        concepto: u.clase === "oficinas" ? "Planta de oficinas" : j.red.unifamiliar ? "Vivienda" : `Vivienda tipo ${u.nombreTipo}`,
+        valor: `${u.numAparatos} aparatos`,
+        origen: `${ORIGEN_EDIFICIO} · Tabla 2.1`,
+      });
+    }
     datosPartida.push({
-      concepto: `Aparato — ${nombreAparato(a.tipo, a.id)}`,
-      valor: `${fmt(a.caudalInstantaneo_dm3_s, "dm³/s", 3)}${flux}`,
-      origen: REF_TABLA_2_1,
+      concepto: "Geometría de la red",
+      valor: `grifos a ${fmt(ALTURA_PUNTO_CONSUMO_M, "m", 0)}; derivación ${fmt(LONGITUDES_M.derivacionParticular, "m", 0)}; cuarto ${fmt(LONGITUDES_M.cuarto, "m", 0)}`,
+      origen: ORIGEN_CRITERIO,
     });
-  }
-
-  // Material + longitud por tramo (origen: entrada del usuario / defaults motor).
-  // El rango de velocidad admisible deriva del material (ap. 4.2 d)).
-  for (const t of result.porTramo) {
-    const rango = rangoVelocidad(t.material);
+  } else {
     datosPartida.push({
-      concepto: `Tramo — ${nombreTramo(t)}`,
-      valor: `${ETIQUETA_MATERIAL[t.material] ?? t.material} · L=${fmt(t.longitud_m, "m")}${
-        t.altura_m > 0 ? ` · Δh=${fmt(t.altura_m, "m")}` : ""
-      }`,
-      origen: `Entrada del usuario · v∈[${fmt(rango.min_m_s, "", 1)}, ${fmt(
-        rango.max_m_s,
-        "m/s",
-        1,
-      )}] (${REF_VELOCIDAD})`,
+      concepto: "Red de agua fría",
+      valor: `${j.inputs.tramos.length} tramos · ${j.inputs.aparatos.length} aparatos`,
+      origen: "Ajustada a mano por el proyectista",
     });
   }
 
-  // ── Verificaciones (comparación contra el límite normativo) ───────────────
-  const verificaciones: FilaVerificacion[] = [];
-
-  // Una fila por tramo: Ø resultante · velocidad real vs rango admisible ·
-  // presión residual a la salida. El motor ya fija `estado` por tramo (NO se
-  // recomputa aquí): la ficha SOLO propaga `t.estado` (transformación pura).
-  for (const t of result.porTramo) {
-    const rango = rangoVelocidad(t.material);
-    const diam = t.diametro_mm != null ? `Ø${fmt(t.diametro_mm, "mm", 0)}` : "—";
-    const vel = t.velocidad_m_s != null ? fmt(t.velocidad_m_s, "m/s", 2) : "—";
-    // Cambio 5 (Wave 1): superficie de los flags que el motor ya fija como `warn`.
-    // No se recalcula veredicto: solo se ANOTA la causa junto al concepto/valor.
-    const flags: string[] = [];
-    if (t.velocidadFueraDeRango) flags.push("velocidad fuera de rango (ap. 4.2 d)");
-    if (t.diametroFueraDeSerie) flags.push("Ø fuera de la serie comercial");
-    const nota = flags.length ? ` — ${flags.join("; ")} [buena práctica, no exigencia CTE]` : "";
-    verificaciones.push({
-      concepto: `${nombreTramo(t)}${nota}`,
-      valor: `${diam} · v=${vel}`,
-      limite: `v∈[${fmt(rango.min_m_s, "", 1)}, ${fmt(rango.max_m_s, "m/s", 1)}] · Pr=${fmt(
-        t.presionResidual_kPa,
-        "kPa",
-      )}`,
-      // Veredicto del motor (única fuente de verdad): `warn` si el tramo trae
-      // `velocidadFueraDeRango` o `diametroFueraDeSerie` (lo fija calc.ts).
-      estado: t.estado,
-      // OV-7: el Ø sale de la serie comercial (criterio de proyecto), además del
-      // Ø mín. de tabla y el rango de velocidad (DB-HS4).
-      referencia: `${refTramoMin(t.tipo)} · ${REF_VELOCIDAD} · ${REF_SERIE_DIAMETROS}`,
-    });
-  }
-
-  // Fila RESUMEN: presión en el punto de consumo más desfavorable vs mínima
-  // exigida en ese punto. Es la verificación clave del módulo (ap. 2.1.3).
-  const apCritico = result.puntoCriticoId
-    ? result.porAparato.find((a) => a.id === result.puntoCriticoId)
-    : undefined;
-  const minExigidaCritico =
-    apCritico?.presionMinExigida_kPa ?? PRESIONES.datos.presionMinGrifosComunes_kPa;
-  const conceptoCritico = apCritico
-    ? `Presión en el punto crítico — ${nombreAparato(apCritico.tipo, apCritico.id)}`
-    : "Presión en el punto crítico";
-  verificaciones.push({
-    // ARCH-1: la presión es una ESTIMACIÓN de predimensionado (modelo de pérdida
-    // de carga orientativo). La advertencia va JUNTO al dato (concepto/valor),
-    // no enterrada en observaciones.
-    concepto: `${conceptoCritico} (presión estimada — predimensionado)`,
-    valor: `${fmt(result.presionCritica_kPa, "kPa")} (orientativa)`,
-    limite: `≥ ${fmt(minExigidaCritico, "kPa")}`,
-    // El veredicto lo decide el motor (única fuente de verdad): propagamos el
-    // `estado` del aparato crítico. Solo si no hay aparato crítico identificado
-    // recurrimos a una comparación local de respaldo.
-    estado:
-      apCritico?.estado ??
-      (result.presionCritica_kPa < minExigidaCritico
-        ? "fail"
-        : result.presionCritica_kPa > PRESIONES.datos.presionMaxConsumo_kPa
-          ? "warn"
-          : "ok"),
-    referencia: REF_PRESIONES,
+  // ── Verificaciones: una por elemento ──────────────────────────────────────
+  const verificaciones: FilaVerificacion[] = j.elementos.map((el) => {
+    const c = cuentas(el);
+    return {
+      concepto: el.nombre,
+      valor: c.valor,
+      limite: c.limite,
+      estado: VEREDICTO_FICHA[el.veredicto],
+      referencia: el.cita[0] ?? "DB-HS4",
+    };
   });
 
-  // Fila de GRUPO DE PRESIÓN: necesario/no necesario (ap. 4.5). Si es necesario
-  // el dimensionado no cumple por presión ⇒ "fail"; si no, informativo ("ok").
-  verificaciones.push({
-    // ARCH-1: la necesidad de grupo de presión se decide sobre una presión
-    // ESTIMADA (predimensionado). La nota acompaña al dato, no se entierra.
-    concepto: "Grupo de presión (ap. 4.5) — sobre presión estimada (predimensionado)",
-    valor: result.grupoPresionNecesario ? "Necesario" : "No necesario",
-    limite: `Pr punto crítico ≥ ${fmt(minExigidaCritico, "kPa")}`,
-    // El veredicto del grupo de presión lo decide el motor (no se recomputa):
-    // `fail` si es necesario, informativo `ok` si no.
-    estado: result.grupoPresionNecesario ? "fail" : "ok",
-    referencia: refDe({ db: "DB-HS4", articulo: "ap. 4.5" }),
+  // ── Observaciones: avisos con su revisión y criterios ─────────────────────
+  const observaciones: string[] = j.avisos.map((a) => {
+    const t = textoAviso(a, j);
+    const revisado = o.revisados.includes(a.id);
+    return `${t.titulo} ${t.detalle} — ${revisado ? "Revisado por el proyectista." : "Pendiente de revisar."}`;
   });
-
-  // ── Observaciones ─────────────────────────────────────────────────────────
-  const observaciones: string[] = [
-    ...result.warnings,
-  ];
-
-  // ARCH-1: la presión (residual / punto crítico / grupo de presión) es una
-  // ESTIMACIÓN de PREDIMENSIONADO. El modelo de pérdida de carga es orientativo
-  // (simplificación tipo Flamant/Hazen-Williams), NO Darcy-Weisbach con factor
-  // de fricción de Colebrook. Estas presiones no sustituyen un cálculo hidráulico
-  // de detalle: sirven para predimensionar y detectar la necesidad de grupo de
-  // presión, no como verificación hidráulica definitiva.
   observaciones.push(
-    "Presión ORIENTATIVA (predimensionado): los valores de presión residual, presión en el " +
-      "punto crítico y la necesidad de grupo de presión (ap. 4.5) se obtienen con un modelo de " +
-      "pérdida de carga simplificado (no Darcy-Weisbach / Colebrook). Es una estimación de " +
-      "predimensionado que NO sustituye un cálculo hidráulico de detalle.",
+    "Criterio: el coeficiente de simultaneidad K = 1/√(n−1) es el método tradicional; el DB pide «un criterio adecuado» (ap. 4.2.1 pto 2 b) y no fija fórmula.",
+    "Criterio: las pérdidas por rozamiento se estiman con un modelo de predimensionado y las localizadas, como un 20–30 % de las longitudinales (ap. 4.2.2 pto 1 a); no sustituyen un cálculo de detalle.",
   );
+  if (d.grupoPresion) {
+    observaciones.push(
+      `Criterio: el grupo de presión se supone de presión constante a su salida. Si es convencional, la presión de parada sube entre ${GRUPO_PRESION.datos.margenParadaSobreArranqueMin_kPa} y ${GRUPO_PRESION.datos.margenParadaSobreArranqueMax_kPa} kPa (ap. 4.5.2.3) y debe comprobarse con los 500 kPa del punto más bajo. El equipo se dimensiona en el proyecto de la instalación.`,
+    );
+  }
+  if (!manual && !j.red.unifamiliar && d.contadores === "bateria") {
+    observaciones.push(
+      "Criterio: la batería de contadores en planta baja es lo habitual de las compañías suministradoras; el DB pide los divisionarios en una zona de uso común, de fácil y libre acceso (ap. 3.2.1.2.7).",
+    );
+  }
+  if (j.red.locales.length > 0) observaciones.push(`Criterio: local sin uso con ${CRITERIOS_PROYECTO_HS4.localSinUso}.`);
 
-  // ARCH-2: alcance. Esta versión dimensiona SOLO la red de agua fría (AF); la
-  // red de ACS no se dimensiona. El usuario no debe asumir cobertura de ACS.
-  observaciones.push(
-    "Alcance del cálculo: esta versión dimensiona ÚNICAMENTE la red de AGUA FRÍA (AF). La red de " +
-      "ACS (agua caliente sanitaria) NO se dimensiona en esta versión —no se calculan sus caudales, " +
-      "diámetros, presiones ni recirculación—; no debe asumirse cobertura de ACS.",
-  );
-
-  // Nota innegociable: K (UNE 149201), la estimación de pérdidas localizadas y la
-  // serie de Ø comerciales (OV-7) son criterios EXTERNOS / DE PROYECTO, no
-  // exigencias del DB-HS4.
-  observaciones.push(
-    `Criterios externos al DB-HS4 (no exigencias CTE): el coeficiente de simultaneidad ${
-      result.kEsCriterioExterno
-        ? `K = 1/√(n−1) procede de ${result.normaCriterioK ?? "UNE 149201"}`
-        : "K = 1 (suma directa de caudales)"
-    }; el DB-HS4 sólo remite a "un criterio adecuado" (ap. 4.2.1). La estimación de pérdidas localizadas (${
-      PERDIDAS_LOCALIZADAS.datos.fraccionLongitudinalesMin_pct
-    }–${
-      PERDIDAS_LOCALIZADAS.datos.fraccionLongitudinalesMax_pct
-    } % de las longitudinales) es buena práctica de cálculo de predimensionado, no cifra del DB. La selección de diámetros usa una serie de Ø comerciales (${SERIE_DIAMETROS_LABEL} mm): es un CRITERIO DE PROYECTO, no exigencia del CTE (el DB-HS4 sólo fija los Ø MÍNIMOS de las Tablas 4.2 y 4.3, que se respetan como cota inferior).`,
-  );
-
-  const { nativeW, nativeH } = hs4NativeSize(result);
+  const memoria = memoriaHs4(j);
 
   return {
     titulo: "HS4 — Suministro de agua (fontanería)",
     engineVersion: ENGINE_VERSION,
-    edicionDB: "DB-HS4 (2009)",
+    edicionDB: "DB-HS4 (consolidado 14-06-2022)",
     normativa,
     datosPartida,
     verificaciones,
-    veredictoGlobal: result.veredictoGlobal,
+    veredictoGlobal: j.veredicto,
     observaciones,
+    memoria: memoria.parrafos.map(textoParrafo),
     svg: {
       elementId: HS4_PDF_SVG_ID,
-      nativeW,
-      nativeH,
-      caption:
-        "Esquema de la red de suministro: árbol de tramos con Ø, caudal de cálculo, velocidad y presión residual; recorrido crítico resaltado.",
+      nativeW: o.svg.nativeW,
+      nativeH: o.svg.nativeH,
+      caption: manual
+        ? "Esquema de la red de agua fría: tramos con Ø, caudal, velocidad y presión residual."
+        : "Sección del edificio con la batería de contadores y los montantes, y la presión que llega a cada planta.",
     },
-    inputs,
+    inputs: { estado: o.estado, edificio: o.edificio, obra: o.obra },
     slug: "hs4-fontaneria",
   };
 }
