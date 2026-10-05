@@ -118,9 +118,6 @@ function piezasPronto(claves: readonly JustificacionKey[], r: ResumenEdificio): 
     const plantas = r.plantasSobreRasante + r.plantasBajoRasante;
     return [...con(plantas > 1, "escaleras"), ...con(r.tieneGaraje, "garaje"), ...con(!r.esUnifamiliar, "itinerario accesible")];
   }
-  if (k === "hr") {
-    return [...con(r.numViviendas > 1, "entre viviendas"), ...con(r.tieneViviendas && (r.tieneLocales || r.tieneOficinas), "viviendas y otros usos")];
-  }
   if (k === "he4" || k === "he5") {
     return [...con(r.tieneViviendas, viviendas(r.numViviendas)), ...con(r.tieneLocales, "local"), ...con(r.tieneOficinas, "oficinas")];
   }

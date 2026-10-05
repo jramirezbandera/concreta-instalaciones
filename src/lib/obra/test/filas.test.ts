@@ -108,9 +108,13 @@ describe("filasObra — el Demo", () => {
     expect(textos(fila(demo(), "rebt"))).toEqual(["91 kW", "elevada", "contadores en armario"]);
   });
 
+  it("HR publicado (feature-25): tabiquería, separaciones, forjados y fachadas", () => {
+    expect(fila(demo(), "hr")).toMatchObject({ codigo: "HR", ruta: "hr/ruido", estado: "revisar" });
+    expect(textos(fila(demo(), "hr"))).toEqual(["tabiquería", "separaciones", "forjados", "fachadas"]);
+  });
+
   it("las «pronto» solo nombran partes del edificio", () => {
     const p = demo();
-    expect(textos(fila(p, "hr"))).toEqual(["entre viviendas", "viviendas y otros usos"]);
     for (const g of filasObra(p))
       for (const f of g.filas)
         if (f.estado === "pronto") for (const t of textos(f)) expect(t, f.id).not.toMatch(/W\/m²|kW|l\/s/);
@@ -146,8 +150,8 @@ describe("piezasDeQueEntra", () => {
 describe("recuento", () => {
   it("una a una, no por filas", () => {
     const r = recuentoObra(demo());
-    expect(r).toMatchObject({ cumple: 6, revisar: 18, no_cumple: 0, no_aplica: 2, externo: 2, pronto: 1 });
-    expect(textoRecuento(r)).toBe("6 cumple · 18 por revisar · 2 no aplica · 2 externo · 1 pronto");
+    expect(r).toMatchObject({ cumple: 6, revisar: 19, no_cumple: 0, no_aplica: 2, externo: 2, pronto: 0 });
+    expect(textoRecuento(r)).toBe("6 cumple · 19 por revisar · 2 no aplica · 2 externo");
   });
 
   it("rotuloGrupo", () => {

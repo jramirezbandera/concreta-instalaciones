@@ -33,7 +33,8 @@ describe("evaluarExpediente — el Demo", () => {
     expect(ev.hs1!.estado).toBe("revisar");
     // REBT (feature-23): cumple, con el ascensor, los servicios y el humo del garaje por revisar.
     expect(ev.rebt!.estado).toBe("revisar");
-    expect(ev.hr!.estado).toBe("pronto");
+    // HR (feature-25): cumple, con el Ld, los huecos y el local por revisar.
+    expect(ev.hr!.estado).toBe("revisar");
     // HS2 (feature-21): cumple, con la recogida y los dormitorios dobles supuestos.
     expect(ev.hs2!.estado).toBe("revisar");
   });
@@ -116,7 +117,7 @@ describe("estadoEfectivo — las entradas del módulo al abrirse", () => {
   it("sin nada guardado, los valores por defecto con lo heredado", () => {
     const p: Proyecto = { ...demo(), justificaciones: {} };
     expect(estadoEfectivo(p, "hs6")).toMatchObject({ zona: "II", municipio: "Cáceres" });
-    expect(estadoEfectivo(p, "hr")).toBeNull();
+    expect(estadoEfectivo(p, "sua5")).toBeNull();
   });
 
   it("en los cuatro casos de El edificio, el veredicto es el del motor del módulo", () => {

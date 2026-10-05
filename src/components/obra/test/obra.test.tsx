@@ -40,7 +40,7 @@ afterEach(() => {
 describe("Lo que se justifica", () => {
   it("el recuento y las filas con su estado, enlazadas al módulo", () => {
     montar(<LoQueSeJustifica />);
-    expect(screen.getByText("6 cumple · 18 por revisar · 2 no aplica · 2 externo · 1 pronto")).toBeInTheDocument();
+    expect(screen.getByText("6 cumple · 19 por revisar · 2 no aplica · 2 externo")).toBeInTheDocument();
     const hs5 = screen.getByRole("link", { name: /HS5.*Evacuación de aguas/ });
     expect(hs5).toHaveAttribute("href", "/hs/saneamiento");
     expect(within(hs5).getByText("revisar")).toBeInTheDocument();
@@ -101,11 +101,14 @@ describe("Antes de entregar", () => {
   it("los avisos sin revisar del Demo, cada uno hacia su módulo", () => {
     montar(<AntesDeEntregar />);
     const items = screen.getAllByRole("listitem");
-    expect(items).toHaveLength(27);
-    expect(within(items[19]).getByRole("link")).toHaveAttribute("href", "/he/acs");
-    expect(items[22]).toHaveTextContent(/HE5 · /);
-    expect(within(items[25]).getByRole("link")).toHaveAttribute("href", "/rebt/prevision");
-    expect(items[25]).toHaveTextContent(/REBT · /);
+    expect(items).toHaveLength(30);
+    // HR (feature-25): el porcentaje de huecos, el Ld y el local.
+    expect(within(items[19]).getByRole("link")).toHaveAttribute("href", "/hr/ruido");
+    expect(items[20]).toHaveTextContent(/HR · Indica el Ld/);
+    expect(within(items[22]).getByRole("link")).toHaveAttribute("href", "/he/acs");
+    expect(items[25]).toHaveTextContent(/HE5 · /);
+    expect(within(items[28]).getByRole("link")).toHaveAttribute("href", "/rebt/prevision");
+    expect(items[28]).toHaveTextContent(/REBT · /);
     expect(within(items[0]).getByRole("link")).toHaveAttribute("href", "/hs/humedad");
     expect(items[0]).toHaveTextContent("HS1 · Faltan datos del clima: se ha supuesto zona pluviométrica I.");
     expect(within(items[1]).getByRole("link")).toHaveAttribute("href", "/hs/residuos");
@@ -145,6 +148,7 @@ describe("Antes de entregar", () => {
         he5: { revisados: ["construida", "mixto"] },
         he6: { revisados: ["mixto"] },
         rebt: { revisados: ["ascensor-supuesto", "servicios", "humo"] },
+        hr: { revisados: ["huecos", "ld", "local"] },
       },
     });
     expect(screen.getByText(/Nada pendiente/)).toBeInTheDocument();
@@ -154,15 +158,15 @@ describe("Antes de entregar", () => {
 describe("Lo que se entrega", () => {
   it("el recuento de cada entregable", () => {
     montar(<LoQueSeEntrega />);
-    expect(screen.getByText("26 apartados")).toBeInTheDocument();
-    expect(screen.getByText("24 fichas")).toBeInTheDocument();
+    expect(screen.getByText("27 apartados")).toBeInTheDocument();
+    expect(screen.getByText("25 fichas")).toBeInTheDocument();
     expect(screen.getByText("2 esquemas")).toBeInTheDocument();
   });
 
   it("con algo que no cumple, lo nombra y no lo cuenta", () => {
     const p = demo();
     montar(<LoQueSeEntrega />, { ...p, datosGenerales: { ...p.datosGenerales, presionAcometida_kPa: 60 } });
-    expect(screen.getByText("25 de 26 apartados")).toBeInTheDocument();
+    expect(screen.getByText("26 de 27 apartados")).toBeInTheDocument();
     expect(screen.getAllByText("HS4 no cumple")).toHaveLength(3);
     expect(screen.getByText("1 de 2 esquemas")).toBeInTheDocument();
   });

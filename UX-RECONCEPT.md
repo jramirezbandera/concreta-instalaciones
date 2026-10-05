@@ -287,7 +287,7 @@ Crítico en rojo + etiqueta + grosor (multicanal, WCAG AA, como hasta ahora).
 | HS2 residuos | Checker (fórmulas 2.1–2.3) | ✓ | ✓ | Bajo | **Hecho** (feature-21, pantalla de SI) |
 | SI1–SI6 (rama vivienda) | Checkers | ✓ | ✓ | Medio total, bajo por sección | **Hecho** (feature-19, patrón v4, núcleo común) |
 | SUA1–SUA9 | Checkers (SUA 8: cálculo ligero; SUA 5: no aplica) | ✓ | ✓ | Bajo | **Hecho** (feature-20, núcleo de SI) |
-| HR opción simplificada | Checker | — (unif. aislada exenta entre usuarios) | ✓ | Medio | Pendiente |
+| HR opción simplificada | Checker (tablas 3.1–3.4, Anejo I; soluciones del CEC) | ✓ (aislada: tabiquería y fachada; adosada: Anejo I) | ✓ | Medio | **Hecho** (feature-25, pantalla de SI) |
 | HE4 ACS · HE5 generación | Checkers (Anejos F y G; Pmin = mín(P1, P2)) | ✓ | ✓ | Bajo | **Hecho** (feature-22, pantalla de SI) |
 | HE6 recarga del vehículo eléctrico | Checker (conducción 100 % / 20 %, estaciones 1/40) | ✓ | ✓ | Bajo | **Hecho** (feature-24, pantalla de SI; comparte esquema y estación con REBT) |
 | REBT grado electrificación + previsión de cargas (ITC-BT-10) | Checker (ITC-BT-10, 16, 04 y 52) | ✓ | ✓ | Bajo | **Hecho** (feature-23, pantalla de SI) |

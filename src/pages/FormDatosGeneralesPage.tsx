@@ -90,6 +90,12 @@ const NG_OPTIONS: { value: string; label: string }[] = [
   ...SUA8_NG.datos.map((v) => ({ value: String(v), label: `${v.toFixed(2).replace(".", ",")} impactos/año·km²` })),
 ];
 
+/** Ld de los mapas de ruido, de 5 en 5 dBA: el límite superior de cada banda (HR, tabla 2.1). */
+const LD_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "— Sin datos oficiales (60 dBA) —" },
+  ...[50, 55, 60, 65, 70, 75, 80].map((v) => ({ value: String(v), label: `${v} dBA` })),
+];
+
 const TERRENO_TIPO_OPTIONS: { value: "" | TerrenoTipo; label: string }[] = [
   { value: "", label: "— No indicado —" },
   { value: "I", label: "I · Costa (E0)" },
@@ -689,6 +695,28 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
                 onChange={(v) => set("densidadImpactosNg", v === "" ? undefined : Number(v))}
               />
             </Field>
+            <Field
+              id="dg-ld"
+              label="Índice de ruido día Ld"
+              sub="(HR)"
+              help="Índice de ruido día de la zona, del mapa estratégico de ruido o de la administración competente. Si el mapa da una banda (65–70), toma su valor superior; si el edificio da a varias calles, el mayor. Sin datos oficiales, HR toma 60 dBA, el valor del DB para las áreas de predominio residencial, y lo avisa: en otras áreas acústicas hay que indicarlo."
+              refText="DB-HR ap. 2.1.1 a) iv, tabla 2.1"
+            >
+              <SelectInput<string>
+                id="dg-ld"
+                value={dg.ldZona === undefined ? "" : String(dg.ldZona)}
+                options={LD_OPTIONS}
+                onChange={(v) => set("ldZona", v === "" ? undefined : Number(v))}
+              />
+            </Field>
+            <CheckRow
+              id="dg-aeronaves"
+              label="Ruido dominante de aeronaves"
+              help="Márcalo si el edificio está en la huella acústica de un aeropuerto según los mapas de ruido: el aislamiento exigido a las fachadas sube 4 dBA y no se puede restar nada por las fachadas a patio."
+              refText="DB-HR ap. 2.1.1 a) iv"
+              checked={dg.aeronaves === true}
+              onChange={(v) => set("aeronaves", v ? true : undefined)}
+            />
             <Field
               id="dg-terreno-tipo"
               label="Entorno del edificio"

@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import {
   Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation, CloudRain, BrickWallFire, Truck, Columns3, FireExtinguisher, Flame, DoorOpen,
   Footprints, ShieldAlert, LockKeyhole, Lightbulb, Users, Car, CloudLightning, Accessibility, Trash2,
-  ShowerHead, SolarPanel, Zap, EvCharger,
+  ShowerHead, SolarPanel, Zap, EvCharger, Ear,
 } from "lucide-react";
 import type { JustificacionKey } from "../lib/proyecto/tipos";
 
@@ -325,12 +325,15 @@ export const justificacionRegistry: JustificacionEntry[] = [
   {
     key: "hr",
     codigo: "HR",
-    label: "Opción simplificada",
+    label: "Protección frente al ruido",
     grupo: "Ruido (DB-HR)",
     db: "DB-HR",
-    edicionDB: "DB-HR (consolidado 2022)",
+    edicionDB: "DB-HR (consolidado 20-dic-2019)",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "hr/ruido",
+    icon: Ear,
+    schemaVersion: "1",
   },
   // ── Ahorro de energía (DB-HE) ──────────────────────────────────────────────
   {

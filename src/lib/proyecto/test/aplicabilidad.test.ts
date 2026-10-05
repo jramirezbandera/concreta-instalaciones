@@ -142,12 +142,15 @@ describe("aplicabilidadBase — reglas de atributos (obra nueva)", () => {
     expect(r.cita).toBe("DB-SUA 7, ámbito de aplicación");
   });
 
-  it("unifamiliar ⇒ HR no_aplica con matización de adosadas y criterio revisable", () => {
-    const r = aplicabilidadBase(dg({ uso: "vivienda_unifamiliar" })).hr;
+  it("unifamiliar ⇒ HR aplica: el ámbito del DB-HR no la excluye (feature-25, verificacion-hr A.3)", () => {
+    expect(aplicabilidadBase(dg({ uso: "vivienda_unifamiliar" })).hr).toEqual({ aplicabilidad: "aplica" });
+  });
+
+  it("edificio existente ⇒ HR no_aplica salvo rehabilitación integral (Introducción II d)", () => {
+    const r = aplicabilidadBase(dg({ intervencion: "reforma" })).hr;
     expect(r.aplicabilidad).toBe("no_aplica");
-    expect(r.nota).toContain("adosadas");
-    expect(r.nota).toContain("revisable");
-    expect(r.cita).toBe("DB-HR, ámbito de aplicación");
+    expect(r.nota).toContain("rehabilitación integral");
+    expect(r.cita).toBe("DB-HR, ámbito de aplicación (Introducción II d)");
   });
 
   it("colectiva ⇒ HR aplica", () => {
@@ -305,7 +308,8 @@ describe("atributos derivados de El edificio (feature-12)", () => {
     const r = aplicabilidadBase(a);
     expect(r.sua7.aplicabilidad).toBe("no_aplica");
     expect(r.sua7.nota).toContain("vivienda unifamiliar");
-    expect(r.hr.aplicabilidad).toBe("no_aplica");
+    // El DB-HR sí se aplica a la unifamiliar (feature-25, verificacion-hr A.3).
+    expect(r.hr.aplicabilidad).toBe("aplica");
   });
 
   it("oficinas con garaje: HS3 aplica (los garajes entran en cualquier uso)", () => {

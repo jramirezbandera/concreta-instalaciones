@@ -24,12 +24,12 @@ beforeEach(() => {
 });
 
 describe("«/p/demo/memoria»", () => {
-  it("los apartados del Demo, el «no aplica» y lo pendiente; «Copiar todo» copia el texto", async () => {
+  it("los apartados del Demo y el «no aplica»; «Copiar todo» copia el texto", async () => {
     inicializarStorage("2026-10-04T10:00:00.000Z");
     await renderApp(`#/p/${DEMO_ID}/memoria`);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Memoria CTE de instalaciones" }, { timeout: 20000 })).toBeInTheDocument();
-    expect(screen.getByText("26 de 26 apartados listos")).toBeInTheDocument();
+    expect(screen.getByText("27 de 27 apartados listos")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 5 · Evacuación de aguas" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-SUA6 · Ahogamiento" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 1 · Protección frente a la humedad" })).toBeInTheDocument();
@@ -39,8 +39,10 @@ describe("«/p/demo/memoria»", () => {
     expect(screen.getByRole("heading", { name: "DB-HE 5 · Generación mínima de energía eléctrica renovable" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HE 6 · Dotaciones mínimas para la infraestructura de recarga de vehículos eléctricos" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "REBT ITC-BT-10 · Grado de electrificación y previsión de cargas" })).toBeInTheDocument();
-    expect(screen.getByText(/Aún sin redactar: .*HR/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Memoria CTE/ })).toHaveTextContent("26/26");
+    expect(screen.getByRole("heading", { name: "DB-HR · Protección frente al ruido" })).toBeInTheDocument();
+    // Desde feature-25 (HR) no queda nada por redactar.
+    expect(screen.queryByText(/Aún sin redactar/)).toBeNull();
+    expect(screen.getByRole("link", { name: /Memoria CTE/ })).toHaveTextContent("27/27");
 
     // user-event pone su propio portapapeles: se espía después de crearlo.
     const user = userEvent.setup();

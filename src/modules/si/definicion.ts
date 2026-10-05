@@ -47,7 +47,7 @@ export interface DefinicionSi<E extends Record<string, unknown>, J extends Justi
    * El documento básico, para los títulos del dibujo y las citas: «DB-SI» si no se
    * dice. El REBT (feature-23) no es un DB del CTE, pero usa la misma pantalla.
    */
-  db?: "DB-SI" | "DB-SUA" | "DB-HS" | "DB-HE" | "REBT";
+  db?: "DB-SI" | "DB-SUA" | "DB-HS" | "DB-HE" | "DB-HR" | "REBT";
   defaults: E;
   /** Sujeto de la cabecera: «Propagación interior». */
   sujeto: string;

@@ -258,19 +258,22 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
       "privado con una zona de aparcamiento de 10 plazas o menos (HE 6 ap. 1 pto 2 a).",
     cita: "DB-HE 6, ámbito de aplicación",
   },
-  // ── DB-HR · Protección frente al ruido ─────────────────────────────────────
+  // ── DB-HR · Protección frente al ruido (feature-25) ────────────────────────
   {
+    // Ámbito (research/verificacion-hr.md, bloque A): el del CTE salvo recintos
+    // ruidosos, espectáculos, aulas de más de 350 m³ y las obras en edificios
+    // existentes que no sean de rehabilitación integral. La unifamiliar, aislada
+    // o adosada, SÍ está dentro (tabiquería, fachada e instalaciones; Anejo I).
     key: "hr",
-    cuando: (a) => a.esUnifamiliar,
+    cuando: (a) => a.intervencion !== "obra_nueva",
     resultado: "no_aplica",
     nota:
-      "DB-HR Protección frente al ruido: no es de aplicación — vivienda " +
-      "unifamiliar (el ámbito del DB-HR excluye las viviendas unifamiliares " +
-      "aisladas; en unifamiliares adosadas el DB-HR sí es de aplicación, " +
-      "únicamente respecto de los elementos de separación con otros " +
-      "edificios). Criterio revisable por el proyectista según la " +
-      "configuración concreta del edificio.",
-    cita: "DB-HR, ámbito de aplicación",
+      "DB-HR Protección frente al ruido: no es de aplicación — la obra es una " +
+      "intervención en un edificio existente, y el DB-HR excluye las obras de " +
+      "ampliación, modificación, reforma o rehabilitación salvo cuando se trate " +
+      "de rehabilitación integral (Introducción II d). Si es una rehabilitación " +
+      "integral, el proyectista debe marcar que se aplica.",
+    cita: "DB-HR, ámbito de aplicación (Introducción II d)",
   },
 ];
 

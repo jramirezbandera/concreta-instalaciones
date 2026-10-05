@@ -39,6 +39,9 @@ describe("antesDeEntregar", () => {
       "SUA8:revisar",
       "SUA8:revisar",
       "SUA9:revisar",
+      "HR:revisar",
+      "HR:revisar",
+      "HR:revisar",
       "HE4:revisar",
       "HE4:revisar",
       "HE5:revisar",
@@ -83,6 +86,7 @@ describe("antesDeEntregar", () => {
         he5: { revisados: ["construida", "mixto"] },
         he6: { revisados: ["mixto"] },
         rebt: { revisados: ["ascensor-supuesto", "servicios", "humo"] },
+        hr: { revisados: ["huecos", "ld", "local"] },
       },
     };
     expect(antesDeEntregar(q)).toEqual([]);
@@ -92,23 +96,23 @@ describe("antesDeEntregar", () => {
 describe("entregables", () => {
   it("el Demo: todo listo", () => {
     expect(entregables(demo())).toEqual({
-      memoria: { listos: 26, total: 26, noCumplen: [] },
-      fichas: { listos: 24, total: 24, noCumplen: [] },
+      memoria: { listos: 27, total: 27, noCumplen: [] },
+      fichas: { listos: 25, total: 25, noCumplen: [] },
       esquemas: { listos: 2, total: 2, noCumplen: [], claves: ["hs5", "hs4"] },
     });
   });
 
   it("lo que no cumple no cuenta como listo", () => {
     expect(entregables(conHs4Fallando())).toEqual({
-      memoria: { listos: 25, total: 26, noCumplen: ["HS4"] },
-      fichas: { listos: 23, total: 24, noCumplen: ["HS4"] },
+      memoria: { listos: 26, total: 27, noCumplen: ["HS4"] },
+      fichas: { listos: 24, total: 25, noCumplen: ["HS4"] },
       esquemas: { listos: 1, total: 2, noCumplen: ["HS4"], claves: ["hs5"] },
     });
   });
 });
 
 describe("memoriaCte", () => {
-  it("los apartados en el orden del registry y lo pendiente al final", () => {
+  it("los apartados en el orden del registry, sin nada pendiente", () => {
     const m = memoriaCte(demo());
     expect(m.apartados.map((a) => `${a.codigo}:${a.tipo}`)).toEqual([
       "HS1:redactado",
@@ -132,6 +136,7 @@ describe("memoriaCte", () => {
       "SUA7:redactado",
       "SUA8:redactado",
       "SUA9:redactado",
+      "HR:redactado",
       "HE1:redactado",
       "HE0:externo",
       "HE4:redactado",
@@ -143,7 +148,8 @@ describe("memoriaCte", () => {
     expect(m.apartados[4].encabezado).toBe("DB-HS 5 · Evacuación de aguas");
     expect(m.apartados[1].encabezado).toBe("DB-HS 2 · Recogida y evacuación de residuos");
     expect(m.apartados[0].encabezado).toBe("DB-HS 1 · Protección frente a la humedad");
-    expect(m.pendientes.map((x) => x.codigo)).toEqual(["HR"]);
+    // Desde feature-25 (HR) no queda ningún apartado por redactar.
+    expect(m.pendientes).toEqual([]);
     expect(m.apartados.find((a) => a.key === "he4")!.encabezado).toBe("DB-HE 4 · Contribución mínima de energía renovable para ACS");
     expect(m.apartados.find((a) => a.key === "rebt")!.encabezado).toBe("REBT ITC-BT-10 · Grado de electrificación y previsión de cargas");
   });
@@ -171,10 +177,10 @@ describe("memoriaCte", () => {
       "Salubridad (DB-HS)",
       "Seguridad en caso de incendio (DB-SI)",
       "Utilización y accesibilidad (DB-SUA)",
+      "Ruido (DB-HR)",
       "Ahorro de energía (DB-HE)",
       "Electricidad (REBT)",
       "Externas",
-      "Apartados pendientes",
     ]);
     expect(b.some((x) => x.tipo === "nota" && x.texto === "DB-SUA 6, ámbito de aplicación")).toBe(true);
     expect(b.some((x) => x.tipo === "tabla")).toBe(true);

@@ -142,6 +142,7 @@ describe("justificacionesPorGrupo", () => {
       "Salubridad (DB-HS)",
       "Seguridad en caso de incendio (DB-SI)",
       "Utilización y accesibilidad (DB-SUA)",
+      "Ruido (DB-HR)",
       "Ahorro de energía (DB-HE)",
       "Electricidad (REBT)",
       "Desarrollo",

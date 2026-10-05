@@ -132,6 +132,15 @@ export interface DatosGenerales {
    * avisa solo si cambia el resultado.
    */
   densidadImpactosNg?: number;
+  /**
+   * HR (feature-25): índice de ruido día Ld de la zona [dBA], del mapa estratégico
+   * de ruido o de la administración competente (DB-HR ap. 2.1.1 a.iv). En una
+   * esquina, el mayor. Sin él, HR toma los 60 dBA que da el DB para las áreas de
+   * predominio residencial y lo avisa.
+   */
+  ldZona?: number;
+  /** HR: el ruido exterior dominante es el de aeronaves (huella acústica de un aeropuerto): + 4 dBA. */
+  aeronaves?: boolean;
 }
 
 // -----------------------------------------------------------------------------
