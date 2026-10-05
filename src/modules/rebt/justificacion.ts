@@ -16,8 +16,10 @@
 //     módulos de reserva de la recarga cuentan para el umbral de 16 (criterio);
 //   - el control de humo mecánico (SI 3 ap. 8) es el del garaje de uso
 //     Aparcamiento (más de 100 m² construidos) que no es abierto (bajo rasante);
-//   - la recarga del garaje de un edificio de oficinas, la estación por cada 40
-//     plazas del HE 6 (el ap. 5.2 de la ITC-BT-10 es solo de viviendas).
+//   - la recarga del garaje de un edificio de oficinas, las estaciones que se
+//     instalan por HE 6, a la potencia de su estación (el ap. 5.2 de la ITC-BT-10
+//     es solo de viviendas); el factor de 0,3 solo con el esquema colectivo que
+//     se elige en HE 6 (feature-24).
 // =============================================================================
 
 import type { Aviso } from "../../lib/cte/resultado";
@@ -25,6 +27,7 @@ import { viviendasEnZona } from "../../lib/edificio/derivar";
 import type { Edificio, ViviendaTipo } from "../../lib/edificio/tipos";
 import type { Veredicto } from "../../lib/pdf/renderFicha";
 import { resolverHe4, he4EstadoDefaults, type He4Estado } from "../he4/estado";
+import { recargaDeHe6 } from "../he6/justificacion";
 import { resolverDecisionesHs3, DECISIONES_HS3_POR_DEFECTO, type DecisionesHs3 } from "../hs3/red";
 import type { ProyectoSi } from "../si/definicion";
 import { edificioSi, superficies, type ZonaSi } from "../si/edificio";
@@ -43,7 +46,6 @@ import {
   LOCALES_REBT,
   potenciaAscensorHabitual,
   PROYECTO_REBT,
-  RECARGA_HE6,
   RECARGA_REBT,
   RESERVA_CT_REBT,
   SERVICIOS_REBT,
@@ -117,10 +119,14 @@ export type DetalleRebt =
     }
   | {
       clase: "recarga";
-      /** `viviendas`: ITC-BT-10 ap. 5.2; `otros`: una estación por cada 40 plazas (HE 6). */
+      /** `viviendas`: ITC-BT-10 ap. 5.2; `otros`: las estaciones de HE 6. */
       ambito: "viviendas" | "otros";
       plazas: number;
       plazasPrevision: number;
+      /** Potencia por plaza o estación [W]: 3 680 en viviendas; la de la estación de HE 6 en otros usos. */
+      porEstacion_W: number;
+      /** El esquema de HE 6 es el colectivo: admite el SPL. */
+      colectivo: boolean;
       /** Otros usos: estaciones de recarga. */
       estaciones: number;
       indicadas: boolean;
@@ -387,19 +393,22 @@ export function justificarRebt(estado: RebtEstado, p: ProyectoSi): Justificacion
   // ── La recarga del vehículo eléctrico (ap. 5.2; ITC-BT-52 ap. 4; HE 6) ──────
   const R = RECARGA_REBT.datos;
   const A2 = ANEXO2_GUIA_BT52.datos;
-  const otrosUsos = clasificacion === "oficinas" && plazasGaraje > RECARGA_HE6.datos.excluidoHastaPlazas;
+  const he6 = recargaDeHe6(p);
+  const otrosUsos = clasificacion === "oficinas" && he6.aplica;
   if ((clasificacion === "viviendas" && plazasGaraje > 0) || otrosUsos) {
     const minimas = plazasGaraje * R.fraccionPlazas;
     const dadas = noNegativo(estado.plazasRecarga);
-    const estaciones = otrosUsos ? Math.ceil(plazasGaraje / RECARGA_HE6.datos.plazasPorEstacion) : 0;
+    const estaciones = otrosUsos ? he6.estaciones : 0;
     const plazasPrevision = otrosUsos
       ? estaciones
       : dadas !== null
         ? Math.min(plazasGaraje, Math.max(minimas, Math.round(dadas)))
         : redondear(minimas, 2);
-    const p5_W = redondear(R.porPlaza_W * plazasPrevision);
-    // El 0,3 solo vale en el esquema colectivo con SPL; en otros usos, 1,0.
-    const spl: Spl = otrosUsos ? "sin_spl" : decisiones.spl;
+    const porEstacion_W = otrosUsos ? he6.potenciaEstacion_W : R.porPlaza_W;
+    const p5_W = redondear(porEstacion_W * plazasPrevision);
+    // El 0,3 solo vale en el esquema colectivo (el de HE 6) con SPL; en otros usos, 1,0.
+    const colectivo = he6.esquema === "1";
+    const spl: Spl = otrosUsos || !colectivo ? "sin_spl" : decisiones.spl;
     const factor = spl === "con_spl" ? R.factorColectivoConSpl : R.factorSinSpl;
     const p_W = redondear(p5_W * factor);
     const anexo2_W = redondear((spl === "con_spl" ? A2.fs1ConSpl : A2.fs1SinSpl) * plazasGaraje * A2.porPlaza_W);
@@ -410,14 +419,16 @@ export function justificarRebt(estado: RebtEstado, p: ProyectoSi): Justificacion
       veredicto: "dato",
       valor: { valor: p_W, unidad: "W" },
       manda: otrosUsos
-        ? { tipo: "formula", formula: "P5 = 3 680 W por estación, una por cada 40 plazas o fracción (HE 6)", resultado: { valor: p_W, unidad: "W" } }
+        ? { tipo: "formula", formula: "P5 = estaciones de HE 6 × potencia de la estación", resultado: { valor: p_W, unidad: "W" } }
         : { tipo: "formula", formula: "P5 = 3 680 W × 10 % de las plazas; × 0,3 colectivo con SPL o × 1,0", resultado: { valor: p_W, unidad: "W" } },
       cita: otrosUsos ? ["DB-HE · HE 6 ap. 3 pto 2", "ITC-BT-52 · ap. 4"] : ["ITC-BT-10 · ap. 5.2", "ITC-BT-52 · ap. 4"],
       detalle: {
         clase: "recarga",
         ambito: otrosUsos ? "otros" : "viviendas",
-        plazas: plazasGaraje,
+        plazas: otrosUsos ? he6.plazas : plazasGaraje,
         plazasPrevision,
+        porEstacion_W,
+        colectivo,
         estaciones,
         indicadas: !otrosUsos && dadas !== null,
         p5_W,

@@ -172,7 +172,7 @@ Todos los formatos comparten esqueleto:
 | Formato | Para | Justificaciones |
 |---|---|---|
 | **Cálculo** — tabla densa + esquema | Colecciones de elementos | HS3, HS4, HS5, HE1-predim, HS1 |
-| **Checker** — formulario corto + veredicto | 5–15 inputs contra tablas | HS2, HS6, SI1–SI6, SUA*, HR, HE4/HE5, REBT |
+| **Checker** — formulario corto + veredicto | 5–15 inputs contra tablas | HS2, HS6, SI1–SI6, SUA*, HR, HE4/HE5/HE6, REBT |
 
 HS6 actual es de facto el prototipo del formato checker. No se fuerza tabla donde no hay
 colección.
@@ -289,6 +289,7 @@ Crítico en rojo + etiqueta + grosor (multicanal, WCAG AA, como hasta ahora).
 | SUA1–SUA9 | Checkers (SUA 8: cálculo ligero; SUA 5: no aplica) | ✓ | ✓ | Bajo | **Hecho** (feature-20, núcleo de SI) |
 | HR opción simplificada | Checker | — (unif. aislada exenta entre usuarios) | ✓ | Medio | Pendiente |
 | HE4 ACS · HE5 generación | Checkers (Anejos F y G; Pmin = mín(P1, P2)) | ✓ | ✓ | Bajo | **Hecho** (feature-22, pantalla de SI) |
+| HE6 recarga del vehículo eléctrico | Checker (conducción 100 % / 20 %, estaciones 1/40) | ✓ | ✓ | Bajo | **Hecho** (feature-24, pantalla de SI; comparte esquema y estación con REBT) |
 | REBT grado electrificación + previsión de cargas (ITC-BT-10) | Checker (ITC-BT-10, 16, 04 y 52) | ✓ | ✓ | Bajo | **Hecho** (feature-23, pantalla de SI) |
 | ICT telecomunicaciones | Checker | — | ✓ | Bajo | **Aparcado** (post-lanzamiento) |
 | HE0/HE1 global | `Externo` → HULC/CYPETHERM | — | — | — | Estado externo con ref. |

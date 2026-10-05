@@ -52,7 +52,7 @@ function limite(el: ElementoRebt): string {
     case "garaje":
       return `${d.W_m2} W/m², mín. ${W(GARAJES_REBT.datos.minimo_W)}`;
     case "recarga":
-      return d.ambito === "otros" ? "1 estación por 40 plazas (HE 6)" : `3680 W × 10 % plazas × ${num(d.factor, 1)}`;
+      return d.ambito === "otros" ? "estaciones de HE 6 × su potencia" : `3680 W × 10 % plazas × ${num(d.factor, 1)}`;
     case "total":
       return "ap. 6";
     case "contadores":

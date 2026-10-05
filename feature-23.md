@@ -131,11 +131,13 @@ de El edificio, en La obra, en la memoria y en el anejo.
   K-REBT.2); recarga sin SPL por defecto (K-REBT.12); ascensor ITA-3 (K-REBT.5); alumbrado
   con las cifras de fluorescencia; superficie útil (K-REBT.8); el garaje con los servicios
   generales; módulos de reserva en el recuento (K-REBT.13); cos φ = 0,9.
-- **Pendientes de la verificación**: el literal del art. 26 del RD 1048/2013 (el aviso del
-  centro de transformación), el cos φ del Anexo 2 de las guías, la correspondencia cabina /
-  carga de la UNE-EN 81-20 (en la que se apoya el ITA-3) y el cotejo en el BOE de lo que
-  cambiaron el RD 1053/2014 y el RD 450/2022.
+- **Pendientes de la verificación**: el cos φ del Anexo 2 de las guías y el cotejo en el BOE de
+  lo que cambiaron el RD 1053/2014 y el RD 450/2022. Hechos el 2026-10-05: el literal del
+  art. 26 del RD 1048/2013 (el solicitante «deberá reservar» el local; aviso corregido) y la
+  correspondencia cabina / carga (tabla 6 de la EN 81-20 en el borrador CEN y DB-SI Anejo SI A:
+  el ITA-3 se mantiene).
 - **Básica de 7 360 W** (IGA de 32 A, Guía BT-10): hoy la básica es siempre 5 750 W.
 - **Lista de la Guía** (secadora, automatización, más de 30 puntos de luz…) como casillas: hoy
   va dentro de la opción «Elevada».
-- **HE 6** (dotación de recarga del CTE): no está en el registro de justificaciones.
+- ~~**HE 6** (dotación de recarga del CTE): no está en el registro de justificaciones.~~ Hecho
+  en [feature-24.md](feature-24.md): REBT lee de HE 6 las estaciones, su potencia y el esquema.

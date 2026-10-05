@@ -39,10 +39,10 @@ function proyecto(
   };
 }
 
-/** Las veinticuatro publicadas (SUA 5 no tiene pantalla: no aplica nunca). */
+/** Las veinticinco publicadas (SUA 5 no tiene pantalla: no aplica nunca). */
 const PUBLICADAS: JustificacionKey[] = [
   "hs1", "hs2", "hs3", "hs4", "hs5", "hs6", "si1", "si2", "si3", "si4", "si5", "si6",
-  "sua1", "sua2", "sua3", "sua4", "sua6", "sua7", "sua8", "sua9", "he1", "he4", "he5", "rebt",
+  "sua1", "sua2", "sua3", "sua4", "sua6", "sua7", "sua8", "sua9", "he1", "he4", "he5", "he6", "rebt",
 ];
 
 describe("estadoDe — calculado con el motor del módulo", () => {
@@ -110,11 +110,11 @@ describe("resumenProyecto — recuento del expediente", () => {
   /** Nº de claves reales del expediente (registry sin entradas dev). */
   const TOTAL = justificacionRegistry.filter((e) => !e.dev).length;
 
-  it("el registry sin dev cubre las 28 claves del union", () => {
-    expect(TOTAL).toBe(28);
+  it("el registry sin dev cubre las 29 claves del union", () => {
+    expect(TOTAL).toBe(29);
   });
 
-  it("proyecto sin abrir nada: las veinticuatro publicadas calculadas, el resto sin iniciar", () => {
+  it("proyecto sin abrir nada: las veinticinco publicadas calculadas, el resto sin iniciar", () => {
     const r = resumenProyecto(proyecto());
     // he0he1_global (HULC) y dbse (Concreta estructura) son externas de base;
     // SUA 5 no aplica nunca a viviendas ni oficinas.

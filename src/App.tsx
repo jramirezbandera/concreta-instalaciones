@@ -109,6 +109,10 @@ const router = createHashRouter([
             lazy: lazyComponent(() => import("./modules/he5/ui"), "He5Module"),
           },
           {
+            path: "he/recarga",
+            lazy: lazyComponent(() => import("./modules/he6/ui"), "He6Module"),
+          },
+          {
             path: "rebt/prevision",
             lazy: lazyComponent(() => import("./modules/rebt/ui"), "RebtModule"),
           },

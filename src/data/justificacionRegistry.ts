@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import {
   Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation, CloudRain, BrickWallFire, Truck, Columns3, FireExtinguisher, Flame, DoorOpen,
   Footprints, ShieldAlert, LockKeyhole, Lightbulb, Users, Car, CloudLightning, Accessibility, Trash2,
-  ShowerHead, SolarPanel, Zap,
+  ShowerHead, SolarPanel, Zap, EvCharger,
 } from "lucide-react";
 import type { JustificacionKey } from "../lib/proyecto/tipos";
 
@@ -384,6 +384,19 @@ export const justificacionRegistry: JustificacionEntry[] = [
     shipped: true,
     route: "he/generacion",
     icon: SolarPanel,
+    schemaVersion: "1",
+  },
+  {
+    key: "he6",
+    codigo: "HE6",
+    label: "Recarga del vehículo eléctrico",
+    grupo: "Ahorro de energía (DB-HE)",
+    db: "DB-HE6",
+    edicionDB: "DB-HE (consolidado 14-jun-2022)",
+    formato: "checker",
+    shipped: true,
+    route: "he/recarga",
+    icon: EvCharger,
     schemaVersion: "1",
   },
   // ── Electricidad (REBT) ────────────────────────────────────────────────────

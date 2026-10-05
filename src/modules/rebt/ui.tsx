@@ -123,9 +123,13 @@ function DecisionesRebt({ state, setField, j, edificio }: PropsDecisionesSi<Rebt
           pregunta="Recarga del vehículo eléctrico"
           opciones={[
             { valor: "sin_spl", label: "Sin SPL" },
-            { valor: "con_spl", label: "Colectivo con SPL" },
+            {
+              valor: "con_spl",
+              label: "Colectivo con SPL",
+              ...(recargaViviendas.colectivo ? {} : { deshabilitada: true, motivo: "El esquema de HE 6 no es el colectivo" }),
+            },
           ]}
-          valor={d.spl}
+          valor={recargaViviendas.spl}
           habitual={h.spl}
           onChange={(v) => setField("spl", v === h.spl ? "habitual" : v)}
           esHabitual={d.spl === h.spl && state.plazasRecarga === null}
@@ -138,9 +142,11 @@ function DecisionesRebt({ state, setField, j, edificio }: PropsDecisionesSi<Rebt
             </div>
           }
           texto={
-            d.spl === "con_spl"
+            recargaViviendas.spl === "con_spl"
               ? `Esquema colectivo con el sistema que protege la línea general de alimentación (SPL): ${kW(recargaViviendas.p5_W)} × 0,3, y un contador principal más en la centralización.`
-              : `Sin SPL vale para cualquier esquema: ${kW(recargaViviendas.p5_W)} × 1,0. Mínimo, el 10 % de las ${recargaViviendas.plazas} plazas.`
+              : recargaViviendas.colectivo
+                ? `Sin SPL vale para cualquier esquema: ${kW(recargaViviendas.p5_W)} × 1,0. Mínimo, el 10 % de las ${recargaViviendas.plazas} plazas.`
+                : `El esquema de conexión de HE 6 no es el colectivo: sin SPL, ${kW(recargaViviendas.p5_W)} × 1,0. Mínimo, el 10 % de las ${recargaViviendas.plazas} plazas.`
           }
         />
       )}

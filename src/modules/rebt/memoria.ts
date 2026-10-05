@@ -9,7 +9,7 @@ import type { MemoriaDoc, Trozo } from "../../lib/cte/presentacion";
 import { ENGINE_VERSION } from "../../lib/version";
 import { lista } from "../sua/colocar";
 import type { DetalleRebt, JustificacionRebt } from "./justificacion";
-import { CONTADORES_REBT, CRITERIOS_REBT, GARAJES_REBT, GRADO_REBT, LOCALES_REBT, RECARGA_HE6, RECARGA_REBT, RESERVA_CT_REBT } from "./tablas";
+import { CONTADORES_REBT, CRITERIOS_REBT, GARAJES_REBT, GRADO_REBT, LOCALES_REBT, RECARGA_REBT, RESERVA_CT_REBT } from "./tablas";
 import { kW, m2, NOMBRE_GRADO, num, textoDesglose, textoMotivos, textoUbicacion, W } from "./textos";
 
 function detalle<K extends DetalleRebt["clase"]>(j: JustificacionRebt, clase: K): Extract<DetalleRebt, { clase: K }> | null {
@@ -114,7 +114,7 @@ function parrafoCargas(j: JustificacionRebt): Trozo[] {
   const rc = detalle(j, "recarga");
   if (rc && rc.ambito === "otros") {
     p.push(
-      ` Para la recarga del vehículo eléctrico se prevén las ${rc.estaciones} estaciones que exige el DB-HE (HE 6 ap. 3, una por cada ${RECARGA_HE6.datos.plazasPorEstacion} plazas o fracción), a ${W(RECARGA_REBT.datos.porPlaza_W)} cada una y con un factor de simultaneidad de 1,0: `,
+      ` Para la recarga del vehículo eléctrico se prevén las ${rc.estaciones} estaciones que se instalan por el DB-HE (HE 6 ap. 3), a ${W(rc.porEstacion_W)} cada una y con un factor de simultaneidad de 1,0: `,
       { v: kW(rc.p_W) },
       " (ITC-BT-52 ap. 4).",
     );
@@ -143,7 +143,7 @@ function parrafoTotal(j: JustificacionRebt): Trozo[] {
     { v: kW(t.p_W) },
     `, la que se considera en el cálculo de la acometida y de las instalaciones de enlace (ap. 6); a ${CRITERIOS_REBT.datos.tensionTrifasica_V} V con cos φ = ${num(CRITERIOS_REBT.datos.cosPhi, 1)} (criterio de cálculo: el REBT no fija el factor de potencia), una intensidad de ${num(t.i_A, 1)} A en la línea general de alimentación.`,
     t.p_W > RESERVA_CT_REBT.datos.masDe_kW * 1000
-      ? ` Al superar ${RESERVA_CT_REBT.datos.masDe_kW} kW, la empresa distribuidora puede exigir la reserva de un local para centro de transformación (art. 13 del REBT; RD 1048/2013, art. 26): se coordinará con ella.`
+      ? ` Al superar ${RESERVA_CT_REBT.datos.masDe_kW} kW, en suelo urbanizado el solicitante reservará a la empresa distribuidora un local cerrado y adaptado, con fácil acceso desde la vía pública, para centro de transformación (art. 13 del REBT; RD 1048/2013, art. 26.1); la obligación decae si la distribuidora no lo usa en seis meses (art. 26.2). Se coordinará con ella.`
       : "",
   ];
 }

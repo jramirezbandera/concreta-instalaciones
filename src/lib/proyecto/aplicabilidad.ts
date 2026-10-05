@@ -11,6 +11,7 @@ import { resumenEdificio } from "../edificio/derivar";
 import type { He4Estado } from "../../modules/he4/estado";
 import { demandaReferencia } from "../../modules/he4/justificacion";
 import { superficiesHe5 } from "../../modules/he5/justificacion";
+import { recargaDeHe6 } from "../../modules/he6/justificacion";
 import { edificioSi } from "../../modules/si/edificio";
 
 // Motor de aplicabilidad — Fase A, obra nueva (feature-6 §A, UX-RECONCEPT §2.3 y §5).
@@ -40,15 +41,29 @@ export interface AtributosProyecto {
   demandaAcs_l_d?: number;
   /** Superficie construida del edificio con el garaje [m²] (HE 5, feature-22). */
   superficieConstruida_m2?: number;
+  /**
+   * Plazas de aparcamiento, interiores y exteriores adscritas (HE 6, feature-24), y
+   * si el edificio queda fuera por la exclusión de 10 plazas o menos.
+   */
+  plazasAparcamiento?: number;
+  excluidoHe6?: boolean;
 }
 
 /**
  * Atributos del proyecto: la piscina y la intervención de la obra; el resto, del
  * edificio. `estadoHe4`: lo guardado de HE 4, que cambia la demanda de ACS
- * (producción centralizada, ocupantes de las oficinas).
+ * (producción centralizada, ocupantes de las oficinas). `justificaciones`: lo
+ * guardado de las demás (las plazas exteriores de HE 6, la plaza en la parcela
+ * de REBT).
  */
-export function atributosDe(dg: DatosGenerales, edificio: Edificio, estadoHe4?: Partial<He4Estado>): AtributosProyecto {
+export function atributosDe(
+  dg: DatosGenerales,
+  edificio: Edificio,
+  estadoHe4?: Partial<He4Estado>,
+  justificaciones?: Proyecto["justificaciones"],
+): AtributosProyecto {
   const r = resumenEdificio(edificio);
+  const he6 = recargaDeHe6({ edificio, datosGenerales: dg, justificaciones });
   return {
     intervencion: dg.intervencion,
     tienePiscina: dg.tienePiscina,
@@ -58,6 +73,8 @@ export function atributosDe(dg: DatosGenerales, edificio: Edificio, estadoHe4?: 
     tieneTrasteros: r.tieneTrasteros,
     demandaAcs_l_d: demandaReferencia(edificio, estadoHe4),
     superficieConstruida_m2: superficiesHe5(edificioSi(edificio).zonas, r.tieneViviendas).s_m2,
+    plazasAparcamiento: he6.plazas,
+    excluidoHe6: he6.plazas > 0 && !he6.aplica,
   };
 }
 
@@ -218,6 +235,29 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
       "1.000 m² (HE 5 ap. 1 pto 1 a).",
     cita: "DB-HE 5, ámbito de aplicación",
   },
+  // ── DB-HE 6 (feature-24) ──────────────────────────────────────────────────
+  {
+    // Ámbito (research/verificacion-he6.md): edificios con una zona destinada a
+    // aparcamiento, interior o exterior adscrita.
+    key: "he6",
+    cuando: (a) => a.plazasAparcamiento === 0,
+    resultado: "no_aplica",
+    nota:
+      "DB-HE 6 Dotaciones mínimas para la infraestructura de recarga de vehículos " +
+      "eléctricos: no es de aplicación — el edificio no cuenta con zona destinada a " +
+      "aparcamiento, interior ni exterior adscrita (HE 6 ap. 1 pto 1).",
+    cita: "DB-HE 6, ámbito de aplicación",
+  },
+  {
+    key: "he6",
+    cuando: (a) => a.excluidoHe6 === true,
+    resultado: "no_aplica",
+    nota:
+      "DB-HE 6 Dotaciones mínimas para la infraestructura de recarga de vehículos " +
+      "eléctricos: no es de aplicación — edificio de uso distinto del residencial " +
+      "privado con una zona de aparcamiento de 10 plazas o menos (HE 6 ap. 1 pto 2 a).",
+    cita: "DB-HE 6, ámbito de aplicación",
+  },
   // ── DB-HR · Protección frente al ruido ─────────────────────────────────────
   {
     key: "hr",
@@ -304,5 +344,5 @@ export function aplicabilidadEfectiva(
     return { aplicabilidad: forzada.valor, nota: forzada.nota, forzada: true };
   }
   const he4 = p.justificaciones.he4?.inputs as Partial<He4Estado> | undefined;
-  return { ...aplicabilidadBase(atributosDe(p.datosGenerales, p.edificio, he4))[key], forzada: false };
+  return { ...aplicabilidadBase(atributosDe(p.datosGenerales, p.edificio, he4, p.justificaciones))[key], forzada: false };
 }

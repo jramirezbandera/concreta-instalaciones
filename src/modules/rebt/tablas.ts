@@ -195,17 +195,6 @@ export const ANEXO2_GUIA_BT52 = tablaCTE(
 );
 
 /**
- * DB-HE, HE 6 (consolidado 14-06-2022): en usos distintos del residencial
- * privado, una estación de recarga por cada 40 plazas o fracción; excluidos los
- * aparcamientos de 10 plazas o menos. Es la carga que se prevé en el garaje de un
- * edificio de oficinas, donde no llega el ap. 5.2 de la ITC-BT-10.
- */
-export const RECARGA_HE6 = tablaCTE(
-  { db: "DB-HE6", edicion: "Consolidado 14-06-2022", fecha: "2022-06-14", articulo: "ap. 1 y 3 pto 2", fuente: "codigotecnico.org · DBHE.pdf (cotejado en imagen)" },
-  { plazasPorEstacion: 40, excluidoHastaPlazas: 10 } as const,
-);
-
-/**
  * ITC-BT-16 ap. 2.2: con más de 16 contadores, la concentración va en local;
  * hasta 16, en armario o en local, en la planta baja, el entresuelo o el primer
  * sótano (edificios de hasta 12 plantas). ap. 2.1: un único usuario, caja de
@@ -220,7 +209,12 @@ export const CONTADORES_REBT = tablaCTE(
  * Criterios de proyecto (no son exigencia del REBT; research/verificacion-rebt.md,
  * «Decisiones de producto»):
  *   - el ascensor que se supone sin su potencia: el de la Guía para 630 kg y
- *     1 m/s (la cabina de un ascensor accesible con viviendas accesibles);
+ *     1 m/s. La cabina más pequeña de un ascensor accesible (1,00 × 1,25 m,
+ *     DB-SUA) mide 1,25 m², y la tabla 6 de la UNE-EN 81-20 da a 400 kg 1,17 m²
+ *     como máximo y a 450 kg, 1,30 m² (leída en el borrador CEN prEN 81-20:2011,
+ *     tabla 5): hace falta al menos 450 kg, y la tabla A de la Guía salta de 400
+ *     a 630. Es también la carga mínima del ascensor de emergencia, con cabina de
+ *     1,10 × 1,40 m (DB-SI, Anejo SI A);
  *   - el alumbrado común con las cifras de fluorescencia de la Guía, como cota
  *     superior del LED de hoy;
  *   - la intensidad de la línea general de alimentación, trifásica a 400 V con
@@ -242,12 +236,16 @@ export function potenciaAscensorHabitual(): number {
 
 /**
  * Reserva de local para centro de transformación: el art. 13 del REBT remite a la
- * reglamentación de distribución, hoy el RD 1048/2013, art. 26 (más de 100 kW en
- * suelo urbanizado; leído en fuentes secundarias, pendiente de cotejo literal). Solo
- * avisa.
+ * reglamentación de distribución, hoy el RD 1048/2013, art. 26 (consolidado
+ * BOE-A-2013-13767, últ. modif. 03-11-2016, cotejado en imagen, pp. 32-33). En
+ * suelo urbanizado, con una potencia solicitada «superior a 100 kW», «el solicitante
+ * deberá reservar un local» cerrado y adaptado, con fácil acceso desde la vía
+ * pública, para la distribuidora; la obligación decae si no lo usa en seis meses.
+ * Solo avisa: la app no sabe si el suelo es urbanizado, y la potencia solicitada
+ * no tiene por qué ser la prevista.
  */
 export const RESERVA_CT_REBT = tablaCTE(
-  { ...PROC_REBT, articulo: "art. 13; RD 1048/2013 art. 26" },
+  { ...PROC_REBT, articulo: "art. 13; RD 1048/2013 art. 26.1 y 26.2" },
   { masDe_kW: 100 } as const,
 );
 

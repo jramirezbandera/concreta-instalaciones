@@ -429,7 +429,7 @@ export function ModuleLayout({
                 totalComprobaciones !== undefined &&
                 resultado && (
                   <span className="text-text-disabled text-[12.5px]">
-                    {totalComprobaciones} comprobaciones
+                    {totalComprobaciones} {totalComprobaciones === 1 ? "comprobación" : "comprobaciones"}
                     {avisos.length > 0 ? " · todo revisado" : ""}
                   </span>
                 )

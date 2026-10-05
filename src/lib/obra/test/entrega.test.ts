@@ -43,6 +43,7 @@ describe("antesDeEntregar", () => {
       "HE4:revisar",
       "HE5:revisar",
       "HE5:revisar",
+      "HE6:revisar",
       "REBT:revisar",
       "REBT:revisar",
       "REBT:revisar",
@@ -80,6 +81,7 @@ describe("antesDeEntregar", () => {
         sua9: { revisados: ["viviendas-accesibles"] },
         he4: { revisados: ["perdidas", "scop"] },
         he5: { revisados: ["construida", "mixto"] },
+        he6: { revisados: ["mixto"] },
         rebt: { revisados: ["ascensor-supuesto", "servicios", "humo"] },
       },
     };
@@ -90,16 +92,16 @@ describe("antesDeEntregar", () => {
 describe("entregables", () => {
   it("el Demo: todo listo", () => {
     expect(entregables(demo())).toEqual({
-      memoria: { listos: 25, total: 25, noCumplen: [] },
-      fichas: { listos: 23, total: 23, noCumplen: [] },
+      memoria: { listos: 26, total: 26, noCumplen: [] },
+      fichas: { listos: 24, total: 24, noCumplen: [] },
       esquemas: { listos: 2, total: 2, noCumplen: [], claves: ["hs5", "hs4"] },
     });
   });
 
   it("lo que no cumple no cuenta como listo", () => {
     expect(entregables(conHs4Fallando())).toEqual({
-      memoria: { listos: 24, total: 25, noCumplen: ["HS4"] },
-      fichas: { listos: 22, total: 23, noCumplen: ["HS4"] },
+      memoria: { listos: 25, total: 26, noCumplen: ["HS4"] },
+      fichas: { listos: 23, total: 24, noCumplen: ["HS4"] },
       esquemas: { listos: 1, total: 2, noCumplen: ["HS4"], claves: ["hs5"] },
     });
   });
@@ -134,6 +136,7 @@ describe("memoriaCte", () => {
       "HE0:externo",
       "HE4:redactado",
       "HE5:redactado",
+      "HE6:redactado",
       "REBT:redactado",
       "DB-SE:externo",
     ]);

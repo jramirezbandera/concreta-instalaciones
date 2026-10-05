@@ -19,7 +19,6 @@ import {
   LOCALES_REBT,
   potenciaAscensorHabitual,
   PROYECTO_REBT,
-  RECARGA_HE6,
   RECARGA_REBT,
 } from "./tablas";
 
@@ -186,7 +185,7 @@ export function queEntraRebt(j: JustificacionRebt, estados: Record<string, Estad
     filas.push({
       id: "recarga",
       titulo: "Recarga del VE",
-      detalle: rc.ambito === "otros" ? `${rc.estaciones} estación${rc.estaciones === 1 ? "" : "es"} (HE 6) × 3680 W` : `${num(rc.plazasPrevision, 1)} plazas × 3680 W`,
+      detalle: rc.ambito === "otros" ? `${rc.estaciones} estación${rc.estaciones === 1 ? "" : "es"} (HE 6) × ${W(rc.porEstacion_W)}` : `${num(rc.plazasPrevision, 1)} plazas × 3680 W`,
       trato: rc.factor < 1 ? `${kW(rc.p_W)} (× ${num(rc.factor, 1)})` : kW(rc.p_W),
       estado: trato(estados.recarga),
       elementoId: "recarga",
@@ -255,7 +254,7 @@ export function resultadoListaRebt(el: ElementoSi<unknown>): string {
         : `${m2(d.m2)} × ${d.W_m2} W/m² (ventilación ${d.ventilacion})${d.minimo ? `, mínimo ${W(GARAJES_REBT.datos.minimo_W)}` : ""} = ${kW(d.p_W)}`;
     case "recarga":
       return d.ambito === "otros"
-        ? `${d.estaciones} estación${d.estaciones === 1 ? "" : "es"} (una por cada 40 plazas, HE 6) × 3680 W = ${kW(d.p_W)}`
+        ? `${d.estaciones} estación${d.estaciones === 1 ? "" : "es"} (HE 6) × ${W(d.porEstacion_W)} = ${kW(d.p_W)}`
         : `3680 W × ${num(d.plazasPrevision, 2)} plazas = ${kW(d.p5_W)} × ${num(d.factor, 1)} ${d.spl === "con_spl" ? "(colectivo con SPL)" : "(sin SPL)"} = ${kW(d.p_W)}`;
     case "total":
       return `${d.partes.map((x) => kW(x.p_W)).join(" + ")} = ${kW(d.p_W)} (${num(d.i_A, 1)} A${d.trifasica ? " a 400 V" : " a 230 V"})`;
@@ -374,12 +373,12 @@ export function franjaRebt(el: ElementoSi<unknown>, j: JustificacionRebt, estado
           valor: kW(d.p_W).replace(" kW", ""),
           unidad: "kW · × 1,0",
           estado,
-          manda: `El ap. 5.2 de la ITC-BT-10 es solo de viviendas. En otros usos, el DB-HE (HE 6 ap. 3) pide una estación de recarga por cada ${RECARGA_HE6.datos.plazasPorEstacion} plazas o fracción, y con más de ${RECARGA_HE6.datos.excluidoHastaPlazas} plazas: se prevén ${W(RECARGA_REBT.datos.porPlaza_W)} por estación, con un factor de 1,0.`,
+          manda: `El ap. 5.2 de la ITC-BT-10 es solo de viviendas. En otros usos se prevén las estaciones que se instalan por el DB-HE (HE 6 ap. 3: una por cada 40 plazas o fracción, con más de 10 plazas), a ${W(d.porEstacion_W)} cada una, la potencia de su estación, con un factor de 1,0.`,
           nota: "Si las estaciones son de más potencia, se prevé la suya.",
           filas: [
             { k: "Plazas del garaje", v: String(d.plazas) },
             { k: "Estaciones (HE 6)", v: String(d.estaciones) },
-            { k: "Carga", v: `${d.estaciones} × ${W(RECARGA_REBT.datos.porPlaza_W)} = ${kW(d.p_W)}` },
+            { k: "Carga", v: `${d.estaciones} × ${W(d.porEstacion_W)} = ${kW(d.p_W)}` },
           ],
           cita: "DB-HE · HE 6 ap. 3 · ITC-BT-52 ap. 4",
         };
@@ -463,7 +462,7 @@ export function textoAvisoRebt(a: Aviso): TextoSi {
       const falta = [...(a.datos.ascensor ? ["la potencia del ascensor"] : []), ...(a.datos.otros ? ["los demás servicios generales"] : [])];
       return {
         titulo: `Indica ${lista(falta)}.`,
-        detalle: `${a.datos.ascensor ? `Sin la del ascensor se toman ${num(potenciaAscensorHabitual(), 1)} kW (${CRITERIOS_REBT.datos.ascensorHabitual} de la Guía BT-10: 630 kg, 1 m/s). ` : ""}${a.datos.otros ? "Suma lo que se conozca del grupo de presión, la central térmica, la ventilación, las telecomunicaciones o el alumbrado de los trasteros: sin ello, la carga se queda corta." : ""}`,
+        detalle: `${a.datos.ascensor ? `Sin la del ascensor se toman ${num(potenciaAscensorHabitual(), 1)} kW (${CRITERIOS_REBT.datos.ascensorHabitual} de la Guía BT-10: 630 kg, 1 m/s; la cabina de un ascensor accesible pide al menos 450 kg, y la tabla pasa de 400 a 630). ` : ""}${a.datos.otros ? "Suma lo que se conozca del grupo de presión, la central térmica, la ventilación, las telecomunicaciones o el alumbrado de los trasteros: sin ello, la carga se queda corta." : ""}`,
       };
     }
     case "ascensor-supuesto":
@@ -489,9 +488,9 @@ export function textoAvisoRebt(a: Aviso): TextoSi {
       };
     case "centro-transformacion":
       return {
-        titulo: "Más de 100 kW: consulta la reserva de local para el centro de transformación.",
+        titulo: "Más de 100 kW: reserva un local para el centro de transformación.",
         detalle:
-          "En suelo urbanizado, con más de 100 kW la distribuidora puede exigir un local para centro de transformación (art. 13 del REBT, que remite a la reglamentación de distribución: RD 1048/2013, art. 26). Coordínalo con ella.",
+          "En suelo urbanizado, si la potencia solicitada pasa de 100 kW, el solicitante debe reservar a la distribuidora un local cerrado y adaptado, con fácil acceso desde la vía pública y solo para el centro de transformación (RD 1048/2013, art. 26.1, al que remite el art. 13 del REBT). Si la distribuidora no lo usa en seis meses desde que se le pone a disposición, la obligación decae (art. 26.2). Coordínalo con ella.",
       };
     case "plantas":
       return {

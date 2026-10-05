@@ -98,6 +98,11 @@ describe("filasObra — el Demo", () => {
     expect(textos(fila(demo(), "hs1"))).toEqual(["muros del sótano", "suelo del sótano", "fachadas", "cubierta"]);
   });
 
+  it("HE 6 publicado (feature-24): la conducción de cables, con el aviso del uso característico", () => {
+    expect(fila(demo(), "he6")).toMatchObject({ codigo: "HE6", ruta: "he/recarga", estado: "revisar" });
+    expect(textos(fila(demo(), "he6"))).toEqual(["conducción 100 %"]);
+  });
+
   it("REBT publicado (feature-23): la carga total, el grado y los contadores", () => {
     expect(fila(demo(), "rebt")).toMatchObject({ codigo: "REBT", ruta: "rebt/prevision", estado: "revisar" });
     expect(textos(fila(demo(), "rebt"))).toEqual(["91 kW", "elevada", "contadores en armario"]);
@@ -141,8 +146,8 @@ describe("piezasDeQueEntra", () => {
 describe("recuento", () => {
   it("una a una, no por filas", () => {
     const r = recuentoObra(demo());
-    expect(r).toMatchObject({ cumple: 6, revisar: 17, no_cumple: 0, no_aplica: 2, externo: 2, pronto: 1 });
-    expect(textoRecuento(r)).toBe("6 cumple · 17 por revisar · 2 no aplica · 2 externo · 1 pronto");
+    expect(r).toMatchObject({ cumple: 6, revisar: 18, no_cumple: 0, no_aplica: 2, externo: 2, pronto: 1 });
+    expect(textoRecuento(r)).toBe("6 cumple · 18 por revisar · 2 no aplica · 2 externo · 1 pronto");
   });
 
   it("rotuloGrupo", () => {
