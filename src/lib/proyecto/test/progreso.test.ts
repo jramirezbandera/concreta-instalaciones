@@ -39,15 +39,15 @@ function proyecto(
   };
 }
 
-/** Las veintitrés publicadas (SUA 5 no tiene pantalla: no aplica nunca). */
+/** Las veinticuatro publicadas (SUA 5 no tiene pantalla: no aplica nunca). */
 const PUBLICADAS: JustificacionKey[] = [
   "hs1", "hs2", "hs3", "hs4", "hs5", "hs6", "si1", "si2", "si3", "si4", "si5", "si6",
-  "sua1", "sua2", "sua3", "sua4", "sua6", "sua7", "sua8", "sua9", "he1", "he4", "he5",
+  "sua1", "sua2", "sua3", "sua4", "sua6", "sua7", "sua8", "sua9", "he1", "he4", "he5", "rebt",
 ];
 
 describe("estadoDe — calculado con el motor del módulo", () => {
   it("una justificación aún no publicada queda sin iniciar y sin veredicto", () => {
-    const e = estadoDe(proyecto(), "rebt");
+    const e = estadoDe(proyecto(), "hr");
     expect(e).toMatchObject({ aplicabilidad: "aplica", forzada: false, progreso: "sin_iniciar" });
     expect(e.veredicto).toBeUndefined();
   });
@@ -114,7 +114,7 @@ describe("resumenProyecto — recuento del expediente", () => {
     expect(TOTAL).toBe(28);
   });
 
-  it("proyecto sin abrir nada: las veintitrés publicadas calculadas, el resto sin iniciar", () => {
+  it("proyecto sin abrir nada: las veinticuatro publicadas calculadas, el resto sin iniciar", () => {
     const r = resumenProyecto(proyecto());
     // he0he1_global (HULC) y dbse (Concreta estructura) son externas de base;
     // SUA 5 no aplica nunca a viviendas ni oficinas.

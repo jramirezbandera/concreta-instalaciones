@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import {
   Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation, CloudRain, BrickWallFire, Truck, Columns3, FireExtinguisher, Flame, DoorOpen,
   Footprints, ShieldAlert, LockKeyhole, Lightbulb, Users, Car, CloudLightning, Accessibility, Trash2,
-  ShowerHead, SolarPanel,
+  ShowerHead, SolarPanel, Zap,
 } from "lucide-react";
 import type { JustificacionKey } from "../lib/proyecto/tipos";
 
@@ -393,9 +393,12 @@ export const justificacionRegistry: JustificacionEntry[] = [
     label: "Grado de electrificación y previsión de cargas",
     grupo: "Electricidad (REBT)",
     db: "REBT ITC-BT-10",
-    edicionDB: "REBT (RD 842/2002) ITC-BT-10",
+    edicionDB: "REBT (RD 842/2002), consolidado 03-09-2025",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "rebt/prevision",
+    icon: Zap,
+    schemaVersion: "1",
   },
   // ── Externas (se resuelven fuera de la app; La obra referencia el documento) ─
   {

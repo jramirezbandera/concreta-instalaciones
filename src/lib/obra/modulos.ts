@@ -63,6 +63,7 @@ import { sua4 } from "../../modules/sua4/definicion";
 import { sua8 } from "../../modules/sua8/definicion";
 import { he4 } from "../../modules/he4/definicion";
 import { he5 } from "../../modules/he5/definicion";
+import { rebt } from "../../modules/rebt/definicion";
 
 /** Un título y su explicación: un aviso o algo que no cumple, ya redactado. */
 export interface TextoObra {
@@ -285,6 +286,7 @@ export const MODULOS_OBRA: Partial<Record<JustificacionKey, ModuloObra>> = {
   he1,
   he4: moduloSi(he4),
   he5: moduloSi(he5),
+  rebt: moduloSi(rebt),
   si1: moduloSi(si1),
   si4: moduloSi(si4),
   si2: moduloSi(si2),

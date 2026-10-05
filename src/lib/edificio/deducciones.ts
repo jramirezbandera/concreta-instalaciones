@@ -120,13 +120,13 @@ export function deduccionesTipo(t: UnidadTipo): Deduccion[] {
     const p = PREVISION_ITC_BT_10.datos;
     const elevada = t.superficieUtil_m2 > p.superficieElevada_m2;
     out.push({
-      etiqueta: "Electrificación · ITC-BT-10",
+      etiqueta: "Electrificación por superficie · ITC-BT-10",
       valor: elevada
         ? `elevada · ${fmt(p.electrificacionElevada_W, "W", 0)}`
         : `básica · ${fmt(p.electrificacionBasica_W, "W", 0)}`,
       cita:
         `ITC-BT-10 ap. 2.1 y 2.2: elevada con más de ${p.superficieElevada_m2} m² útiles; ` +
-        "también con calefacción eléctrica o aire acondicionado",
+        "la calefacción eléctrica o el aire acondicionado también la hacen elevada (se decide en REBT)",
     });
   }
   return out;

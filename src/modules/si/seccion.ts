@@ -61,7 +61,11 @@ export type IconoSi =
   | "fotovoltaica"
   | "bomba_calor"
   | "caldera"
-  | "grifo";
+  | "grifo"
+  // REBT (feature-23): un contador de electricidad y un punto de recarga del
+  // vehículo eléctrico.
+  | "contador"
+  | "recarga";
 
 export type MarcaSi =
   | {

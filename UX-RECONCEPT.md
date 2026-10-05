@@ -289,7 +289,7 @@ Crítico en rojo + etiqueta + grosor (multicanal, WCAG AA, como hasta ahora).
 | SUA1–SUA9 | Checkers (SUA 8: cálculo ligero; SUA 5: no aplica) | ✓ | ✓ | Bajo | **Hecho** (feature-20, núcleo de SI) |
 | HR opción simplificada | Checker | — (unif. aislada exenta entre usuarios) | ✓ | Medio | Pendiente |
 | HE4 ACS · HE5 generación | Checkers (Anejos F y G; Pmin = mín(P1, P2)) | ✓ | ✓ | Bajo | **Hecho** (feature-22, pantalla de SI) |
-| **REBT** grado electrificación + previsión de cargas (ITC-BT-10) | Checker | ✓ | ✓ | Bajo | **Entra** (decidido) |
+| REBT grado electrificación + previsión de cargas (ITC-BT-10) | Checker (ITC-BT-10, 16, 04 y 52) | ✓ | ✓ | Bajo | **Hecho** (feature-23, pantalla de SI) |
 | ICT telecomunicaciones | Checker | — | ✓ | Bajo | **Aparcado** (post-lanzamiento) |
 | HE0/HE1 global | `Externo` → HULC/CYPETHERM | — | — | — | Estado externo con ref. |
 | DB-SE estructura | `Externo` → Concreta estructura | — | — | — | Cross-sell en checklist |

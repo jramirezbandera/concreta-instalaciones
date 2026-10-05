@@ -29,7 +29,7 @@ describe("«/p/demo/memoria»", () => {
     await renderApp(`#/p/${DEMO_ID}/memoria`);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Memoria CTE de instalaciones" }, { timeout: 20000 })).toBeInTheDocument();
-    expect(screen.getByText("24 de 24 apartados listos")).toBeInTheDocument();
+    expect(screen.getByText("25 de 25 apartados listos")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 5 · Evacuación de aguas" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-SUA6 · Ahogamiento" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 1 · Protección frente a la humedad" })).toBeInTheDocument();
@@ -37,8 +37,9 @@ describe("«/p/demo/memoria»", () => {
     expect(screen.getByRole("heading", { name: "DB-HS 2 · Recogida y evacuación de residuos" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HE 4 · Contribución mínima de energía renovable para ACS" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HE 5 · Generación mínima de energía eléctrica renovable" })).toBeInTheDocument();
-    expect(screen.getByText(/Aún sin redactar: .*REBT/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Memoria CTE/ })).toHaveTextContent("24/24");
+    expect(screen.getByRole("heading", { name: "REBT ITC-BT-10 · Grado de electrificación y previsión de cargas" })).toBeInTheDocument();
+    expect(screen.getByText(/Aún sin redactar: .*HR/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Memoria CTE/ })).toHaveTextContent("25/25");
 
     // user-event pone su propio portapapeles: se espía después de crearlo.
     const user = userEvent.setup();

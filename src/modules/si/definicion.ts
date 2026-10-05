@@ -43,8 +43,11 @@ export interface OpcionesFichaSi<E> {
 
 export interface DefinicionSi<E extends Record<string, unknown>, J extends JustificacionSiBase> {
   key: JustificacionKey;
-  /** El documento básico, para los títulos del dibujo y las citas: «DB-SI» si no se dice. */
-  db?: "DB-SI" | "DB-SUA" | "DB-HS" | "DB-HE";
+  /**
+   * El documento básico, para los títulos del dibujo y las citas: «DB-SI» si no se
+   * dice. El REBT (feature-23) no es un DB del CTE, pero usa la misma pantalla.
+   */
+  db?: "DB-SI" | "DB-SUA" | "DB-HS" | "DB-HE" | "REBT";
   defaults: E;
   /** Sujeto de la cabecera: «Propagación interior». */
   sujeto: string;

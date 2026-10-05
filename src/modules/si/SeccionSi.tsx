@@ -220,6 +220,24 @@ function Icono({ icono, x, y, color, P }: { icono: IconoSi; x: number; y: number
           <path d="M12 12.5c-.8 1-.8 1.8 0 2.5.8-.7.8-1.5 0-2.5z" fill={color} stroke="none" />
         </g>
       );
+    case "contador":
+      // La caja del contador con su visor y el rayo.
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <rect x={2.5} y={1.5} width={11} height={13} rx={1} fill={P.fondo} />
+          <rect x={4.5} y={3.5} width={7} height={3.5} strokeWidth={0.9} />
+          <path d="M8.6 8.5 6.6 11.4h2l-.6 2.3 2.2-3h-2z" fill={color} stroke="none" />
+        </g>
+      );
+    case "recarga":
+      // El poste de recarga con su manguera.
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <rect x={2.5} y={1.5} width={7} height={13} rx={1} fill={P.fondo} />
+          <path d="M6.6 4.2 4.9 7.2h1.8l-.6 2.4 2-3.2H6.4z" fill={color} stroke="none" />
+          <path d="M9.5 6.5h2a1.5 1.5 0 0 1 1.5 1.5v4.5a1 1 0 0 0 2 0V9" />
+        </g>
+      );
   }
 }
 

@@ -124,9 +124,6 @@ function piezasPronto(claves: readonly JustificacionKey[], r: ResumenEdificio): 
   if (k === "he4" || k === "he5") {
     return [...con(r.tieneViviendas, viviendas(r.numViviendas)), ...con(r.tieneLocales, "local"), ...con(r.tieneOficinas, "oficinas")];
   }
-  if (k === "rebt") {
-    return [...con(r.tieneViviendas, "viviendas"), ...con(r.tieneLocales, "local"), ...con(r.tieneOficinas, "oficinas"), ...con(r.tieneGaraje, "garaje"), ...con(!r.esUnifamiliar, "zonas comunes")];
-  }
   return [];
 }
 
