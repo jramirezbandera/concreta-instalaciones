@@ -473,7 +473,7 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
                     municipioIne: c.municipioIne,
                   }));
                   // Solo hay altitud verificada para las capitales de provincia
-                  // (`altitudCapital_m` del Anejo B). Y aun esa se OFRECE, no se
+                  // (`altitudCapital_m`, la de la tabla a-Anejo G). Y aun esa se OFRECE, no se
                   // escribe: el DB-HE pide la cota del emplazamiento.
                   const cap = altitudCapitalDe(dg.provincia);
                   setSugerencia(

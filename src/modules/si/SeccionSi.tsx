@@ -177,6 +177,49 @@ function Icono({ icono, x, y, color, P }: { icono: IconoSi; x: number; y: number
           <circle cx={5.5} cy={14.6} r={1} fill={color} stroke="none" />
         </g>
       );
+    case "captador":
+      // Inclinado sobre su soporte, con los tubos del absorbedor.
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <path d="M1.5 12 12.5 3.5l2 3L3.5 15z" fill={P.fondo} strokeLinejoin="round" />
+          <path d="M4.2 11.5 12.4 5.2M5.7 13.4l8-6.2" />
+          <path d="M12 6.5V15" />
+        </g>
+      );
+    case "fotovoltaica":
+      // Inclinado, con la rejilla de células.
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <path d="M1.5 12 12.5 3.5l2 3L3.5 15z" fill={P.fondo} strokeLinejoin="round" />
+          <path d="M7 7.8l2 3.1M10 5.5l2 3.1M2.5 13.5l11-8.5" strokeWidth={0.9} />
+          <path d="M12 6.5V15" />
+        </g>
+      );
+    case "bomba_calor":
+      // La unidad exterior: caja con el ventilador.
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <rect x={1.5} y={3} width={13} height={10} rx={1} fill={P.fondo} />
+          <circle cx={6.5} cy={8} r={3} />
+          <path d="M6.5 5v6M3.5 8h6" strokeWidth={0.9} />
+          <path d="M11 5.5v5" />
+        </g>
+      );
+    case "caldera":
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <rect x={3} y={1.5} width={10} height={13} rx={1.5} fill={P.fondo} />
+          <path d="M8 12c-1.8 0-2.6-1.3-2.2-2.7.3-1 1.3-1.6 1.2-3.1 1.4.8 3.2 2.4 3.2 3.9 0 1.1-.9 1.9-2.2 1.9z" />
+        </g>
+      );
+    case "grifo":
+      return (
+        <g transform={t} fill="none" stroke={color} strokeWidth={sw}>
+          <path d="M2 5.5h7a3 3 0 0 1 3 3v1.5" fill="none" />
+          <path d="M5.5 5.5V3M3.5 3h4" />
+          <path d="M12 12.5c-.8 1-.8 1.8 0 2.5.8-.7.8-1.5 0-2.5z" fill={color} stroke="none" />
+        </g>
+      );
   }
 }
 

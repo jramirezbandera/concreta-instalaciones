@@ -39,6 +39,7 @@
 //     paramétrica fina = refinamiento futuro). Nunca contaminan el veredicto.
 // =============================================================================
 
+import { AGUA_FRIA_ANEJO_G } from "../../data/aguaFriaHE";
 import { tablaCTE } from "../../lib/cte/tabla";
 import type { ProcedenciaCTE } from "../../lib/cte/tabla";
 
@@ -1106,16 +1107,10 @@ export const ALTITUD_CAPITAL_ANEJO_G = tablaCTE(
     fuente: "codigotecnico.org · DB-HE p. 54 — altitud de referencia de la capital (criterio: el DA/2 no la fija)",
   },
   {
-    altitud_m: {
-      "Álava": 540, "Albacete": 686, "Alicante": 8, "Almería": 16, "Asturias": 232, "Ávila": 1131, "Badajoz": 186,
-      "Baleares": 15, "Barcelona": 12, "Burgos": 929, "Cáceres": 459, "Cádiz": 14, "Cantabria": 11, "Castellón": 27,
-      "Ceuta": 40, "Ciudad Real": 628, "Córdoba": 106, "A Coruña": 26, "Cuenca": 999, "Girona": 70, "Granada": 683,
-      "Guadalajara": 685, "Guipúzcoa": 12, "Huelva": 30, "Huesca": 488, "Jaén": 568, "León": 838, "Lleida": 182,
-      "La Rioja": 385, "Lugo": 454, "Madrid": 655, "Málaga": 11, "Melilla": 15, "Murcia": 39, "Navarra": 490,
-      "Ourense": 139, "Palencia": 734, "Las Palmas": 13, "Pontevedra": 27, "Salamanca": 800,
-      "Santa Cruz de Tenerife": 5, "Segovia": 1002, "Sevilla": 11, "Soria": 1063, "Tarragona": 69, "Teruel": 912,
-      "Toledo": 629, "Valencia": 13, "Valladolid": 698, "Vizcaya": 6, "Zamora": 649, "Zaragoza": 199,
-    } as Record<string, number>,
+    // La misma tabla que HE 4 y la zona climática (feature-22): una sola fuente.
+    altitud_m: Object.fromEntries(
+      Object.entries(AGUA_FRIA_ANEJO_G.datos.provincias).map(([p, c]) => [p, c.altitud_m]),
+    ) as Record<string, number>,
   },
 );
 

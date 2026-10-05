@@ -54,7 +54,14 @@ export type IconoSi =
   | "coche"
   | "puerta"
   // DB-HS 2 (feature-21): un contenedor de residuos.
-  | "contenedor";
+  | "contenedor"
+  // DB-HE 4 y HE 5 (feature-22): un captador solar térmico, un panel
+  // fotovoltaico, una bomba de calor, una caldera y un grifo de ACS.
+  | "captador"
+  | "fotovoltaica"
+  | "bomba_calor"
+  | "caldera"
+  | "grifo";
 
 export type MarcaSi =
   | {

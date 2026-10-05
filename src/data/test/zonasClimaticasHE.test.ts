@@ -9,6 +9,7 @@ import {
   zonaTermicaHS3De,
 } from "../zonasClimaticasHE";
 import { ZONAS_TERMICAS_TABLA_4_4, type ZonaProvincia } from "../../modules/hs3/tablas";
+import { AGUA_FRIA_ANEJO_G } from "../aguaFriaHE";
 
 // =============================================================================
 // Tabla a-Anejo B (DB-HE 2019, consolidado 14-jun-2022) — tests de la T1.1 de
@@ -93,6 +94,15 @@ describe("ZONAS_CLIMATICAS_ANEJO_B — spot-checks de capitales (fuente oficial)
     expect(PROVS["León"].tramos).toEqual([{ altitudMin_m: 0, zona: "E1" }]);
     expect(PROVS["Ceuta"].tramos).toEqual([{ altitudMin_m: 0, zona: "B3" }]);
     expect(PROVS["Melilla"].tramos).toEqual([{ altitudMin_m: 0, zona: "A3" }]);
+  });
+
+  it("la altitud de la capital es la de la tabla a-Anejo G del mismo DB (feature-22), en las 52", () => {
+    for (const provincia of PROVINCIAS) {
+      expect(PROVS[provincia].altitudCapital_m, provincia).toBe(AGUA_FRIA_ANEJO_G.datos.provincias[provincia].altitud_m);
+    }
+    // Las dos capitales que cambiaban de zona con las altitudes orientativas de antes.
+    expect(PROVS["Toledo"]).toMatchObject({ altitudCapital_m: 629, zonaCapital: "D3" }); // antes 445 m, C4
+    expect(PROVS["Zaragoza"]).toMatchObject({ altitudCapital_m: 199, zonaCapital: "C3" }); // antes 207 m, D3
   });
 
   it("zonaCapital es coherente con aplicar los tramos a altitudCapital_m", () => {

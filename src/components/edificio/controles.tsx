@@ -117,8 +117,10 @@ export function CampoNumero(props: {
   onChange: (v: number) => void;
   unidad: string;
   decimales?: number;
+  /** Nombre accesible cuando no hay un `<label>` que lo nombre (feature-22). */
+  etiqueta?: string;
 }): JSX.Element {
-  const { id, value, onChange, unidad, decimales = 0 } = props;
+  const { id, value, onChange, unidad, decimales = 0, etiqueta } = props;
   return (
     <span className="inline-flex h-8 items-stretch">
       <NumeroEditable
@@ -126,6 +128,7 @@ export function CampoNumero(props: {
         value={value}
         decimales={decimales}
         onCommit={(v) => onChange(Math.max(0, v))}
+        ariaLabel={etiqueta}
         className="border-border-main bg-bg-primary text-text-primary focus:border-accent w-[76px] rounded-l border px-2 text-right font-mono text-[13px] tabular-nums focus:outline-none"
       />
       <span className="border-border-main bg-bg-elevated text-text-secondary flex items-center rounded-r border border-l-0 px-2 font-mono text-[11px]">

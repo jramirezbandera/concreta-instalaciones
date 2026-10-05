@@ -39,6 +39,10 @@ describe("antesDeEntregar", () => {
       "SUA8:revisar",
       "SUA8:revisar",
       "SUA9:revisar",
+      "HE4:revisar",
+      "HE4:revisar",
+      "HE5:revisar",
+      "HE5:revisar",
     ]);
     expect(l[0]).toMatchObject({ id: "hs1:clima-supuesto", ruta: "hs/humedad" });
     expect(l[0].detalle.length).toBeGreaterThan(10);
@@ -71,6 +75,8 @@ describe("antesDeEntregar", () => {
         sua4: { revisados: ["cuarto-sin-tipo"] },
         sua8: { revisados: ["ng-supuesto", "local-comercial"] },
         sua9: { revisados: ["viviendas-accesibles"] },
+        he4: { revisados: ["perdidas", "scop"] },
+        he5: { revisados: ["construida", "mixto"] },
       },
     };
     expect(antesDeEntregar(q)).toEqual([]);
@@ -80,16 +86,16 @@ describe("antesDeEntregar", () => {
 describe("entregables", () => {
   it("el Demo: todo listo", () => {
     expect(entregables(demo())).toEqual({
-      memoria: { listos: 22, total: 22, noCumplen: [] },
-      fichas: { listos: 20, total: 20, noCumplen: [] },
+      memoria: { listos: 24, total: 24, noCumplen: [] },
+      fichas: { listos: 22, total: 22, noCumplen: [] },
       esquemas: { listos: 2, total: 2, noCumplen: [], claves: ["hs5", "hs4"] },
     });
   });
 
   it("lo que no cumple no cuenta como listo", () => {
     expect(entregables(conHs4Fallando())).toEqual({
-      memoria: { listos: 21, total: 22, noCumplen: ["HS4"] },
-      fichas: { listos: 19, total: 20, noCumplen: ["HS4"] },
+      memoria: { listos: 23, total: 24, noCumplen: ["HS4"] },
+      fichas: { listos: 21, total: 22, noCumplen: ["HS4"] },
       esquemas: { listos: 1, total: 2, noCumplen: ["HS4"], claves: ["hs5"] },
     });
   });
@@ -122,14 +128,17 @@ describe("memoriaCte", () => {
       "SUA9:redactado",
       "HE1:redactado",
       "HE0:externo",
+      "HE4:redactado",
+      "HE5:redactado",
       "DB-SE:externo",
     ]);
     expect(m.apartados[4].encabezado).toBe("DB-HS 5 · Evacuación de aguas");
     expect(m.apartados[1].encabezado).toBe("DB-HS 2 · Recogida y evacuación de residuos");
     expect(m.apartados[0].encabezado).toBe("DB-HS 1 · Protección frente a la humedad");
-    expect(m.pendientes.map((x) => x.codigo)).toContain("HE4");
-    expect(m.pendientes.map((x) => x.codigo)).not.toContain("HS2");
-    expect(m.pendientes).toHaveLength(4);
+    expect(m.pendientes.map((x) => x.codigo)).toContain("REBT");
+    expect(m.pendientes.map((x) => x.codigo)).not.toContain("HE4");
+    expect(m.apartados.find((a) => a.key === "he4")!.encabezado).toBe("DB-HE 4 · Contribución mínima de energía renovable para ACS");
+    expect(m.pendientes).toHaveLength(2);
   });
 
   it("lo que no cumple sale como pendiente, sin su texto", () => {

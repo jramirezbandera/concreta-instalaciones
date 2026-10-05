@@ -66,7 +66,11 @@ export function PantallaSi<E extends Record<string, unknown>, J extends Justific
   const deferredState = useDeferredValue(state);
   const edificio = proyecto.edificio;
   const dg = proyecto.datosGenerales;
-  const j = useMemo(() => def.justificar(deferredState, { edificio, datosGenerales: dg }), [def, deferredState, edificio, dg]);
+  const justificaciones = proyecto.justificaciones;
+  const j = useMemo(
+    () => def.justificar(deferredState, { edificio, datosGenerales: dg, justificaciones }),
+    [def, deferredState, edificio, dg, justificaciones],
+  );
 
   // ── Avisos y estados ───────────────────────────────────────────────────────
   const revisados = proyecto.justificaciones[def.key]?.revisados ?? [];

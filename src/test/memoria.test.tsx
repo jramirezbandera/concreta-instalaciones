@@ -29,14 +29,16 @@ describe("«/p/demo/memoria»", () => {
     await renderApp(`#/p/${DEMO_ID}/memoria`);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Memoria CTE de instalaciones" }, { timeout: 20000 })).toBeInTheDocument();
-    expect(screen.getByText("22 de 22 apartados listos")).toBeInTheDocument();
+    expect(screen.getByText("24 de 24 apartados listos")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 5 · Evacuación de aguas" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-SUA6 · Ahogamiento" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 1 · Protección frente a la humedad" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-SI 1 · Propagación interior" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DB-HS 2 · Recogida y evacuación de residuos" })).toBeInTheDocument();
-    expect(screen.getByText(/Aún sin redactar: .*HE4/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Memoria CTE/ })).toHaveTextContent("22/22");
+    expect(screen.getByRole("heading", { name: "DB-HE 4 · Contribución mínima de energía renovable para ACS" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "DB-HE 5 · Generación mínima de energía eléctrica renovable" })).toBeInTheDocument();
+    expect(screen.getByText(/Aún sin redactar: .*REBT/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Memoria CTE/ })).toHaveTextContent("24/24");
 
     // user-event pone su propio portapapeles: se espía después de crearlo.
     const user = userEvent.setup();

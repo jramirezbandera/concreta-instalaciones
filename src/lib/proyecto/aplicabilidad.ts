@@ -8,6 +8,10 @@ import type {
 } from "./tipos";
 import { justificacionRegistry } from "../../data/justificacionRegistry";
 import { resumenEdificio } from "../edificio/derivar";
+import type { He4Estado } from "../../modules/he4/estado";
+import { demandaReferencia } from "../../modules/he4/justificacion";
+import { superficiesHe5 } from "../../modules/he5/justificacion";
+import { edificioSi } from "../../modules/si/edificio";
 
 // Motor de aplicabilidad — Fase A, obra nueva (feature-6 §A, UX-RECONCEPT §2.3 y §5).
 // Lib PURA: sin React/DOM/Date.now. Dados los atributos del proyecto propone, por
@@ -29,10 +33,21 @@ export interface AtributosProyecto {
   tieneViviendas: boolean;
   tieneGaraje: boolean;
   tieneTrasteros: boolean;
+  /**
+   * Demanda de ACS de referencia del edificio [l/d] (DB-HE Anejo F, feature-22),
+   * con las decisiones guardadas de HE 4. Sin ella, la regla de HE 4 no se evalúa.
+   */
+  demandaAcs_l_d?: number;
+  /** Superficie construida del edificio con el garaje [m²] (HE 5, feature-22). */
+  superficieConstruida_m2?: number;
 }
 
-/** Atributos del proyecto: la piscina y la intervención de la obra; el resto, del edificio. */
-export function atributosDe(dg: DatosGenerales, edificio: Edificio): AtributosProyecto {
+/**
+ * Atributos del proyecto: la piscina y la intervención de la obra; el resto, del
+ * edificio. `estadoHe4`: lo guardado de HE 4, que cambia la demanda de ACS
+ * (producción centralizada, ocupantes de las oficinas).
+ */
+export function atributosDe(dg: DatosGenerales, edificio: Edificio, estadoHe4?: Partial<He4Estado>): AtributosProyecto {
   const r = resumenEdificio(edificio);
   return {
     intervencion: dg.intervencion,
@@ -41,6 +56,8 @@ export function atributosDe(dg: DatosGenerales, edificio: Edificio): AtributosPr
     tieneViviendas: r.tieneViviendas,
     tieneGaraje: r.tieneGaraje,
     tieneTrasteros: r.tieneTrasteros,
+    demandaAcs_l_d: demandaReferencia(edificio, estadoHe4),
+    superficieConstruida_m2: superficiesHe5(edificioSi(edificio).zonas, r.tieneViviendas).s_m2,
   };
 }
 
@@ -174,6 +191,33 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
       "del aire interior se consideran cumplidas con las condiciones del RITE.",
     cita: "DB-HS 3, ámbito de aplicación",
   },
+  // ── DB-HE 4 y HE 5 (feature-22) ────────────────────────────────────────────
+  {
+    // Ámbito (research/verificacion-he4-he5.md): edificios nuevos con una demanda
+    // de ACS superior a 100 l/d, calculada según el Anejo F.
+    key: "he4",
+    cuando: (a) => a.demandaAcs_l_d !== undefined && a.demandaAcs_l_d <= 100,
+    resultado: "no_aplica",
+    nota:
+      "DB-HE 4 Contribución mínima de energía renovable para cubrir la demanda de " +
+      "agua caliente sanitaria: no es de aplicación — la demanda de ACS de " +
+      "referencia del edificio, calculada de acuerdo con el Anejo F, no supera " +
+      "100 l/d (HE 4 ap. 1 pto 1 a).",
+    cita: "DB-HE 4, ámbito de aplicación",
+  },
+  {
+    // Ámbito: edificios nuevos que superen los 1.000 m² construidos, con el
+    // aparcamiento interior (desde el RD 450/2022, de cualquier uso).
+    key: "he5",
+    cuando: (a) => a.superficieConstruida_m2 !== undefined && a.superficieConstruida_m2 <= 1000,
+    resultado: "no_aplica",
+    nota:
+      "DB-HE 5 Generación mínima de energía eléctrica procedente de fuentes " +
+      "renovables: no es de aplicación — la superficie construida del edificio, " +
+      "incluida la de las zonas de aparcamiento en su interior, no supera " +
+      "1.000 m² (HE 5 ap. 1 pto 1 a).",
+    cita: "DB-HE 5, ámbito de aplicación",
+  },
   // ── DB-HR · Protección frente al ruido ─────────────────────────────────────
   {
     key: "hr",
@@ -259,5 +303,6 @@ export function aplicabilidadEfectiva(
   if (forzada) {
     return { aplicabilidad: forzada.valor, nota: forzada.nota, forzada: true };
   }
-  return { ...aplicabilidadBase(atributosDe(p.datosGenerales, p.edificio))[key], forzada: false };
+  const he4 = p.justificaciones.he4?.inputs as Partial<He4Estado> | undefined;
+  return { ...aplicabilidadBase(atributosDe(p.datosGenerales, p.edificio, he4))[key], forzada: false };
 }

@@ -47,22 +47,23 @@ describe("filasObra — el Demo", () => {
     expect(fila(p, "hs5").frase).toMatch(/^Residuales y pluviales/);
   });
 
-  it("las «pronto» de una familia van juntas", () => {
+  it("ya no queda ninguna familia «pronto»: SUA (feature-20) y HE4·5 (feature-22) van con fila propia", () => {
     const p = demo();
-    expect(fila(p, "junta-he45")).toMatchObject({ codigo: "HE4·5", titulo: "ACS y fotovoltaica" });
-    // SUA (feature-20) ya no es «pronto»: cada sección tiene su fila.
-    expect(filasObra(p).flatMap((g) => g.filas).some((f) => f.id === "junta-sua")).toBe(false);
+    const ids = filasObra(p).flatMap((g) => g.filas).map((f) => f.id);
+    expect(ids).not.toContain("junta-sua");
+    expect(ids).not.toContain("junta-he45");
+    expect(fila(p, "he4")).toMatchObject({ codigo: "HE4", ruta: "he/acs", estado: "revisar" });
+    expect(fila(p, "he5")).toMatchObject({ codigo: "HE5", ruta: "he/generacion", estado: "revisar" });
   });
 
-  it("si una sale de la familia y queda sola, va en su fila", () => {
+  it("una forzada a no aplicar deja la otra en su fila", () => {
     const p = demo();
     const q: Proyecto = {
       ...p,
       justificaciones: { ...p.justificaciones, he4: { aplicabilidadForzada: { valor: "no_aplica", nota: "n/a" } } },
     };
     expect(fila(q, "he4")).toMatchObject({ estado: "no_aplica", forzada: true, nota: "n/a" });
-    expect(fila(q, "he5")).toMatchObject({ estado: "pronto", codigo: "HE5" });
-    expect(filasObra(q).flatMap((g) => g.filas).some((f) => f.id === "junta-he45")).toBe(false);
+    expect(fila(q, "he5")).toMatchObject({ estado: "revisar", codigo: "HE5" });
   });
 
   it("SUA1 a SUA9 (feature-20): fila y ruta propias; SUA5 y SUA6 no aplican con su párrafo", () => {
@@ -135,8 +136,8 @@ describe("piezasDeQueEntra", () => {
 describe("recuento", () => {
   it("una a una, no por filas", () => {
     const r = recuentoObra(demo());
-    expect(r).toMatchObject({ cumple: 6, revisar: 14, no_cumple: 0, no_aplica: 2, externo: 2, pronto: 4 });
-    expect(textoRecuento(r)).toBe("6 cumple · 14 por revisar · 2 no aplica · 2 externo · 4 pronto");
+    expect(r).toMatchObject({ cumple: 6, revisar: 16, no_cumple: 0, no_aplica: 2, externo: 2, pronto: 2 });
+    expect(textoRecuento(r)).toBe("6 cumple · 16 por revisar · 2 no aplica · 2 externo · 2 pronto");
   });
 
   it("rotuloGrupo", () => {

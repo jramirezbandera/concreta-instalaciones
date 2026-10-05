@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import {
   Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation, CloudRain, BrickWallFire, Truck, Columns3, FireExtinguisher, Flame, DoorOpen,
   Footprints, ShieldAlert, LockKeyhole, Lightbulb, Users, Car, CloudLightning, Accessibility, Trash2,
+  ShowerHead, SolarPanel,
 } from "lucide-react";
 import type { JustificacionKey } from "../lib/proyecto/tipos";
 
@@ -362,22 +363,28 @@ export const justificacionRegistry: JustificacionEntry[] = [
   {
     key: "he4",
     codigo: "HE4",
-    label: "Demanda de ACS y contribución renovable",
+    label: "ACS de origen renovable",
     grupo: "Ahorro de energía (DB-HE)",
     db: "DB-HE4",
-    edicionDB: "DB-HE 2019 (consolidado 2022)",
+    edicionDB: "DB-HE (consolidado 14-jun-2022)",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "he/acs",
+    icon: ShowerHead,
+    schemaVersion: "1",
   },
   {
     key: "he5",
     codigo: "HE5",
-    label: "Fotovoltaica mínima",
+    label: "Generación eléctrica renovable",
     grupo: "Ahorro de energía (DB-HE)",
     db: "DB-HE5",
-    edicionDB: "DB-HE 2019 (consolidado 2022)",
+    edicionDB: "DB-HE (consolidado 14-jun-2022)",
     formato: "checker",
-    shipped: false,
+    shipped: true,
+    route: "he/generacion",
+    icon: SolarPanel,
+    schemaVersion: "1",
   },
   // ── Electricidad (REBT) ────────────────────────────────────────────────────
   {

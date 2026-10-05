@@ -121,6 +121,8 @@ const ADAPTADORES: Partial<Record<JustificacionKey, Adaptador>> = {
   sua4: adaptadorSi(async () => (await import("../../modules/sua4/definicion")).sua4),
   sua8: adaptadorSi(async () => (await import("../../modules/sua8/definicion")).sua8),
   hs2: adaptadorSi(async () => (await import("../../modules/hs2/definicion")).hs2),
+  he4: adaptadorSi(async () => (await import("../../modules/he4/definicion")).he4),
+  he5: adaptadorSi(async () => (await import("../../modules/he5/definicion")).he5),
   hs1: async (inputs, id, proyecto) => {
     // HS1 (feature-17) sale de El edificio y de los datos de la obra.
     const [estadoMod, just, ficha, seccion, dibujo] = await Promise.all([

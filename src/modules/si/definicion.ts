@@ -13,7 +13,7 @@ import type { DetalleElemento, EstadoPresentacion, MemoriaDoc } from "../../lib/
 import type { Aviso } from "../../lib/cte/resultado";
 import type { Edificio } from "../../lib/edificio/tipos";
 import type { FichaData } from "../../lib/pdf/renderFicha";
-import type { DatosGenerales, JustificacionKey } from "../../lib/proyecto/tipos";
+import type { DatosGenerales, JustificacionKey, Proyecto } from "../../lib/proyecto/tipos";
 import type { DibujoSi } from "./seccion";
 import type { ElementoSi, JustificacionSiBase } from "./tipos";
 
@@ -27,6 +27,11 @@ export interface TextoSi {
 export interface ProyectoSi {
   edificio: Edificio;
   datosGenerales: DatosGenerales;
+  /**
+   * Lo guardado de las demás justificaciones (feature-22): HE 5 lee los captadores
+   * solares de HE 4. Opcional: quien no lo pase, no lo tiene.
+   */
+  justificaciones?: Proyecto["justificaciones"];
 }
 
 export interface OpcionesFichaSi<E> {
@@ -39,7 +44,7 @@ export interface OpcionesFichaSi<E> {
 export interface DefinicionSi<E extends Record<string, unknown>, J extends JustificacionSiBase> {
   key: JustificacionKey;
   /** El documento básico, para los títulos del dibujo y las citas: «DB-SI» si no se dice. */
-  db?: "DB-SI" | "DB-SUA" | "DB-HS";
+  db?: "DB-SI" | "DB-SUA" | "DB-HS" | "DB-HE";
   defaults: E;
   /** Sujeto de la cabecera: «Propagación interior». */
   sujeto: string;

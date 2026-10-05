@@ -40,7 +40,7 @@ afterEach(() => {
 describe("Lo que se justifica", () => {
   it("el recuento y las filas con su estado, enlazadas al módulo", () => {
     montar(<LoQueSeJustifica />);
-    expect(screen.getByText("6 cumple · 14 por revisar · 2 no aplica · 2 externo · 4 pronto")).toBeInTheDocument();
+    expect(screen.getByText("6 cumple · 16 por revisar · 2 no aplica · 2 externo · 2 pronto")).toBeInTheDocument();
     const hs5 = screen.getByRole("link", { name: /HS5.*Evacuación de aguas/ });
     expect(hs5).toHaveAttribute("href", "/hs/saneamiento");
     expect(within(hs5).getByText("revisar")).toBeInTheDocument();
@@ -101,7 +101,9 @@ describe("Antes de entregar", () => {
   it("los avisos sin revisar del Demo, cada uno hacia su módulo", () => {
     montar(<AntesDeEntregar />);
     const items = screen.getAllByRole("listitem");
-    expect(items).toHaveLength(19);
+    expect(items).toHaveLength(23);
+    expect(within(items[19]).getByRole("link")).toHaveAttribute("href", "/he/acs");
+    expect(items[22]).toHaveTextContent(/HE5 · /);
     expect(within(items[0]).getByRole("link")).toHaveAttribute("href", "/hs/humedad");
     expect(items[0]).toHaveTextContent("HS1 · Faltan datos del clima: se ha supuesto zona pluviométrica I.");
     expect(within(items[1]).getByRole("link")).toHaveAttribute("href", "/hs/residuos");
@@ -137,6 +139,8 @@ describe("Antes de entregar", () => {
         sua4: { revisados: ["cuarto-sin-tipo"] },
         sua8: { revisados: ["ng-supuesto", "local-comercial"] },
         sua9: { revisados: ["viviendas-accesibles"] },
+        he4: { revisados: ["perdidas", "scop"] },
+        he5: { revisados: ["construida", "mixto"] },
       },
     });
     expect(screen.getByText(/Nada pendiente/)).toBeInTheDocument();
@@ -146,15 +150,15 @@ describe("Antes de entregar", () => {
 describe("Lo que se entrega", () => {
   it("el recuento de cada entregable", () => {
     montar(<LoQueSeEntrega />);
-    expect(screen.getByText("22 apartados")).toBeInTheDocument();
-    expect(screen.getByText("20 fichas")).toBeInTheDocument();
+    expect(screen.getByText("24 apartados")).toBeInTheDocument();
+    expect(screen.getByText("22 fichas")).toBeInTheDocument();
     expect(screen.getByText("2 esquemas")).toBeInTheDocument();
   });
 
   it("con algo que no cumple, lo nombra y no lo cuenta", () => {
     const p = demo();
     montar(<LoQueSeEntrega />, { ...p, datosGenerales: { ...p.datosGenerales, presionAcometida_kPa: 60 } });
-    expect(screen.getByText("21 de 22 apartados")).toBeInTheDocument();
+    expect(screen.getByText("23 de 24 apartados")).toBeInTheDocument();
     expect(screen.getAllByText("HS4 no cumple")).toHaveLength(3);
     expect(screen.getByText("1 de 2 esquemas")).toBeInTheDocument();
   });

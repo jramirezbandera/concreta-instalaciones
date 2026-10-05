@@ -27,10 +27,11 @@
 // depende la zona climática. Se DESCARTÓ tras contrastarla: la fuente mezcla
 // criterios sin distinguirlos — da 2.123 m para Aller (cota del pico del
 // concejo; su núcleo está a ~500 m) y 0 m para Ferrol o Siero — y sobre las
-// capitales se desviaba hasta 78 m (Toledo 523 vs 445 m), suficiente para
-// cruzar un tramo de la Tabla a-Anejo B y cambiar el U_lim exigido al edificio.
-// La altitud del núcleo de las 52 CAPITALES sí está, verificada, en
-// ./zonasClimaticasHE.ts ('altitudCapital_m'), y es la que la UI sugiere.
+// capitales se desviaba decenas de metros, suficiente para cruzar un tramo de
+// la Tabla a-Anejo B y cambiar el U_lim exigido al edificio. La altitud de las
+// 52 CAPITALES sí está, verificada, en la tabla a-Anejo G del propio DB-HE
+// (./aguaFriaHE.ts, que lee ./zonasClimaticasHE.ts como 'altitudCapital_m'), y
+// es la que la UI sugiere.
 // =============================================================================
 
 /** Un municipio con su clave INE oficial. */

@@ -288,7 +288,7 @@ Crítico en rojo + etiqueta + grosor (multicanal, WCAG AA, como hasta ahora).
 | SI1–SI6 (rama vivienda) | Checkers | ✓ | ✓ | Medio total, bajo por sección | **Hecho** (feature-19, patrón v4, núcleo común) |
 | SUA1–SUA9 | Checkers (SUA 8: cálculo ligero; SUA 5: no aplica) | ✓ | ✓ | Bajo | **Hecho** (feature-20, núcleo de SI) |
 | HR opción simplificada | Checker | — (unif. aislada exenta entre usuarios) | ✓ | Medio | Pendiente |
-| HE4 ACS · HE5 FV | Checkers | ✓ | ✓ | Bajo | Pendiente |
+| HE4 ACS · HE5 generación | Checkers (Anejos F y G; Pmin = mín(P1, P2)) | ✓ | ✓ | Bajo | **Hecho** (feature-22, pantalla de SI) |
 | **REBT** grado electrificación + previsión de cargas (ITC-BT-10) | Checker | ✓ | ✓ | Bajo | **Entra** (decidido) |
 | ICT telecomunicaciones | Checker | — | ✓ | Bajo | **Aparcado** (post-lanzamiento) |
 | HE0/HE1 global | `Externo` → HULC/CYPETHERM | — | — | — | Estado externo con ref. |

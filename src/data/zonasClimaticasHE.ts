@@ -23,14 +23,19 @@
 // p.ej. Huelva capital pasa a A4 (antes B4), Oviedo a D1 (antes C1),
 // Canarias introduce la letra α (Las Palmas / S.C. Tenerife capital: α3).
 //
-// PENDIENTE (menor): `altitudCapital_m` NO figura en la tabla del DB-HE 2019
-// (que solo da tramos de altitud); son altitudes de referencia de las capitales
-// (valores municipales comúnmente citados, INE/derogada tabla B.1 del DB-HE
-// 2013), orientativas para preseleccionar la zona. `zonaCapital` se DERIVA de
-// los tramos verificados + esa altitud (autoconsistente por construcción).
+// ALTITUD DE LA CAPITAL (feature-22): la tabla a-Anejo B solo da tramos de
+// altitud. `altitudCapital_m` es la columna «Altitud» de la tabla a-Anejo G del
+// MISMO DB-HE (`./aguaFriaHE.ts`, verificada casilla a casilla), la única altitud
+// de las capitales que da el DB; antes eran valores orientativos (INE / tabla B.1
+// del DB-HE 2013, derogado) que no coincidían con el Anejo G en 34 capitales y
+// cambiaban la zona de Toledo (445 m, C4 → 629 m, D3) y Zaragoza (207 m, D3 →
+// 199 m, C3). `zonaCapital` se DERIVA de los tramos verificados + esa altitud
+// (autoconsistente por construcción). Sigue siendo una SUGERENCIA: el DB-HE pide
+// la altitud del emplazamiento.
 // =============================================================================
 
 import { tablaCTE, type ProcedenciaCTE, type TablaCTE } from "../lib/cte/tabla";
+import { AGUA_FRIA_ANEJO_G } from "./aguaFriaHE";
 import {
   ZONAS_TERMICAS_TABLA_4_4,
   type ZonaProvincia,
@@ -83,7 +88,7 @@ export interface TramoAltitud {
 export interface EntradaProvincia {
   /** Capital de la provincia (denominación de uso común). */
   capital: string;
-  /** Altitud de referencia de la capital [m] (orientativa, ver cabecera). */
+  /** Altitud de la capital [m]: la de la tabla a-Anejo G (ver cabecera). */
   altitudCapital_m: number;
   /** Zona climática de la capital, derivada de `tramos` + `altitudCapital_m`. */
   zonaCapital: string;
@@ -104,17 +109,24 @@ function zonaEnTramos(tramos: ReadonlyArray<TramoAltitud>, altitud_m: number): s
   return zona;
 }
 
+type TramosProvincia = Pick<EntradaProvincia, "capital" | "tramos">;
+
 /**
- * Constructor legible de una entrada: capital + altitud de referencia + pares
- * [altitudMin_m, zona]. `zonaCapital` se deriva de los tramos (autoconsistente).
+ * Constructor legible de una fila: capital + pares [altitudMin_m, zona]. La
+ * altitud de la capital y su zona se añaden después, del Anejo G.
  */
-function p(
-  capital: string,
-  altitudCapital_m: number,
-  ...pares: ReadonlyArray<readonly [number, string]>
-): EntradaProvincia {
-  const tramos = pares.map(([altitudMin_m, zona]) => ({ altitudMin_m, zona }));
-  return { capital, altitudCapital_m, zonaCapital: zonaEnTramos(tramos, altitudCapital_m), tramos };
+function p(capital: string, ...pares: ReadonlyArray<readonly [number, string]>): TramosProvincia {
+  return { capital, tramos: pares.map(([altitudMin_m, zona]) => ({ altitudMin_m, zona })) };
+}
+
+/** Completa cada fila con la altitud de su capital (tabla a-Anejo G) y la zona que le toca. */
+function conCapital(filas: Record<string, TramosProvincia>): Record<string, EntradaProvincia> {
+  return Object.fromEntries(
+    Object.entries(filas).map(([provincia, f]) => {
+      const altitudCapital_m = AGUA_FRIA_ANEJO_G.datos.provincias[provincia].altitud_m;
+      return [provincia, { ...f, altitudCapital_m, zonaCapital: zonaEnTramos(f.tramos, altitudCapital_m) }];
+    }),
+  );
 }
 
 // -----------------------------------------------------------------------------
@@ -126,38 +138,36 @@ function p(
 export const ZONAS_CLIMATICAS_ANEJO_B: TablaCTE<{
   provincias: Record<string, EntradaProvincia>;
 }> = tablaCTE(PROC_ANEJO_B, {
-  provincias: {
-    "Álava": p("Vitoria-Gasteiz", 525, [0, "D1"], [601, "E1"]),
-    "Albacete": p("Albacete", 677, [0, "C3"], [451, "D3"], [951, "E1"]),
-    "Alicante": p("Alicante/Alacant", 7, [0, "B4"], [251, "C3"], [701, "D3"]),
-    "Almería": p("Almería", 22, [0, "A4"], [101, "B4"], [251, "B3"], [401, "C3"], [801, "D3"]),
-    "Asturias": p("Oviedo", 232, [0, "C1"], [51, "D1"], [551, "E1"]),
-    "Ávila": p("Ávila", 1131, [0, "D2"], [551, "D1"], [851, "E1"]),
-    "Badajoz": p("Badajoz", 168, [0, "C4"], [401, "C3"], [451, "D3"]),
-    "Baleares": p("Palma", 13, [0, "B3"], [251, "C3"]),
-    "Barcelona": p("Barcelona", 12, [0, "C2"], [251, "D2"], [451, "D1"], [751, "E1"]),
-    "Burgos": p("Burgos", 859, [0, "D1"], [601, "E1"]),
-    "Cáceres": p("Cáceres", 459, [0, "C4"], [601, "D3"], [1051, "E1"]),
-    "Cádiz": p("Cádiz", 11, [0, "A3"], [151, "B3"], [451, "C3"], [601, "C2"], [851, "D2"]),
-    "Cantabria": p("Santander", 15, [0, "C1"], [151, "D1"], [651, "E1"]),
+  provincias: conCapital({
+    "Álava": p("Vitoria-Gasteiz", [0, "D1"], [601, "E1"]),
+    "Albacete": p("Albacete", [0, "C3"], [451, "D3"], [951, "E1"]),
+    "Alicante": p("Alicante/Alacant", [0, "B4"], [251, "C3"], [701, "D3"]),
+    "Almería": p("Almería", [0, "A4"], [101, "B4"], [251, "B3"], [401, "C3"], [801, "D3"]),
+    "Asturias": p("Oviedo", [0, "C1"], [51, "D1"], [551, "E1"]),
+    "Ávila": p("Ávila", [0, "D2"], [551, "D1"], [851, "E1"]),
+    "Badajoz": p("Badajoz", [0, "C4"], [401, "C3"], [451, "D3"]),
+    "Baleares": p("Palma", [0, "B3"], [251, "C3"]),
+    "Barcelona": p("Barcelona", [0, "C2"], [251, "D2"], [451, "D1"], [751, "E1"]),
+    "Burgos": p("Burgos", [0, "D1"], [601, "E1"]),
+    "Cáceres": p("Cáceres", [0, "C4"], [601, "D3"], [1051, "E1"]),
+    "Cádiz": p("Cádiz", [0, "A3"], [151, "B3"], [451, "C3"], [601, "C2"], [851, "D2"]),
+    "Cantabria": p("Santander", [0, "C1"], [151, "D1"], [651, "E1"]),
     "Castellón": p(
       "Castelló de la Plana",
-      30,
       [0, "B3"],
       [101, "C3"],
       [501, "D3"],
       [601, "D2"],
       [1001, "E1"],
     ),
-    "Ceuta": p("Ceuta", 10, [0, "B3"]),
-    "Ciudad Real": p("Ciudad Real", 628, [0, "C4"], [451, "C3"], [501, "D3"]),
-    "Córdoba": p("Córdoba", 106, [0, "B4"], [151, "C4"], [551, "D3"]),
-    "A Coruña": p("A Coruña", 21, [0, "C1"], [201, "D1"]),
-    "Cuenca": p("Cuenca", 999, [0, "D3"], [801, "D2"], [1051, "E1"]),
-    "Girona": p("Girona", 70, [0, "C2"], [101, "D2"], [601, "E1"]),
+    "Ceuta": p("Ceuta", [0, "B3"]),
+    "Ciudad Real": p("Ciudad Real", [0, "C4"], [451, "C3"], [501, "D3"]),
+    "Córdoba": p("Córdoba", [0, "B4"], [151, "C4"], [551, "D3"]),
+    "A Coruña": p("A Coruña", [0, "C1"], [201, "D1"]),
+    "Cuenca": p("Cuenca", [0, "D3"], [801, "D2"], [1051, "E1"]),
+    "Girona": p("Girona", [0, "C2"], [101, "D2"], [601, "E1"]),
     "Granada": p(
       "Granada",
-      683,
       [0, "A4"],
       [51, "B4"],
       [351, "C4"],
@@ -165,52 +175,50 @@ export const ZONAS_CLIMATICAS_ANEJO_B: TablaCTE<{
       [801, "D3"],
       [1301, "E1"],
     ),
-    "Guadalajara": p("Guadalajara", 685, [0, "D3"], [951, "D2"], [1001, "E1"]),
-    "Guipúzcoa": p("Donostia/San Sebastián", 6, [0, "D1"], [401, "E1"]),
-    "Huelva": p("Huelva", 24, [0, "A4"], [51, "B4"], [151, "B3"], [351, "C3"], [801, "D3"]),
-    "Huesca": p("Huesca", 488, [0, "C3"], [201, "D3"], [401, "D2"], [701, "E1"]),
-    "Jaén": p("Jaén", 573, [0, "B4"], [351, "C4"], [751, "D3"], [1251, "E1"]),
+    "Guadalajara": p("Guadalajara", [0, "D3"], [951, "D2"], [1001, "E1"]),
+    "Guipúzcoa": p("Donostia/San Sebastián", [0, "D1"], [401, "E1"]),
+    "Huelva": p("Huelva", [0, "A4"], [51, "B4"], [151, "B3"], [351, "C3"], [801, "D3"]),
+    "Huesca": p("Huesca", [0, "C3"], [201, "D3"], [401, "D2"], [701, "E1"]),
+    "Jaén": p("Jaén", [0, "B4"], [351, "C4"], [751, "D3"], [1251, "E1"]),
     "Las Palmas": p(
       "Las Palmas de Gran Canaria",
-      8,
       [0, "α3"],
       [351, "A2"],
       [751, "B2"],
       [1001, "C2"],
     ),
-    "León": p("León", 837, [0, "E1"]),
-    "Lleida": p("Lleida", 167, [0, "C3"], [101, "D3"], [601, "E1"]),
-    "Lugo": p("Lugo", 454, [0, "D1"], [501, "E1"]),
-    "Madrid": p("Madrid", 657, [0, "C3"], [501, "D3"], [951, "D2"], [1001, "E1"]),
-    "Málaga": p("Málaga", 11, [0, "A3"], [101, "B3"], [301, "C3"], [701, "D3"]),
-    "Melilla": p("Melilla", 25, [0, "A3"]),
-    "Murcia": p("Murcia", 43, [0, "B3"], [101, "C3"], [551, "D3"]),
-    "Navarra": p("Pamplona/Iruña", 449, [0, "C2"], [101, "D2"], [351, "D1"], [601, "E1"]),
-    "Ourense": p("Ourense", 132, [0, "C3"], [151, "C2"], [301, "D2"], [801, "E1"]),
-    "Palencia": p("Palencia", 749, [0, "D1"], [801, "E1"]),
-    "Pontevedra": p("Pontevedra", 20, [0, "C1"], [351, "D1"]),
-    "La Rioja": p("Logroño", 384, [0, "C2"], [201, "D2"], [701, "E1"]),
-    "Salamanca": p("Salamanca", 802, [0, "D2"], [851, "E1"]),
-    "Segovia": p("Segovia", 1002, [0, "D2"], [1051, "E1"]),
-    "Sevilla": p("Sevilla", 11, [0, "B4"], [201, "C4"]),
-    "Soria": p("Soria", 1063, [0, "D2"], [751, "D1"], [801, "E1"]),
+    "León": p("León", [0, "E1"]),
+    "Lleida": p("Lleida", [0, "C3"], [101, "D3"], [601, "E1"]),
+    "Lugo": p("Lugo", [0, "D1"], [501, "E1"]),
+    "Madrid": p("Madrid", [0, "C3"], [501, "D3"], [951, "D2"], [1001, "E1"]),
+    "Málaga": p("Málaga", [0, "A3"], [101, "B3"], [301, "C3"], [701, "D3"]),
+    "Melilla": p("Melilla", [0, "A3"]),
+    "Murcia": p("Murcia", [0, "B3"], [101, "C3"], [551, "D3"]),
+    "Navarra": p("Pamplona/Iruña", [0, "C2"], [101, "D2"], [351, "D1"], [601, "E1"]),
+    "Ourense": p("Ourense", [0, "C3"], [151, "C2"], [301, "D2"], [801, "E1"]),
+    "Palencia": p("Palencia", [0, "D1"], [801, "E1"]),
+    "Pontevedra": p("Pontevedra", [0, "C1"], [351, "D1"]),
+    "La Rioja": p("Logroño", [0, "C2"], [201, "D2"], [701, "E1"]),
+    "Salamanca": p("Salamanca", [0, "D2"], [851, "E1"]),
+    "Segovia": p("Segovia", [0, "D2"], [1051, "E1"]),
+    "Sevilla": p("Sevilla", [0, "B4"], [201, "C4"]),
+    "Soria": p("Soria", [0, "D2"], [751, "D1"], [801, "E1"]),
     "Santa Cruz de Tenerife": p(
       "Santa Cruz de Tenerife",
-      4,
       [0, "α3"],
       [351, "A2"],
       [751, "B2"],
       [1001, "C2"],
     ),
-    "Tarragona": p("Tarragona", 68, [0, "B3"], [101, "C3"], [501, "D3"]),
-    "Teruel": p("Teruel", 915, [0, "C3"], [451, "C2"], [501, "D2"], [1001, "E1"]),
-    "Toledo": p("Toledo", 445, [0, "C4"], [501, "D3"]),
-    "Valencia": p("València", 15, [0, "B3"], [51, "C3"], [501, "D2"], [951, "E1"]),
-    "Valladolid": p("Valladolid", 698, [0, "D2"], [801, "E1"]),
-    "Vizcaya": p("Bilbao", 19, [0, "C1"], [251, "D1"]),
-    "Zamora": p("Zamora", 649, [0, "D2"], [801, "E1"]),
-    "Zaragoza": p("Zaragoza", 207, [0, "C3"], [201, "D3"], [651, "E1"]),
-  } satisfies Record<string, EntradaProvincia>,
+    "Tarragona": p("Tarragona", [0, "B3"], [101, "C3"], [501, "D3"]),
+    "Teruel": p("Teruel", [0, "C3"], [451, "C2"], [501, "D2"], [1001, "E1"]),
+    "Toledo": p("Toledo", [0, "C4"], [501, "D3"]),
+    "Valencia": p("València", [0, "B3"], [51, "C3"], [501, "D2"], [951, "E1"]),
+    "Valladolid": p("Valladolid", [0, "D2"], [801, "E1"]),
+    "Vizcaya": p("Bilbao", [0, "C1"], [251, "D1"]),
+    "Zamora": p("Zamora", [0, "D2"], [801, "E1"]),
+    "Zaragoza": p("Zaragoza", [0, "C3"], [201, "D3"], [651, "E1"]),
+  } satisfies Record<string, TramosProvincia>),
 });
 
 /** Las 52 provincias/ciudades autónomas, en orden alfabético (colación española). */
@@ -296,8 +304,8 @@ export function limiteTramoCercano(
 /**
  * Capital de la provincia y su altitud de referencia [m] (feature-9). Es la
  * ÚNICA altitud por municipio que el proyecto tiene verificada: se ofrece como
- * sugerencia cuando el municipio elegido ES la capital. Sigue siendo la del
- * núcleo (orientativa, ver cabecera): el DB-HE exige la del EMPLAZAMIENTO.
+ * sugerencia cuando el municipio elegido ES la capital: la de la tabla a-Anejo G
+ * (ver cabecera). El DB-HE exige la del EMPLAZAMIENTO.
  * `null` si la provincia no existe.
  */
 export function altitudCapitalDe(
