@@ -98,7 +98,7 @@ export const hr: DefinicionSi<HrEstado, JustificacionHr> = {
     if (j.separaciones.medianeras) datosPartida.push({ concepto: "Medianeras", valor: "Sí", origen: "SI 2" });
     const observaciones = [
       "Opción simplificada (DB-HR ap. 3.1.2). Valores del Catálogo de Elementos Constructivos del CTE (CEC, versión de marzo de 2010, no reglamentario): con garantía legal para las soluciones hechas en obra y orientativos para los productos industriales, que se exigirán con su ensayo en el pliego.",
-      "Criterios de proyecto (no son exigencia del CTE): en cada celda de las tablas 3.2 y 3.3 basta con cumplir una de sus alternativas con sus notas; todo lo que comparte planta se supone colindante; la caja de persiana se suma a la ventana con la expresión G.1 del Anejo G.",
+      "Criterios de proyecto (no son exigencia del CTE): en cada celda de las tablas 3.2 y 3.3 basta con cumplir una de sus alternativas con sus notas; lo que comparte planta con las viviendas se supone colindante y lo de la planta de abajo, debajo, salvo lo que el proyecto indica que no linda; la caja de persiana se suma a la ventana con la expresión G.1 del Anejo G.",
       "El edificio es de uso residencial privado: no se le aplican los valores límite de tiempo de reverberación (ap. 2.2).",
     ];
     if (j.tipologia === "otros") observaciones.pop();

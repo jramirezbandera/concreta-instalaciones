@@ -21,8 +21,16 @@ const ANCHO = S.W + 130;
 export function dibujoHr(j: JustificacionHr, edificio: Edificio): DibujoSi {
   const { base, zonas } = seccionConZonas(edificio);
   const ids = new Set(j.elementos.map((e) => e.id));
+  // Lo que el proyectista dice que no linda no se dibuja.
+  const noLinda = new Set(j.separaciones.colindancias.filter((c) => !c.linda).map((c) => c.clave));
   const zonaDe = new Map<string, Zona>();
-  for (const g of edificio.grupos) for (const z of g.zonas) zonaDe.set(z.id, z);
+  const grupoDe = new Map<string, string>();
+  for (const g of edificio.grupos) {
+    for (const z of g.zonas) {
+      zonaDe.set(z.id, z);
+      grupoDe.set(z.id, g.id);
+    }
+  }
   const clase = (z: ZonaDibujada): ClaseRecinto => {
     const zona = zonaDe.get(z.zonaId);
     return zona ? claseRecinto(zona) : "no_habitable";
@@ -61,11 +69,12 @@ export function dibujoHr(j: JustificacionHr, edificio: Edificio): DibujoSi {
     for (const z of debajo) {
       const c = clase(z);
       let id: string | null = null;
+      if (hayViviendaArriba && c !== "vivienda" && noLinda.has(`debajo:${z.zonaId}`)) continue;
       if (hayViviendaArriba) {
         if (c === "vivienda") id = ids.has("forjado-viviendas") ? "forjado-viviendas" : ids.has("forjado-adosada") ? "forjado-adosada" : null;
         else if (c === "comun" || c === "no_habitable") id = "forjado-comun";
         else id = "forjado-actividad";
-      } else if (hayViviendaAbajo && c === "vivienda" && arriba.some((u) => clase(u) === "actividad" || clase(u) === "instalaciones")) {
+      } else if (hayViviendaAbajo && c === "vivienda" && arriba.some((u) => (clase(u) === "actividad" || clase(u) === "instalaciones") && !noLinda.has(`encima:${u.zonaId}`))) {
         id = "forjado-encima";
       }
       if (!id || !ids.has(id)) continue;
@@ -81,7 +90,7 @@ export function dibujoHr(j: JustificacionHr, edificio: Edificio): DibujoSi {
       const z = fila[i];
       const zona = zonaDe.get(z.zonaId);
       // Dentro de la zona de viviendas: entre ellas, si hay más de una.
-      if (zona?.uso === "viviendas" && (zona.unidades ?? []).reduce((s, u) => s + u.cantidad, 0) > 1 && ids.has("separacion")) {
+      if (zona?.uso === "viviendas" && (zona.unidades ?? []).reduce((s, u) => s + u.cantidad, 0) > 1 && ids.has("separacion") && !noLinda.has(`entre:${grupoDe.get(z.zonaId)}`)) {
         const x = (z.x0 + z.x1) / 2;
         marcas.push({ tipo: "linea", key: `sv-${p.nivel}-${z.zonaId}`, d: `M${x} ${z.y0 + 4}V${z.y1 - 4}`, grosor: 3, elementoId: "separacion" });
         etiquetar("separacion", x, (z.y0 + z.y1) / 2);
@@ -91,6 +100,7 @@ export function dibujoHr(j: JustificacionHr, edificio: Edificio): DibujoSi {
       const b = clase(z);
       if (a !== "vivienda" && b !== "vivienda") continue;
       const otra = a === "vivienda" ? b : a;
+      if (noLinda.has(`lado:${(a === "vivienda" ? z : fila[i - 1]).zonaId}`)) continue;
       const id = otra === "actividad" || otra === "instalaciones" ? "separacion-actividad" : otra === "vivienda" ? null : "separacion";
       if (!id || !ids.has(id)) continue;
       marcas.push({ tipo: "linea", key: `sv-${p.nivel}-${i}`, d: `M${z.x0} ${z.y0 + 4}V${z.y1 - 4}`, grosor: 3, elementoId: id });

@@ -15,7 +15,8 @@ import { CAPIALZADOS, deCategoria, solucionDe, valor, type Capialzado, type Cate
 import { hr } from "./definicion";
 import { conValoresPropios, HUECOS_SUPUESTOS, hrEstadoDefaults, numero, type Eleccion, type HrEstado, type ParametroHr } from "./estado";
 import type { DetalleHr, JustificacionHr } from "./justificacion";
-import { dB, dBA, kg, TABIQUERIA } from "./textos";
+import type { ColindanciaHr } from "./edificio";
+import { dB, dBA, kg, RELACION_HR, TABIQUERIA } from "./textos";
 
 const SELECT =
   "border-border-main bg-bg-primary text-text-primary focus:border-accent h-8 w-full rounded border px-1.5 text-[12.5px] focus:outline-none";
@@ -167,7 +168,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
   const cubiertaHabitual = proyecto.edificio.cubierta.tipo === "inclinada" ? "cu-incl-fu-bovhorm-250" : "cu-plana-fu-bovhorm-300";
 
   // Números fijos: con el React Compiler, un contador mutado en el JSX se memoriza mal.
+  const colindancias = j.separaciones.colindancias;
   const visibles = [
+    colindancias.length > 0,
     j.tipologia !== "otros",
     adosada,
     ids.has("separacion"),
@@ -197,8 +200,16 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
       <div className="text-text-disabled pt-5 pb-1.5 text-[10px] font-semibold tracking-[0.09em] uppercase">Decisiones</div>
 
       {visibles[0] && (
-        <DecisionSolucion
+        <DecisionColindancias
           numero={n[0]}
+          colindancias={colindancias}
+          onChange={(clave, linda) => setField("colindancias", { ...(state.colindancias ?? {}), [clave]: linda })}
+        />
+      )}
+
+      {visibles[1] && (
+        <DecisionSolucion
+          numero={n[1]}
           pregunta="Tabiquería"
           categoria="tabiqueria"
           eleccion={state.tabiqueria}
@@ -225,9 +236,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[1] && (
+      {visibles[2] && (
         <Decision<"compartida" | "independiente">
-          numero={n[1]}
+          numero={n[2]}
           pregunta="Estructura de las adosadas"
           opciones={[
             { valor: "compartida", label: "Compartida" },
@@ -244,9 +255,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[2] && (
+      {visibles[3] && (
         <DecisionSolucion
-          numero={n[2]}
+          numero={n[3]}
           pregunta={adosada ? "Separación con las adosadas" : "Entre viviendas y con la zona común"}
           categoria="base"
           eleccion={state.separacion}
@@ -262,9 +273,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[3] && (
+      {visibles[4] && (
         <DecisionSolucion
-          numero={n[3]}
+          numero={n[4]}
           pregunta="Cada hoja de la separación"
           categoria="base"
           eleccion={state.hojaAdosada}
@@ -275,9 +286,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[4] && (
+      {visibles[5] && (
         <DecisionSolucion
-          numero={n[4]}
+          numero={n[5]}
           pregunta="Con locales, garaje e instalaciones"
           categoria="base"
           eleccion={state.separacionActividad}
@@ -299,9 +310,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[5] && (
+      {visibles[6] && (
         <DecisionSolucion
-          numero={n[5]}
+          numero={n[6]}
           pregunta="Forjado y suelo flotante"
           categoria="forjado"
           eleccion={state.forjado}
@@ -317,9 +328,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[6] && (
+      {visibles[7] && (
         <DecisionSolucion
-          numero={n[6]}
+          numero={n[7]}
           pregunta="Techo entre viviendas"
           categoria="techo"
           eleccion={state.techo}
@@ -331,9 +342,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[7] && (
+      {visibles[8] && (
         <DecisionSolucion
-          numero={n[7]}
+          numero={n[8]}
           pregunta="Techo bajo las viviendas"
           categoria="techo"
           eleccion={state.techoBajo}
@@ -345,9 +356,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[8] && (
+      {visibles[9] && (
         <DecisionSolucion
-          numero={n[8]}
+          numero={n[9]}
           pregunta="Fachada"
           categoria="fachada"
           eleccion={state.fachada}
@@ -372,9 +383,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[9] && (
+      {visibles[10] && (
         <DecisionSolucion
-          numero={n[9]}
+          numero={n[10]}
           pregunta="Ventanas"
           categoria="ventana"
           eleccion={state.ventana}
@@ -418,9 +429,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[10] && (
+      {visibles[11] && (
         <DecisionSolucion
-          numero={n[10]}
+          numero={n[11]}
           pregunta="Cubierta"
           categoria="cubierta"
           eleccion={state.cubierta ?? { id: cubiertaHabitual }}
@@ -431,9 +442,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[11] && (
+      {visibles[12] && (
         <DecisionSolucion
-          numero={n[11]}
+          numero={n[12]}
           pregunta="Medianería"
           categoria="base"
           eleccion={state.medianeria}
@@ -444,9 +455,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[12] && puerta && (
+      {visibles[13] && puerta && (
         <Decision<"vestibulo" | "estancia">
-          numero={n[12]}
+          numero={n[13]}
           pregunta="Puerta de entrada a la vivienda"
           opciones={[
             { valor: "vestibulo", label: "Abre a un vestíbulo" },
@@ -465,9 +476,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[13] && asc && (
+      {visibles[14] && asc && (
         <Decision<"hueco" | "cuarto">
-          numero={n[13]}
+          numero={n[14]}
           pregunta="Maquinaria del ascensor"
           opciones={[
             { valor: "hueco", label: "En el hueco" },
@@ -485,7 +496,7 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
       )}
 
       <DecisionValor
-        numero={n[14]}
+        numero={n[15]}
         pregunta="Valores del Catálogo"
         marca={medios ? { texto: "medios", aviso: true } : { texto: "mínimos" }}
         control={
@@ -503,6 +514,61 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         texto="Los mínimos los garantiza el Catálogo en todos los casos; los medios tienen en cuenta la dispersión de la producción y valen si el producto lo justifica."
       />
     </section>
+  );
+}
+
+/**
+ * Qué linda con qué (K-HR.16): cada colindancia que se deduce de El edificio,
+ * con Sí o No. Sin indicarla, se supone que sí, del lado de la seguridad.
+ */
+function DecisionColindancias({
+  numero: num,
+  colindancias,
+  onChange,
+}: {
+  numero: number;
+  colindancias: readonly ColindanciaHr[];
+  onChange: (clave: string, linda: boolean) => void;
+}): JSX.Element {
+  const supuestas = colindancias.filter((c) => c.supuesta).length;
+  const negadas = colindancias.filter((c) => !c.linda).length;
+  return (
+    <div className="border-border-sub border-t pt-3 pb-3.5">
+      <div className="text-text-primary mb-2 flex items-baseline gap-2 text-[13px] font-medium">
+        <span className="text-text-disabled font-mono text-[10.5px] font-medium">{num}</span>
+        Qué linda con qué
+      </div>
+      <ul className="flex flex-col gap-1.5">
+        {colindancias.map((c) => (
+          <li key={c.clave} className="flex items-center justify-between gap-2">
+            <span className="min-w-0 text-[12px] leading-tight">
+              <span className="text-text-primary">{c.nombre}</span>{" "}
+              <span className="text-text-secondary">{RELACION_HR[c.relacion]}</span>
+              {c.supuesta && <span className="text-text-disabled"> · supuesto</span>}
+            </span>
+            <div className="w-28 shrink-0">
+              <Opciones<"si" | "no">
+                etiqueta={`${c.nombre} ${RELACION_HR[c.relacion]}`}
+                pequenas
+                opciones={[
+                  { valor: "si", label: "Linda" },
+                  { valor: "no", label: "No" },
+                ]}
+                valor={c.linda ? "si" : "no"}
+                onChange={(v) => onChange(c.clave, v === "si")}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+      <p className="text-text-secondary mt-2 text-[12px] leading-normal">
+        <b className="text-text-primary font-medium">{supuestas === colindancias.length ? "Supuesto." : supuestas > 0 ? "En parte supuesto." : "Indicado."}</b>{" "}
+        {supuestas > 0
+          ? "Sin la planta, lo que comparte planta con las viviendas se supone colindante y lo de abajo, debajo: lo más desfavorable. "
+          : ""}
+        {negadas > 0 ? "Lo que no linda no se justifica." : "Si algo no linda, márcalo: deja de justificarse."}
+      </p>
+    </div>
   );
 }
 

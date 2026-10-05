@@ -28,6 +28,11 @@ export interface Eleccion {
 export type ModoAscensor = "hueco" | "cuarto";
 
 export type HrEstado = {
+  /**
+   * Qué linda con qué (K-HR.16), por la clave de cada colindancia deducida de El
+   * edificio (`edificio.ts`): false, no linda; sin clave, se supone que sí.
+   */
+  colindancias: Record<string, boolean>;
   /** Valores medios del Catálogo en lugar de los mínimos (K-CEC.1). */
   medios: boolean;
   tabiqueria: Eleccion;
@@ -73,6 +78,7 @@ export type HrEstado = {
 export const HUECOS_SUPUESTOS = { dormitorio: 20, estancia: 30 } as const;
 
 export const hrEstadoDefaults: HrEstado = {
+  colindancias: {},
   medios: false,
   tabiqueria: { id: "tab-lhd70-yeso" },
   apoyo: "bandas",

@@ -14,10 +14,11 @@
 //
 // Sin la posición de las zonas en planta, se supone que todo lo que comparte
 // planta es colindante y que lo que está en la planta de abajo queda debajo:
-// del lado de la seguridad.
+// del lado de la seguridad (K-HR.16). Cada una de esas colindancias se puede
+// negar (`colindancias`): lo que no linda no se justifica.
 // =============================================================================
 
-import { plantasDe, renumerar, resumenEdificio } from "../../lib/edificio/derivar";
+import { nombreGrupo, plantasDe, renumerar, resumenEdificio } from "../../lib/edificio/derivar";
 import type { TipoCuarto, Zona } from "../../lib/edificio/tipos";
 import { USOS } from "../../lib/edificio/usos";
 import type { ProyectoSi } from "../si/definicion";
@@ -59,6 +60,31 @@ export interface Colindante {
   garaje: boolean;
 }
 
+/**
+ * Cómo se toca con las viviendas: viviendas de una planta entre sí, una zona en
+ * la planta de las viviendas, una zona con viviendas encima o una zona encima
+ * de viviendas.
+ */
+export type RelacionHr = "entre" | "lado" | "debajo" | "encima";
+
+/**
+ * Una colindancia que se deduce de El edificio y que el proyectista puede negar.
+ * Clave estable: la relación y la zona (o el grupo de plantas, para «entre»);
+ * en un grupo de plantas iguales vale para todas.
+ */
+export interface ColindanciaHr {
+  clave: string;
+  relacion: RelacionHr;
+  /** «Garaje (S1)», «Viviendas (P1–P3)». */
+  nombre: string;
+  /** Si linda: lo indicado o, sin indicar, lo supuesto (sí). */
+  linda: boolean;
+  supuesta: boolean;
+}
+
+/** Lo que el proyectista ha dicho de cada colindancia; sin clave, se supone que linda. */
+export type Colindancias = Readonly<Record<string, boolean>>;
+
 export interface SeparacionesHr {
   tipologia: Tipologia;
   viviendas: number;
@@ -85,13 +111,10 @@ export interface SeparacionesHr {
   ascensorHabitual: ModoAscensor;
   /** Hay más de una planta en la vivienda o el edificio (forjados interiores). */
   plantas: number;
+  /** Todas las colindancias deducidas, también las negadas, en el orden del edificio. */
+  colindancias: ColindanciaHr[];
 }
 
-function colindantes(zonas: readonly Zona[], etiqueta: string, clases: readonly ClaseRecinto[]): Colindante[] {
-  return zonas
-    .filter((z) => clases.includes(claseRecinto(z)))
-    .map((z) => ({ nombre: `${USOS[z.uso].etiqueta} (${etiqueta})`, clase: claseRecinto(z), garaje: z.uso === "garaje" }));
-}
 
 function unicos(xs: Colindante[]): Colindante[] {
   const vistos = new Set<string>();
@@ -104,7 +127,7 @@ export function medianerasDe(p: ProyectoSi, unifamiliar: boolean): boolean {
   return resolverSi2({ ...si2EstadoDefaults, ...(guardado ?? {}) }, unifamiliar).medianeras === "si";
 }
 
-export function separacionesHr(p: ProyectoSi): SeparacionesHr {
+export function separacionesHr(p: ProyectoSi, dichas: Colindancias = {}): SeparacionesHr {
   const e = renumerar(p.edificio);
   const r = resumenEdificio(e);
   const plantas = plantasDe(e);
@@ -130,28 +153,48 @@ export function separacionesHr(p: ProyectoSi): SeparacionesHr {
     ascensor: false,
     ascensorHabitual: "hueco",
     plantas: plantas.length,
+    colindancias: [],
   };
   if (unifamiliar || tipologia === "otros") return s;
+
+  // Cada colindancia deducida se apunta una vez (con el nombre de su grupo) y
+  // solo cuenta si no se ha negado.
+  const grupoDe = new Map(e.grupos.map((g) => [g.id, nombreGrupo(g).corto]));
+  const vistas = new Map<string, ColindanciaHr>();
+  const linda = (clave: string, relacion: RelacionHr, nombre: string): boolean => {
+    let c = vistas.get(clave);
+    if (!c) {
+      const dicho = dichas[clave];
+      c = { clave, relacion, nombre, linda: dicho !== false, supuesta: typeof dicho !== "boolean" };
+      vistas.set(clave, c);
+      s.colindancias.push(c);
+    }
+    return c.linda;
+  };
+  const colindantes = (pl: (typeof plantas)[number], relacion: RelacionHr, clases: readonly ClaseRecinto[]): Colindante[] =>
+    pl.zonas
+      .filter((z) => clases.includes(claseRecinto(z)) && linda(`${relacion}:${z.id}`, relacion, `${USOS[z.uso].etiqueta} (${grupoDe.get(pl.grupoId) ?? pl.etiqueta})`))
+      .map((z) => ({ nombre: `${USOS[z.uso].etiqueta} (${pl.etiqueta})`, clase: claseRecinto(z), garaje: z.uso === "garaje" }));
 
   plantas.forEach((pl, i) => {
     if (!conViviendas(pl.zonas)) {
       // Un recinto de actividad o de instalaciones sobre viviendas.
       const abajo = plantas[i + 1];
-      if (abajo && conViviendas(abajo.zonas)) s.actividadEncima.push(...colindantes(pl.zonas, pl.etiqueta, ["actividad", "instalaciones"]));
+      if (abajo && conViviendas(abajo.zonas)) s.actividadEncima.push(...colindantes(pl, "encima", ["actividad", "instalaciones"]));
       return;
     }
-    if (unidades(pl.zonas) > 1) s.entreViviendas.push(pl.etiqueta);
-    s.conComun.push(...colindantes(pl.zonas, pl.etiqueta, ["comun", "no_habitable"]));
-    s.conActividad.push(...colindantes(pl.zonas, pl.etiqueta, ["actividad", "instalaciones"]));
+    if (unidades(pl.zonas) > 1 && linda(`entre:${pl.grupoId}`, "entre", `Viviendas (${grupoDe.get(pl.grupoId) ?? pl.etiqueta})`)) s.entreViviendas.push(pl.etiqueta);
+    s.conComun.push(...colindantes(pl, "lado", ["comun", "no_habitable"]));
+    s.conActividad.push(...colindantes(pl, "lado", ["actividad", "instalaciones"]));
     const abajo = plantas[i + 1];
     if (abajo) {
       if (conViviendas(abajo.zonas)) {
         s.sobreViviendas.push(pl.etiqueta);
         // Un local u oficinas en una planta de viviendas también pisa las de abajo.
-        s.actividadEncima.push(...colindantes(pl.zonas, pl.etiqueta, ["actividad", "instalaciones"]));
+        s.actividadEncima.push(...colindantes(pl, "encima", ["actividad", "instalaciones"]));
       }
-      s.sobreComun.push(...colindantes(abajo.zonas, abajo.etiqueta, ["comun", "no_habitable"]));
-      s.sobreActividad.push(...colindantes(abajo.zonas, abajo.etiqueta, ["actividad", "instalaciones"]));
+      s.sobreComun.push(...colindantes(abajo, "debajo", ["comun", "no_habitable"]));
+      s.sobreActividad.push(...colindantes(abajo, "debajo", ["actividad", "instalaciones"]));
     }
   });
   s.conComun = unicos(s.conComun);

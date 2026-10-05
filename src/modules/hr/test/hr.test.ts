@@ -155,8 +155,27 @@ describe("HR · el Demo (plurifamiliar con local)", () => {
       "medianeria", "fachada-dormitorios", "fachada-estancias", "cubierta", "instalaciones",
     ]);
     expect(j.veredicto).toBe("ok");
-    expect(avisos(j)).toEqual(["huecos", "ld", "local"]);
+    expect(avisos(j)).toEqual(["huecos", "ld", "colindancias", "local"]);
     expect(hr.frase(j)).toBe("6 viviendas con Ld 60 dBA: tabiquería, separaciones, forjados y fachadas cumplen la opción simplificada.");
+  });
+
+  it("qué linda con qué: lo deducido de El edificio, supuesto mientras no se indique (K-HR.16)", () => {
+    expect(j.separaciones.colindancias.map((c) => [c.clave, c.nombre, c.relacion, c.linda, c.supuesta])).toEqual([
+      ["entre:g1", "Viviendas (P1–P3)", "entre", true, true],
+      ["debajo:z3", "Portal y escalera (PB)", "debajo", true, true],
+      ["debajo:z2", "Local sin uso (PB)", "debajo", true, true],
+    ]);
+    expect(textoPlanoMemoria(hr.memoria(j))).toContain("Sin la distribución en planta, se suponen todas del lado de la seguridad");
+
+    // El local no queda bajo viviendas: su forjado y su aviso desaparecen; lo demás, indicado.
+    const k = con(demo.edificio, { colindancias: { "entre:g1": true, "debajo:z3": true, "debajo:z2": false } }, {}, demo.justificaciones);
+    expect(ids(k)).not.toContain("forjado-actividad");
+    expect(ids(k)).toContain("forjado-comun");
+    expect(avisos(k)).toEqual(["huecos", "ld"]);
+    expect(k.separaciones.colindancias.every((c) => !c.supuesta)).toBe(true);
+    const texto = textoPlanoMemoria(hr.memoria(k));
+    expect(texto).toContain("Según el proyecto, no lindan con las viviendas: Local sin uso (PB), bajo viviendas.");
+    expect(texto).toContain("Las colindancias son las del proyecto.");
   });
 
   it("entre viviendas, el tipo 2 de ½ pie y LH con bandas, fila 170/54 sin trasdosado", () => {

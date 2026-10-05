@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, render, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DEMO_ID } from "../../../lib/proyecto/demo";
 import { inicializarStorage } from "../../../lib/proyecto/storage";
@@ -41,5 +41,14 @@ describe("HR · Protección frente al ruido (feature-25)", () => {
     await user.selectOptions(getByRole("combobox", { name: /Tabiquería/ }), "tab-lhgf70-yeso");
     await user.click(getByRole("button", { name: "Apoyo directo" }));
     await waitFor(() => expect(getByRole("region", { name: "Avisos" })).toHaveTextContent("La tabiquería no llega."));
+  });
+
+  it("qué linda con qué: el local que no queda bajo viviendas deja de justificarse", async () => {
+    const user = userEvent.setup();
+    const { getByRole } = await renderModulo();
+    expect(getByRole("region", { name: "Avisos" })).toHaveTextContent("3 colindancias supuestas.");
+    await user.click(within(getByRole("group", { name: "Local sin uso (PB) bajo viviendas" })).getByRole("button", { name: "No" }));
+    await waitFor(() => expect(getByRole("region", { name: "Qué entra" })).not.toHaveTextContent("Actividad e instalaciones"));
+    expect(getByRole("region", { name: "Avisos" })).toHaveTextContent("2 colindancias supuestas.");
   });
 });

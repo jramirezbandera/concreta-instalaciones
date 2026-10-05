@@ -10,6 +10,7 @@ import type { Aviso } from "../../lib/cte/resultado";
 import type { TextoSi } from "../si/definicion";
 import type { ElementoSi } from "../si/tipos";
 import type { Condicion } from "./comprobar";
+import type { RelacionHr } from "./edificio";
 import type { DetalleHr, ElementoHr, JustificacionHr, SolucionUsada } from "./justificacion";
 import { TRAMOS_HUECOS, tramoHuecos, type ColumnaHorizontal, type TipoTabiqueria } from "./tablas";
 
@@ -33,6 +34,14 @@ export const COLUMNA_H: Record<ColumnaHorizontal, string> = {
   BE: "fábrica con bandas elásticas",
   ENT1H: "entramado, fachada de una hoja (1H)",
   ENT2H: "entramado, fachada de dos hojas (2H)",
+};
+
+/** Cómo toca cada colindancia a las viviendas, para la decisión y la memoria. */
+export const RELACION_HR: Record<RelacionHr, string> = {
+  entre: "entre sí",
+  lado: "en la planta de las viviendas",
+  debajo: "bajo viviendas",
+  encima: "sobre viviendas",
 };
 
 const RECINTO: Record<"dormitorios" | "estancias" | "administrativo" | "cubierta", string> = {
@@ -423,6 +432,13 @@ export function textoAvisoHr(a: Aviso): TextoSi {
         titulo: "Porcentaje de huecos supuesto.",
         detalle: "Se suponen un 20 % en los dormitorios y un 30 % en las estancias. Indica el del recinto más desfavorable de cada uno: la superficie de huecos entre la de la fachada vista desde dentro, con todas sus fachadas si está en esquina.",
       };
+    case "colindancias": {
+      const n = Number(a.datos.n) || 0;
+      return {
+        titulo: n === 1 ? "Una colindancia supuesta." : `${n} colindancias supuestas.`,
+        detalle: "Sin la planta, se supone lo más desfavorable: lo que comparte planta con las viviendas linda con ellas y lo de la planta de abajo queda debajo. Indica en «Qué linda con qué» lo que es así y lo que no: lo que no linda no se justifica.",
+      };
+    }
     case "existente":
       return {
         titulo: "Edificio existente: el DB-HR solo se aplica a la rehabilitación integral.",

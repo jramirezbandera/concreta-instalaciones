@@ -106,9 +106,13 @@ aplicabilidad corregida.
   - Huecos supuestos del 20 % (dormitorio) y 30 % (estancia).
   - Lo habitual: P3.2 entre viviendas, hormigón de 16 cm con trasdosado hacia locales, techo en
     el local, estructura compartida en las adosadas.
-- **Sin posición en planta**: el motor no sabe qué recinto linda con cuál; supone lo más
-  desfavorable. Las aristas comunes (figura 3.4) y los recintos de una misma vivienda no se
-  distinguen.
+- **Sin posición en planta**: el motor no sabe dónde está cada zona en la planta. Desde el
+  2026-10-05 cada colindancia que deduce (viviendas de un grupo entre sí; cada zona en la planta
+  de las viviendas, bajo ellas o sobre ellas) se puede negar en la decisión «Qué linda con qué»
+  (`HrEstado.colindancias`, clave `relación:zona` o `entre:grupo`); sin indicar, se supone que
+  linda, con el aviso «colindancias supuestas», y la memoria dice cuáles se justifican y cuáles
+  no lindan. Las aristas comunes (figura 3.4) y los recintos de una misma vivienda siguen sin
+  distinguirse.
 - **Lo que no está**: suelos en contacto con el aire exterior (soportales), lucernarios en
   cubierta, corrección por tamaño de ventana (CEC 4.3.2 nota 6), suelo flotante propio del
   recinto de actividad encima de viviendas (se usa el de las viviendas), opción general.

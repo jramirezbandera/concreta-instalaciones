@@ -192,7 +192,7 @@ const nombres = (cs: readonly Colindante[]) => cs.map((c) => c.nombre);
 export function justificarHr(estado: HrEstado, p: ProyectoSi, comparar = true): JustificacionHr {
   const st: HrEstado = { ...hrEstadoDefaults, ...estado };
   const medios = st.medios === true;
-  const sep = separacionesHr(p);
+  const sep = separacionesHr(p, st.colindancias ?? {});
   const tipologia = sep.tipologia;
   const elementos: ElementoHr[] = [];
   const avisos: Aviso[] = [];
@@ -447,6 +447,8 @@ export function justificarHr(estado: HrEstado, p: ProyectoSi, comparar = true): 
   const supEst = exterior(tipologia === "otros" ? "administrativo" : "estancias");
   if (supDorm || supEst) avisos.push({ id: "huecos", tipo: "supuesto", elementoId: supDorm ? "fachada-dormitorios" : "fachada-estancias", datos: {} });
   if (ld.supuesto) avisos.push({ id: "ld", tipo: "supuesto", elementoId: "fachada-dormitorios", datos: {} });
+  const supuestas = sep.colindancias.filter((c) => c.supuesta).length;
+  if (supuestas > 0) avisos.push({ id: "colindancias", tipo: "supuesto", datos: { n: supuestas } });
 
   if (sep.cubierta) {
     const cuS = solucionDe("cubierta", st.cubierta?.id ?? (p.edificio.cubierta.tipo === "inclinada" ? "cu-incl-fu-bovhorm-250" : "cu-plana-fu-bovhorm-300"));

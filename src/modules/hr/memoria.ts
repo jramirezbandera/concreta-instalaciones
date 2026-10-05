@@ -10,7 +10,7 @@ import type { MemoriaDoc, Trozo } from "../../lib/cte/presentacion";
 import { ENGINE_VERSION } from "../../lib/version";
 import type { DetalleHr, JustificacionHr } from "./justificacion";
 import { EDICION_HR, TRAMOS_HUECOS, tramoHuecos } from "./tablas";
-import { COLUMNA_H, dB, dBA, kg, solucionEnFrase, TABIQUERIA, textoSolucion } from "./textos";
+import { COLUMNA_H, dB, dBA, kg, RELACION_HR, solucionEnFrase, TABIQUERIA, textoSolucion } from "./textos";
 
 const CUMPLE = (ok: boolean) => (ok ? "CUMPLE." : "NO CUMPLE por la opción simplificada: se justifica por la opción general (ap. 3.1.3).");
 
@@ -34,6 +34,25 @@ function parrafoAmbito(j: JustificacionHr): Trozo[] {
         "El edificio es de nueva construcción y de uso residencial privado, por lo que le es de aplicación el DB-HR (Introducción II), sin que concurra ninguna de las excepciones a) a d). Se justifica mediante la opción simplificada (ap. 3.1.2), con forjados de hormigón (ap. 3.1.2.1).",
       ];
   }
+}
+
+/** Qué linda con las viviendas: lo que se justifica y lo que el proyecto dice que no linda (K-HR.16). */
+function parrafoColindancias(j: JustificacionHr): Trozo[] {
+  const cs = j.separaciones.colindancias;
+  if (cs.length === 0) return [];
+  const lista = (xs: typeof cs) => xs.map((c) => `${c.nombre}, ${RELACION_HR[c.relacion]}`).join("; ");
+  const si = cs.filter((c) => c.linda);
+  const no = cs.filter((c) => !c.linda);
+  const supuestas = si.filter((c) => c.supuesta).length;
+  return [
+    si.length > 0 ? `Recintos que lindan con las viviendas y cuyas separaciones se justifican: ${lista(si)}. ` : "Ningún otro recinto linda con las viviendas. ",
+    no.length > 0 ? `Según el proyecto, no lindan con las viviendas: ${lista(no)}. ` : "",
+    supuestas === 0
+      ? "Las colindancias son las del proyecto."
+      : supuestas === si.length
+        ? "Sin la distribución en planta, se suponen todas del lado de la seguridad: lo que comparte planta con las viviendas, colindante, y lo de la planta de abajo, debajo."
+        : "Las no indicadas se suponen del lado de la seguridad.",
+  ];
 }
 
 function parrafoExterior(j: JustificacionHr): Trozo[] {
@@ -171,6 +190,8 @@ export function memoriaHr(j: JustificacionHr): MemoriaDoc {
   const titulo = "Protección frente al ruido";
   if (!j.aplica) return { titulo, norma: "DB-HR", parrafos: [parrafoAmbito(j)], fuente };
   const parrafos: Trozo[][] = [parrafoAmbito(j)];
+  const col = parrafoColindancias(j);
+  if (col.length > 0) parrafos.push(col);
   const ex = parrafoExterior(j);
   if (ex.length > 0) parrafos.push(ex);
   for (const el of j.elementos) {

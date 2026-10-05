@@ -42,6 +42,7 @@ describe("antesDeEntregar", () => {
       "HR:revisar",
       "HR:revisar",
       "HR:revisar",
+      "HR:revisar",
       "HE4:revisar",
       "HE4:revisar",
       "HE5:revisar",
@@ -86,7 +87,7 @@ describe("antesDeEntregar", () => {
         he5: { revisados: ["construida", "mixto"] },
         he6: { revisados: ["mixto"] },
         rebt: { revisados: ["ascensor-supuesto", "servicios", "humo"] },
-        hr: { revisados: ["huecos", "ld", "local"] },
+        hr: { revisados: ["huecos", "ld", "colindancias", "local"] },
       },
     };
     expect(antesDeEntregar(q)).toEqual([]);

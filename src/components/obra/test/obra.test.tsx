@@ -101,14 +101,15 @@ describe("Antes de entregar", () => {
   it("los avisos sin revisar del Demo, cada uno hacia su módulo", () => {
     montar(<AntesDeEntregar />);
     const items = screen.getAllByRole("listitem");
-    expect(items).toHaveLength(30);
-    // HR (feature-25): el porcentaje de huecos, el Ld y el local.
+    expect(items).toHaveLength(31);
+    // HR (feature-25): el porcentaje de huecos, el Ld, las colindancias supuestas y el local.
     expect(within(items[19]).getByRole("link")).toHaveAttribute("href", "/hr/ruido");
     expect(items[20]).toHaveTextContent(/HR · Indica el Ld/);
-    expect(within(items[22]).getByRole("link")).toHaveAttribute("href", "/he/acs");
-    expect(items[25]).toHaveTextContent(/HE5 · /);
-    expect(within(items[28]).getByRole("link")).toHaveAttribute("href", "/rebt/prevision");
-    expect(items[28]).toHaveTextContent(/REBT · /);
+    expect(items[21]).toHaveTextContent(/HR · 3 colindancias supuestas/);
+    expect(within(items[23]).getByRole("link")).toHaveAttribute("href", "/he/acs");
+    expect(items[26]).toHaveTextContent(/HE5 · /);
+    expect(within(items[29]).getByRole("link")).toHaveAttribute("href", "/rebt/prevision");
+    expect(items[29]).toHaveTextContent(/REBT · /);
     expect(within(items[0]).getByRole("link")).toHaveAttribute("href", "/hs/humedad");
     expect(items[0]).toHaveTextContent("HS1 · Faltan datos del clima: se ha supuesto zona pluviométrica I.");
     expect(within(items[1]).getByRole("link")).toHaveAttribute("href", "/hs/residuos");
@@ -148,7 +149,7 @@ describe("Antes de entregar", () => {
         he5: { revisados: ["construida", "mixto"] },
         he6: { revisados: ["mixto"] },
         rebt: { revisados: ["ascensor-supuesto", "servicios", "humo"] },
-        hr: { revisados: ["huecos", "ld", "local"] },
+        hr: { revisados: ["huecos", "ld", "colindancias", "local"] },
       },
     });
     expect(screen.getByText(/Nada pendiente/)).toBeInTheDocument();
