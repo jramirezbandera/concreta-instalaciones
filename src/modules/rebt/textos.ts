@@ -469,7 +469,7 @@ export function textoAvisoRebt(a: Aviso): TextoSi {
     case "ascensor-supuesto":
       return {
         titulo: "El ascensor no está indicado en El edificio.",
-        detalle: "Se cuenta el que exige SUA 9. Indica en El edificio si lo hay o no.",
+        detalle: "Se cuenta el que exige SUA 9. Indica si lo hay o no en El edificio, en la zona Portal y escalera.",
       };
     case "acs-central":
       return {

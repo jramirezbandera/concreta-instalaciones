@@ -361,11 +361,11 @@ export function textoAvisoSua1(a: Aviso): TextoSi {
       return a.datos.hay
         ? {
             titulo: "El ascensor se supone.",
-            detalle: "SUA 9 lo exige y se ha supuesto que lo hay; sin él cambia la escalera (contrahuella de 17,5 cm y tramos de 2,25 m como máximo). Indica en El edificio si hay ascensor.",
+            detalle: "SUA 9 lo exige y se ha supuesto que lo hay; sin él cambia la escalera (contrahuella de 17,5 cm y tramos de 2,25 m como máximo). Indica si hay ascensor en El edificio, en la zona Portal y escalera.",
           }
         : {
             titulo: "No se sabe si hay ascensor.",
-            detalle: "SUA 9 no lo exige y se ha supuesto que no lo hay; con ascensor la escalera cambia. Indica en El edificio si hay ascensor.",
+            detalle: "SUA 9 no lo exige y se ha supuesto que no lo hay; con ascensor la escalera cambia. Indica si hay ascensor en El edificio, en la zona Portal y escalera.",
           };
     default:
       return { titulo: "Revisa este punto.", detalle: "" };

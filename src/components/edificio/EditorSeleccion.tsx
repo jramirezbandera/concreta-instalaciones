@@ -29,6 +29,7 @@ import {
   setUso,
 } from "../../lib/edificio/editar";
 import { deduccionesTipo, deduccionesZona, dondeEstaTipo, loUsanZona } from "../../lib/edificio/deducciones";
+import { cambiarAscensor } from "../../modules/sua/editar";
 import type { Edificio, OrigenDocumento, TipoCubierta, UnidadTipo, UsoZona } from "../../lib/edificio/tipos";
 import { ORDEN_USOS, USOS, type LoUsa } from "../../lib/edificio/usos";
 import { BotonSec, CampoNumero, Fila, ParKV, PasoAPaso, Sub } from "./controles";
@@ -351,6 +352,8 @@ function EditorZona(props: Props & { zonaId: string }): JSX.Element | null {
         <CuartosDeZona edificio={e} zonaId={zona.id} repeticiones={n} onCambiar={onCambiar} />
       )}
 
+      {zona.uso === "zona_comun" && <AscensorEdificio edificio={e} onCambiar={onCambiar} />}
+
       <Sub>Lo que se deduce</Sub>
       {deduccionesZona(e, zona.id).map((d) => (
         <ParKV key={d.etiqueta} k={d.etiqueta} v={d.valor} title={d.cita} />
@@ -441,6 +444,55 @@ function CuartosDeZona(props: {
             ? "Hay cuartos de la vivienda tipo sin situar: se han puesto en la planta de la regla. Cambia una cifra para fijarlos."
             : "Supuesto: los baños en la planta más alta; la cocina y los aseos en la más baja. Cambia una cifra para fijarlo."
           : "Mover un cuarto es quitarlo aquí y ponerlo en otra planta. La vivienda tipo suma lo que hay en todas."}
+      </p>
+    </>
+  );
+}
+
+const OPCIONES_ASCENSOR: { valor: boolean | undefined; label: string }[] = [
+  { valor: true, label: "Sí" },
+  { valor: false, label: "No" },
+  { valor: undefined, label: "Sin indicar" },
+];
+
+/**
+ * Si el edificio tiene ascensor (`Edificio.ascensor`, feature-20). Es del
+ * edificio entero, pero se pregunta en la zona común, que es donde está. Sin
+ * indicar, SUA 9 supone el que exige; lo leen SUA 1, SUA 9 y REBT.
+ */
+function AscensorEdificio(props: { edificio: Edificio; onCambiar: (e: Edificio) => void }): JSX.Element {
+  const { edificio: e, onCambiar } = props;
+  return (
+    <>
+      <Sub>Ascensor del edificio</Sub>
+      <Fila etiqueta="Ascensor">
+        <div
+          role="group"
+          aria-label="Ascensor del edificio"
+          className="border-border-main bg-bg-surface flex gap-0.5 rounded border p-0.5"
+        >
+          {OPCIONES_ASCENSOR.map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              aria-pressed={e.ascensor === o.valor}
+              onClick={() => onCambiar(cambiarAscensor(e, o.valor))}
+              className={[
+                "h-[26px] rounded-[3px] px-2 text-[12px] whitespace-nowrap transition-colors",
+                e.ascensor === o.valor
+                  ? "bg-bg-primary text-text-primary ring-border-main font-medium ring-1"
+                  : "text-text-secondary hover:text-text-primary",
+              ].join(" ")}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </Fila>
+      <p className="text-text-disabled px-3.5 pb-1 text-[11px] leading-snug">
+        {e.ascensor === undefined
+          ? "Sin indicar, se supone que lo hay solo si SUA 9 lo exige. Lo leen SUA 1 (escalera), SUA 9 y la previsión de cargas."
+          : "Es del edificio entero, no de esta planta. Lo leen SUA 1 (escalera), SUA 9 y la previsión de cargas."}
       </p>
     </>
   );
