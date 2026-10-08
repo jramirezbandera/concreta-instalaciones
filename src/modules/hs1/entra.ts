@@ -59,12 +59,12 @@ export function filasQueEntraHs1(j: JustificacionHs1, estados: Record<string, Es
         break;
       case "fachada":
         filas.push({
-          id: "fachada",
-          titulo: "Fachadas",
-          detalle: `${fmt(d.altura_m, "m", 1)} de coronación · ${d.exposicion}`,
-          trato: `grado ${d.grado}`,
-          estado: trato(estados.fachada),
-          elementoId: "fachada",
+          id: el.id,
+          titulo: el.nombre,
+          detalle: `${d.sol.codigo} · ${fmt(d.altura_m, "m", 1)} de coronación · ${d.exposicion}`,
+          trato: d.cumple ? `grado ${d.grado}` : `grado ${d.grado} · no llega`,
+          estado: trato(estados[el.id]),
+          elementoId: el.id,
         });
         break;
       case "cubierta":

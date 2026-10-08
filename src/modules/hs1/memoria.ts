@@ -168,7 +168,8 @@ function parrafoDrenaje(j: JustificacionHs1): Trozo[] {
 }
 
 function parrafosFachada(j: JustificacionHs1): Trozo[][] {
-  const f = det(j, "fachada")[0]?.d;
+  const fs = det(j, "fachada").map((x) => x.d);
+  const f = fs[0];
   if (!f) return [];
   const sup = (s: boolean) => (s ? " (supuesta, del lado de la seguridad)" : "");
   const eolica =
@@ -179,18 +180,26 @@ function parrafosFachada(j: JustificacionHs1): Trozo[][] {
     `Las fachadas tienen una altura de coronación de ${n1(f.altura_m)} m y el edificio está en la zona pluviométrica de promedios ${f.zona.valor}${sup(f.zona.supuesto)} y en un entorno ${f.entorno.valor}${f.terrenoTipo ? ` (terreno tipo ${f.terrenoTipo})` : sup(f.entorno.supuesto)}${eolica}: grado de exposición al viento ${f.exposicion} (tabla 2.6) y grado de impermeabilidad mínimo `,
     { v: `${f.grado}` },
     " (tabla 2.5). ",
-    `La fachada, ${f.columna === "con_revestimiento" ? "con" : "sin"} revestimiento exterior${f.unaHoja ? " y de una sola hoja" : ""}, cumple las condiciones `,
-    { v: codigos(f.condiciones) },
-    " de la tabla 2.7",
-    f.hojaUnicaAplicada ? " (al ser de una sola hoja, la hoja principal es de espesor alto, C2, como pide la nota de la tabla):" : ":",
   ];
+  const porFachada = fs.flatMap((x): Trozo[][] => {
+    const quien = fs.length > 1 ? (x.rol === "fachada-pb" ? "La fachada de la planta baja" : "La fachada de las demás plantas") : "La fachada";
+    const tipo = `${quien}, ${x.sol.nombre} (CEC ${x.sol.codigo}), ${x.columna === "con_revestimiento" ? `con revestimiento exterior de resistencia R${x.niveles.R}` : "sin revestimiento exterior"}${x.unaHoja ? " y de una sola hoja" : ""}`;
+    if (!x.cumple) return [[`${tipo}, no llega al grado exigido: le falta `, { v: codigos(x.faltan) }, " de la tabla 2.7."]];
+    const t: Trozo[] = [
+      `${tipo}, cumple las condiciones `,
+      { v: codigos(x.condiciones) },
+      x.gradoOpcion > x.grado ? ` de la tabla 2.7, que son las del grado ${x.gradoOpcion} y valen para el ${x.grado}` : " de la tabla 2.7",
+      x.hojaUnicaAplicada ? " (al ser de una sola hoja, la hoja principal es de espesor alto, C2, como pide la nota de la tabla):" : ":",
+    ];
+    return [t, ...condicionesEnParrafos(x.condiciones, "fachada")];
+  });
   const cierre: Trozo[] = ["Cualquier condición de número mayor del mismo bloque puede sustituir a la de número menor (ap. 2.3.2)."];
   if (f.grado === 5) {
     cierre.push(
       " Con grado 5, si las carpinterías están retranqueadas, se dispone precerco y una barrera impermeable en las jambas prolongada 10 cm hacia el interior (ap. 2.3.3.6).",
     );
   }
-  return [p, ...condicionesEnParrafos(f.condiciones, "fachada"), cierre];
+  return [p, ...porFachada, cierre];
 }
 
 function parrafoCubierta(j: JustificacionHs1): Trozo[] {
@@ -225,7 +234,7 @@ function tablaResumen(j: JustificacionHs1): MemoriaDoc["tabla"] {
     const d = el.detalle;
     if (d.clase === "muro") filas.push([el.nombre, String(d.grado), solucionMuro(d.tipo, d.imper), d.condiciones ? codigos(d.condiciones) : "no aceptable"]);
     if (d.clase === "suelo") filas.push([el.nombre, String(d.grado), unaSolucionSuelo(d.tipo, d.intervencion).replace(/^una? /, ""), d.condiciones ? codigos(d.condiciones) : "no aceptable"]);
-    if (d.clase === "fachada") filas.push([el.nombre, String(d.grado), d.columna === "con_revestimiento" ? "con revestimiento exterior" : "sin revestimiento exterior", codigos(d.condiciones)]);
+    if (d.clase === "fachada") filas.push([el.nombre, String(d.grado), `${d.sol.codigo} · ${d.columna === "con_revestimiento" ? `R${d.niveles.R}` : "sin revestimiento"}`, d.cumple ? codigos(d.condiciones) : `no llega: falta ${codigos(d.faltan)}`]);
     if (d.clase === "cubierta") filas.push([el.nombre, "único", solucionCubierta(d.cubierta), textoPendiente(d.cubierta) ? `pendiente ${textoPendiente(d.cubierta)}` : "ap. 2.4.2"]);
   }
   return { cabecera: ["Elemento", "Grado", "Solución", "Condiciones"], filas };

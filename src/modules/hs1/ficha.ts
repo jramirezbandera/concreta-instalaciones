@@ -125,11 +125,17 @@ export function toFichaData(j: JustificacionHs1, o: OpcionesFichaHs1): FichaData
   if (muro) datosPartida.push({ concepto: "Muro", valor: solucionMuro(d.muroTipo, d.muroImper), origen: ORIGEN_DECISION });
   datosPartida.push(
     { concepto: "Suelo", valor: solucionSuelo(d.sueloTipo, d.sueloIntervencion), origen: ORIGEN_DECISION },
-    {
-      concepto: "Fachada",
-      valor: `${d.fachadaRevestimiento === "con" ? "Con" : "Sin"} revestimiento exterior · ${d.fachadaHojas === "una" ? "una hoja" : "dos hojas"}`,
-      origen: ORIGEN_DECISION,
-    },
+    ...j.elementos.flatMap((el) =>
+      el.detalle.clase === "fachada"
+        ? [
+            {
+              concepto: el.detalle.rol === "fachada-pb" ? "Fachada de la planta baja" : "Fachada",
+              valor: `${el.detalle.sol.nombre} (CEC ${el.detalle.sol.codigo}, p. ${el.detalle.sol.pagina}) · ${el.detalle.columna === "con_revestimiento" ? `revestimiento R${el.detalle.niveles.R}` : "sin revestimiento"} · ${el.detalle.unaHoja ? "una hoja" : "dos hojas"}`,
+              origen: el.detalle.declarado ? `El edificio · ${ORIGEN_DECISION}` : "El edificio · lo declarado, lo habitual",
+            },
+          ]
+        : [],
+    ),
     { concepto: "Cubierta", valor: solucionCubierta(j.cubierta), origen: ORIGEN_DECISION },
   );
 

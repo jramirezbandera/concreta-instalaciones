@@ -8,14 +8,16 @@
 //   - muro de sótano flexorresistente, impermeabilizado por el exterior;
 //   - solera sin intervención en el terreno: la «sub-base» del DB es una capa de
 //     bentonita de sodio (Apéndice A), no el encachado de grava;
-//   - fachada con revestimiento exterior, de dos hojas, y la primera combinación
-//     de la casilla;
+//   - la fachada es la de El edificio (feature-26): sus rasgos dan la columna,
+//     las hojas y la combinación (`fachada.ts`); aquí solo se declara lo que el
+//     catálogo no sabe (la R del revestimiento, J, N y H);
 //   - cubierta plana invertida (aislante sobre la impermeabilización), con grava
 //     si no es transitable y solado fijo si lo es; inclinada de teja mixta, sin
 //     impermeabilización bajo el tejado.
 // =============================================================================
 
 import type { TipoCubierta } from "../../lib/edificio/tipos";
+import type { DeclaraFachadas } from "./fachada";
 import type { ProteccionPlana } from "./tablas";
 
 /** Tipo de muro (tabla 2.2 y bloques de la tabla 2.4). */
@@ -26,10 +28,6 @@ export type ImpermeabilizacionMuro = "exterior" | "interior" | "parcialmente_est
 export type TipoSuelo = "solera" | "placa" | "elevado";
 /** Tipo de intervención en el terreno (tabla 2.4). */
 export type IntervencionTerreno = "sub_base" | "inyecciones" | "sin_intervencion";
-/** Revestimiento exterior de la fachada (tabla 2.7). */
-export type RevestimientoFachada = "con" | "sin";
-/** Hojas de la fachada: la nota (1) de la tabla 2.7 cambia C1 por C2 en una hoja. */
-export type HojasFachada = "dos" | "una";
 /** Dónde va el aislante de una cubierta plana: bajo la impermeabilización o encima (invertida). */
 export type AislantePlana = "bajo" | "sobre";
 /** Si una cubierta inclinada lleva capa de impermeabilización bajo el tejado. */
@@ -55,10 +53,8 @@ export interface DecisionesHs1 {
   muroImper: Opcion<ImpermeabilizacionMuro>;
   sueloTipo: Opcion<TipoSuelo>;
   sueloIntervencion: Opcion<IntervencionTerreno>;
-  fachadaRevestimiento: Opcion<RevestimientoFachada>;
-  fachadaHojas: Opcion<HojasFachada>;
-  /** Índice de la combinación dentro de la casilla de la tabla 2.7. */
-  fachadaOpcion: Opcion<number>;
+  /** Lo declarado de cada fachada de El edificio; sin dar, lo habitual (feature-26). */
+  fachadaDeclara?: DeclaraFachadas;
   cubiertaProteccion: Opcion<ProteccionPlana>;
   cubiertaAislante: Opcion<AislantePlana>;
   /** Fila de la tabla 2.10. */
@@ -71,9 +67,6 @@ export interface DecisionesEfectivasHs1 {
   muroImper: ImpermeabilizacionMuro;
   sueloTipo: TipoSuelo;
   sueloIntervencion: IntervencionTerreno;
-  fachadaRevestimiento: RevestimientoFachada;
-  fachadaHojas: HojasFachada;
-  fachadaOpcion: number;
   cubiertaProteccion: ProteccionPlana;
   cubiertaAislante: AislantePlana;
   cubiertaTejado: number;
@@ -85,9 +78,6 @@ export const DECISIONES_HS1_POR_DEFECTO: DecisionesHs1 = {
   muroImper: "habitual",
   sueloTipo: "habitual",
   sueloIntervencion: "habitual",
-  fachadaRevestimiento: "habitual",
-  fachadaHojas: "habitual",
-  fachadaOpcion: "habitual",
   cubiertaProteccion: "habitual",
   cubiertaAislante: "habitual",
   cubiertaTejado: "habitual",
@@ -116,9 +106,6 @@ export function decisionesHabitualesHs1(cubierta: TipoCubierta, suelo: SueloHabi
     muroImper: "exterior",
     sueloTipo: suelo.tipo,
     sueloIntervencion: suelo.intervencion,
-    fachadaRevestimiento: "con",
-    fachadaHojas: "dos",
-    fachadaOpcion: 0,
     cubiertaProteccion: cubierta === "plana_transitable" ? "solado_fijo" : "grava",
     cubiertaAislante: "sobre",
     cubiertaTejado: TEJADO_HABITUAL,
@@ -136,9 +123,6 @@ export function resolverDecisionesHs1(d: DecisionesHs1, cubierta: TipoCubierta, 
     muroImper: v("muroImper"),
     sueloTipo: v("sueloTipo"),
     sueloIntervencion: v("sueloIntervencion"),
-    fachadaRevestimiento: v("fachadaRevestimiento"),
-    fachadaHojas: v("fachadaHojas"),
-    fachadaOpcion: v("fachadaOpcion"),
     // Una protección de otro tipo de cubierta (la cubierta cambió) vuelve a lo habitual.
     cubiertaProteccion: proteccionesDe(cubierta).includes(proteccion) ? proteccion : h.cubiertaProteccion,
     cubiertaAislante: v("cubiertaAislante"),

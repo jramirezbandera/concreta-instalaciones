@@ -241,6 +241,31 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
 5. **HS1**: `fachadaHojas`, `fachadaRevestimiento` y la combinación de la tabla 2.7 se deducen de
    los rasgos de la fachada. El grado del CEC se usa como contraste y avisa si difiere. Con la
    planta baja distinta, se comprueban las dos.
+
+   **Hecho (2026-10-08), paso 5:**
+   - `hs1/fachada.ts` (pura): de los rasgos del catálogo salen la columna, las hojas (nota (1))
+     y B (con el aislante hidrófilo o no), C y N; se declaran R (desde la de su tipo hasta R3),
+     y J, N y H sin revestimiento. Lo habitual es lo mínimo que pide la primera combinación que
+     la fachada puede cumplir. La combinación es la primera cubierta, con la sustitución del
+     2.3.2 pto 2. Si no cumple, lo que falta de la más cercana.
+   - **Una solución de grado mayor vale para uno menor** (el grado es un mínimo): sin esto, un
+     SATE (una hoja, C1) no cumpliría el grado 2, cuya casilla pide C2 por la nota (1).
+   - `DecisionesHs1` pierde `fachadaRevestimiento`, `fachadaHojas` y `fachadaOpcion`; gana
+     `fachadaDeclara?: { general?, pb? }`. Con la planta baja de otro tipo, `fachada-pb` aparte.
+   - La fachada **puede no cumplir**: el arreglo es «Volver a lo propuesto» si lo habitual
+     llega, o elegir otra fachada en El edificio si ni declarando lo máximo llega.
+   - Contraste del CEC (K-CER.12): aviso solo si, con lo declarado, el CEC da un grado menor que
+     el exigido y la tabla 2.7 dice que llega (F 3.5 con R1: CEC 3, tabla 4).
+   - El Demo no cambia: grado 5 con R3 + C1, ahora como lo habitual de F 3.2.
+   - Tests: `hs1/test/fachada.test.ts` (12, el cotejo F.3 de la verificación) y
+     `hs1/test/cerramientos.test.ts` (5); 1310 en verde. Comprobado en el navegador.
+
+   **Decisiones a validar:**
+   - La R habitual es la menor que cumple (con grado 5, R3: «revestimiento estanco»), igual
+     que HE1 propone el aislante; así ningún proyecto sin cerramientos cambia de veredicto.
+   - Las declaraciones de antes (con o sin revestimiento, hojas, combinación) se ignoran.
+   - J, N y H se pueden declarar en las fachadas sin revestimiento; N solo si la sección tiene
+     enfoscado intermedio.
 6. **Fichas y memoria**: cada ficha cita el tipo con su código y su página del CEC, por ejemplo
    «F1 · SATE sobre LP ½ pie (CEC F 4.1, p. 64)». El mismo nombre en HE1, HR y HS1.
 7. **Tests**:

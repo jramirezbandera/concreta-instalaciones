@@ -38,7 +38,7 @@ describe("HS1 · desde El edificio (feature-17)", () => {
 
     const entra = getByRole("region", { name: "Qué entra" });
     expect(entra).toHaveTextContent(/Terreno.*freático no detectado hasta 10 m.*presencia baja/);
-    expect(entra).toHaveTextContent(/Fachadas.*13 m de coronación · V3.*grado 5/);
+    expect(entra).toHaveTextContent(/Fachadas.*F 3\.2 · 13 m de coronación · V3.*grado 5/);
 
     const decisiones = getByRole("region", { name: "Decisiones" });
     const muro = within(decisiones).getByRole("group", { name: "El muro del sótano" });
@@ -48,7 +48,7 @@ describe("HS1 · desde El edificio (feature-17)", () => {
 
     // Lo seleccionado por defecto: la fachada.
     const aside = await findByRole("complementary", { name: DIBUJO });
-    expect(aside).toHaveTextContent(/Fachada con revestimiento exterior/);
+    expect(aside).toHaveTextContent(/Enfoscado \+ LP ½ pie \+ cámara \+ aislante \+ LHD 7 \+ enlucido/);
     expect(aside).toHaveTextContent(/a esta altura la zona eólica no influye/);
 
     const avisos = getByRole("region", { name: "Avisos" });
@@ -56,15 +56,19 @@ describe("HS1 · desde El edificio (feature-17)", () => {
     expect(within(avisos).getByRole("link", { name: "Indicarlo en Datos de la obra" })).toHaveAttribute("href", `#/p/${DEMO_ID}/datos`);
   });
 
-  it("sin revestimiento cambia la combinación; el muro por dentro la condición", async () => {
+  it("la fachada es la de El edificio: con un revestimiento R1 no llega al grado 5 y se vuelve a lo propuesto; el muro por dentro la condición", async () => {
     const user = userEvent.setup();
     const { getByRole, findByRole } = await renderHs1();
     const decisiones = getByRole("region", { name: "Decisiones" });
-    await user.click(within(decisiones).getByRole("button", { name: "Sin revestimiento" }));
+    expect(within(decisiones).getByRole("link", { name: "Cambiar en El edificio" })).toHaveAttribute("href", `#/p/${DEMO_ID}/edificio`);
+    const rev = within(decisiones).getByRole("group", { name: "Revestimiento exterior" });
+    expect(within(rev).getByRole("button", { name: "R3 · muy alta" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(rev).getByRole("button", { name: "R1 · media" }));
     const aside = await findByRole("complementary", { name: DIBUJO });
-    await waitFor(() => expect(aside).toHaveTextContent(/Fachada sin revestimiento exterior/));
-    expect(aside).toHaveTextContent(/B3\+C1/);
-    expect(within(decisiones).getAllByText("No es lo habitual.").length).toBeGreaterThan(0);
+    await waitFor(() => expect(getByRole("region", { name: "Avisos" })).toHaveTextContent("La fachada no llega al grado 5."));
+    expect(within(decisiones).getByText("Declarado.")).toBeInTheDocument();
+    await user.click(getByRole("button", { name: "Volver a lo propuesto" }));
+    await waitFor(() => expect(within(rev).getByRole("button", { name: "R3 · muy alta" })).toHaveAttribute("aria-pressed", "true"));
 
     await user.click(within(decisiones).getByRole("button", { name: "Por dentro" }));
     await user.click(getByRole("button", { name: /^Muros del sótano: grado 1 · C1\+I2\+D1\+D5/ }));

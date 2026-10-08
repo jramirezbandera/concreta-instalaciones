@@ -12,6 +12,7 @@
 // Así, con 15 m o menos de altura la zona eólica no se pide (no influye).
 // =============================================================================
 
+import { cerramientosDe } from "../../lib/constructivo/cerramientos";
 import type { Aviso, ElementoResultado } from "../../lib/cte/resultado";
 import type { Edificio } from "../../lib/edificio/tipos";
 import type { DatosGenerales } from "../../lib/proyecto/tipos";
@@ -33,9 +34,9 @@ import {
   type TipoSuelo,
 } from "./decisiones";
 import type { Hs1Estado } from "./estado";
+import { evaluarFachada, type Niveles } from "./fachada";
 import { deltaFreatico, partesDe, presenciaAguaDe, type PartesHs1, type SueloHs1 } from "./partes";
 import {
-  aplicarHojaUnica,
   bloqueSuelo,
   canaletas,
   casillaMuro,
@@ -47,7 +48,6 @@ import {
   gradoMuro,
   gradoSuelo,
   maxSotanosMuro,
-  opcionesFachada,
   orificiosDrenaje,
   tuboDrenaje,
   type BloqueMuroSuelo,
@@ -149,6 +149,9 @@ export type DetalleHs1 =
     }
   | {
       clase: "fachada";
+      rol: "fachada" | "fachada-pb";
+      /** El tipo de El edificio (feature-26). */
+      sol: { codigo: string; nombre: string; pagina: number };
       grado: Grado;
       zona: DatoHs1<ZonaPluviometricaHs1>;
       eolica: DatoHs1<ZonaEolica>;
@@ -160,11 +163,26 @@ export type DetalleHs1 =
       exposicion: Exposicion;
       columna: ColumnaFachada;
       unaHoja: boolean;
+      hidrofilo: boolean;
+      /** Lo que aporta la fachada con lo declarado, y lo habitual propuesto. */
+      niveles: Niveles;
+      habituales: Niveles;
+      declarado: boolean;
       opciones: { codigos: readonly string[]; nota1: boolean }[];
+      /** La casilla de la combinación: la del grado o la de uno mayor que la fachada cubre. */
+      gradoOpcion: Grado;
       opcion: number;
-      /** Las condiciones de la opción elegida (con C2 si la nota de la hoja única aplica). */
+      /** Las condiciones de la combinación (con C2 si la nota de la hoja única aplica). */
       condiciones: readonly string[];
       hojaUnicaAplicada: boolean;
+      cumple: boolean;
+      /** Lo que falta de la combinación más cercana, si no cumple. */
+      faltan: readonly string[];
+      gradoMax: Grado | 0;
+      /** El grado del CEC con lo declarado: contraste (K-CER.12). */
+      cec: { clave: string; grado: number } | null;
+      /** Si no cumple: con lo habitual sí cumpliría, o hay que cambiar la fachada en El edificio. */
+      arreglo: "habitual" | "edificio" | null;
       fueraDeTabla: boolean;
       /** Los datos supuestos que cambian el grado (los demás no influyen). */
       influyen: ("zona" | "eolica" | "entorno")[];
@@ -624,19 +642,24 @@ export function justificarHs1(estado: Hs1Estado, edificio: Edificio, obra: ObraH
   const altura_m = partes.fachada.alturaCoronacion_m;
   const exposicion = exposicionViento(altura_m, clima.entorno.valor, clima.eolica.valor);
   const grado = gradoFachada(exposicion, clima.zona.valor);
-  const columna: ColumnaFachada = d.fachadaRevestimiento === "con" ? "con_revestimiento" : "sin_revestimiento";
-  const opciones = opcionesFachada(columna, grado);
-  const opcion = d.fachadaOpcion >= 0 && d.fachadaOpcion < opciones.length ? Math.trunc(d.fachadaOpcion) : 0;
-  const unaHoja = d.fachadaHojas === "una";
-  const hojaUnicaAplicada = unaHoja && opciones[opcion].nota1;
-  const condicionesFachada = hojaUnicaAplicada ? aplicarHojaUnica(opciones[opcion].codigos) : [...opciones[opcion].codigos];
   const fila = filaExposicion(altura_m);
   const influyen = climaQueInfluye(altura_m, clima);
+  // Las fachadas de El edificio: la general y, si es otro tipo, la de la planta baja.
+  const cer = cerramientosDe(edificio);
+  const conPB = cer.fachadaPB !== null && cer.fachadaPB.sol.id !== cer.fachada.sol.id;
+  const fachadas = [
+    { rol: "fachada" as const, nombre: conPB ? "Fachadas de las demás plantas" : "Fachadas", sol: cer.fachada.sol, declara: estado.fachadaDeclara?.general },
+    ...(conPB && cer.fachadaPB
+      ? [{ rol: "fachada-pb" as const, nombre: "Fachada de la planta baja", sol: cer.fachadaPB.sol, declara: estado.fachadaDeclara?.pb }]
+      : []),
+  ];
+  for (const fa of fachadas) {
+  const ev = evaluarFachada(fa.sol, grado, fa.declara);
   elementos.push({
-    id: "fachada",
-    nombre: "Fachadas",
+    id: fa.rol,
+    nombre: fa.nombre,
     tipo: "fachada",
-    veredicto: "ok",
+    veredicto: ev.cumple ? "ok" : "fail",
     valor: { valor: grado, unidad: "grado" },
     manda: {
       tipo: "grado_tabla",
@@ -649,6 +672,8 @@ export function justificarHs1(estado: Hs1Estado, edificio: Edificio, obra: ObraH
     cita: ["HS 1 · tablas 2.5, 2.6 y 2.7", "ap. 2.3"],
     detalle: {
       clase: "fachada",
+      rol: fa.rol,
+      sol: { codigo: fa.sol.codigo, nombre: fa.sol.nombre, pagina: fa.sol.pagina },
       grado,
       zona: clima.zona,
       eolica: clima.eolica,
@@ -657,16 +682,31 @@ export function justificarHs1(estado: Hs1Estado, edificio: Edificio, obra: ObraH
       altura_m,
       filaAltura: (fila ?? { rotulo: "más de 100 m" }).rotulo,
       exposicion,
-      columna,
-      unaHoja,
-      opciones,
-      opcion,
-      condiciones: condicionesFachada,
-      hojaUnicaAplicada,
+      columna: ev.columna,
+      unaHoja: ev.unaHoja,
+      hidrofilo: ev.hidrofilo,
+      niveles: ev.niveles,
+      habituales: ev.habituales,
+      declarado: ev.declarado,
+      opciones: ev.opciones,
+      gradoOpcion: ev.gradoOpcion,
+      opcion: ev.opcion,
+      condiciones: ev.condiciones,
+      hojaUnicaAplicada: ev.opciones[ev.opcion].nota1,
+      cumple: ev.cumple,
+      faltan: ev.faltan,
+      gradoMax: ev.gradoMax,
+      cec: ev.cec,
+      arreglo: ev.cumple ? null : evaluarFachada(fa.sol, grado).cumple ? "habitual" : "edificio",
       fueraDeTabla: fila === null,
       influyen,
     },
   });
+  // El CEC solo es contraste: se avisa si, con lo declarado, daría que no llega cuando la tabla 2.7 dice que sí.
+  if (ev.cumple && ev.cec && ev.cec.grado < grado) {
+    avisos.push({ id: `cec-${fa.rol}`, tipo: "caso_especial", elementoId: fa.rol, datos: { codigo: fa.sol.codigo, clave: ev.cec.clave, cec: ev.cec.grado, grado, gradoMax: ev.gradoMax } });
+  }
+  }
   if (influyen.length > 0) {
     avisos.push({ id: "clima-supuesto", tipo: "supuesto", elementoId: "fachada", datos: { faltan: influyen } });
   }

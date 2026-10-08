@@ -1,3 +1,4 @@
+import { setCerramientos } from "../../../lib/constructivo/cerramientos";
 import { describe, it, expect } from "vitest";
 import { edificioDeCaso } from "../../../lib/edificio/casos";
 import type { Edificio } from "../../../lib/edificio/tipos";
@@ -150,16 +151,21 @@ describe("justificación", () => {
     expect(avisos(justificarHs1(est(), E("plurifamiliar_locales"), { ...OBRA, zonaEolica: undefined }))).toEqual([]);
   });
 
-  it("fachada de una hoja: la nota (1) cambia C1 por C2", () => {
-    const j = justificarHs1(est({ fachadaHojas: "una" }), E("plurifamiliar_locales"), OBRA);
-    expect(el(j, "fachada").detalle).toMatchObject({ grado: 2, condiciones: ["R1", "C2"], hojaUnicaAplicada: true });
-    const s = justificarHs1(est({ fachadaRevestimiento: "sin", fachadaOpcion: 2 }), E("plurifamiliar_locales"), OBRA);
-    expect(el(s, "fachada").detalle).toMatchObject({ columna: "sin_revestimiento", condiciones: ["C2", "J2", "N2"] });
+  it("la fachada habitual (F 3.2): grado 2 con R1 + C1, como antes de feature-26", () => {
+    const j = justificarHs1(est(), E("plurifamiliar_locales"), OBRA);
+    expect(el(j, "fachada")).toMatchObject({ veredicto: "ok", detalle: { grado: 2, columna: "con_revestimiento", condiciones: ["R1", "C1"], sol: { codigo: "F 3.2" } } });
   });
 
-  it("una combinación que ya no existe en la casilla vuelve a la primera", () => {
-    const j = justificarHs1(est({ fachadaOpcion: 3 }), E("plurifamiliar_locales"), OBRA);
-    expect(el(j, "fachada").detalle).toMatchObject({ opcion: 0, condiciones: ["R1", "C1"] });
+  it("fachada de una hoja (SATE en El edificio): la nota (1) quita la casilla del grado 2 y vale la del 3", () => {
+    const e = setCerramientos(E("plurifamiliar_locales"), { fachada: { id: "fa-sate-lp115" } });
+    const j = justificarHs1(est(), e, OBRA);
+    expect(el(j, "fachada").detalle).toMatchObject({ grado: 2, unaHoja: true, gradoOpcion: 3, condiciones: ["R1", "B1", "C1"], cumple: true });
+  });
+
+  it("fachada sin revestimiento (F 1.1): J y N son lo habitual que pide la primera combinación", () => {
+    const e = setCerramientos(E("plurifamiliar_locales"), { fachada: { id: "fa-cv-lp115-at-lhd70" } });
+    const j = justificarHs1(est(), e, OBRA);
+    expect(el(j, "fachada").detalle).toMatchObject({ columna: "sin_revestimiento", condiciones: ["B1", "C1", "J1", "N1"], cumple: true });
   });
 
   it("unifamiliar: suelo sin muro, cubierta inclinada de teja y bombeo según la acometida", () => {

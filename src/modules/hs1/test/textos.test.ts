@@ -102,7 +102,7 @@ describe("«Qué entra» y los avisos", () => {
       ["Terreno", "freático no detectado hasta 10 m", "presencia baja"],
       ["Muros del sótano", "S1 · 3 m enterrados", "grado 1"],
       ["Suelo del sótano", "S1 · −3,00 · 470 m²", "grado 2"],
-      ["Fachadas", "13 m de coronación · V3", "grado 5"],
+      ["Fachadas", "F 3.2 · 13 m de coronación · V3", "grado 5"],
       ["Cubierta", "plana no transitable · 210 m²", "1–5 %"],
     ]);
   });
@@ -127,7 +127,7 @@ describe("la memoria", () => {
     expect(m.tabla?.filas).toEqual([
       ["Muros del sótano", "1", "muro flexorresistente impermeabilizado por el exterior", "I2+I3+D1+D5"],
       ["Suelo del sótano", "2", "solera sin intervención en el terreno", "C2+C3+D1"],
-      ["Fachadas", "5", "con revestimiento exterior", "R3+C1"],
+      ["Fachadas", "5", "F 3.2 · R3", "R3+C1"],
       ["Cubierta", "único", "plana no transitable, invertida, con grava", "pendiente del 1 al 5 %"],
     ]);
     expect(m.fuente).toContain("tablas 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7 y 2.9");

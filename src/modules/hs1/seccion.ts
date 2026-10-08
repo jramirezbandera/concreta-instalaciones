@@ -162,6 +162,8 @@ export function calcularSeccionHs1(j: JustificacionHs1, edificio: Edificio): Sec
   const etiquetas: EtiquetaHs1[] = [];
   etiquetas.push({ key: "et-cubierta", elementoId: "cubierta", x: S.X0 + (S.X1 - S.X0) * 0.36, y: S.ROOF - (inclinada ? 22 : 16) });
   etiquetas.push({ key: "et-fachada", elementoId: "fachada", x: S.X1 - 90, y: (S.ROOF + yR) / 2 });
+  // La fachada de la planta baja, si es otro tipo (feature-26): su rótulo, a la altura de la planta baja.
+  if (hay("fachada-pb")) etiquetas.push({ key: "et-fachada-pb", elementoId: "fachada-pb", x: S.X1 - 90, y: yR - 18 });
   // Por encima del rótulo del sótano («S1 −3,00»), que va al pie de la planta.
   if (muro) etiquetas.push({ key: "et-muro", elementoId: "muro", x: S.X0 + 96, y: yR + (yFondo - yR) * 0.36 });
   const yBajo = (conSotano ? yFondo : ySueloPb) + (camara ? CAMARA_ALTO : 0);

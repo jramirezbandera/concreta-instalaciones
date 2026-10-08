@@ -237,7 +237,7 @@ export function EditorCerramientos(props: { edificio: Edificio; onCambiar: (e: E
         filas={[
           { codigo: "HE1", texto: "U de cada fachada, de la cubierta, del suelo y de las ventanas; el aislante y el vidrio se deciden allí", trato: "si" },
           { codigo: "HR", texto: "parte ciega y huecos frente al ruido exterior, flancos y forjados; los valores propios se dan allí", trato: "si" },
-          { codigo: "HS1", texto: "todavía con sus propias decisiones de fachada", trato: "no" },
+          { codigo: "HS1", texto: "grado de impermeabilidad de cada fachada por sus rasgos (tabla 2.7); la resistencia del revestimiento se declara allí", trato: "si" },
         ]}
       />
     </Tarjeta>

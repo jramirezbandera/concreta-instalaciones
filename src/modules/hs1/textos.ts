@@ -155,7 +155,7 @@ export function textoEtiqueta(el: ElementoHs1): string {
     case "suelo":
       return det.condiciones === null ? `grado ${det.grado} · no vale` : `grado ${det.grado} · ${condicionesCortas(det.condiciones)}`;
     case "fachada":
-      return `grado ${det.grado} · ${condicionesCortas(det.condiciones)}`;
+      return det.cumple ? `grado ${det.grado} · ${condicionesCortas(det.condiciones)}` : `grado ${det.grado} · no llega`;
     case "cubierta":
       return det.cubierta.pendiente ? `pendiente ${valorCorto(el)}` : "grado único";
     case "dren":
@@ -181,7 +181,7 @@ export function resultadoLista(el: ElementoHs1): string {
         ? `grado ${det.grado} · ${solucionSuelo(det.tipo, det.intervencion)}: no aceptable`
         : `grado ${det.grado} · ${codigos(det.condiciones)}`;
     case "fachada":
-      return `grado ${det.grado} · ${codigos(det.condiciones)}`;
+      return det.cumple ? `grado ${det.grado} · ${codigos(det.condiciones)}` : `grado ${det.grado} · falta ${codigos(det.faltan)}`;
     case "cubierta":
       return det.cubierta.pendiente ? `grado único · pendiente ${textoPendiente(det.cubierta)}` : "grado único";
     case "dren":
@@ -302,9 +302,9 @@ export function franjaDe(el: ElementoHs1, j: JustificacionHs1, estado: EstadoPre
       const sup = (s: boolean, k: "zona" | "eolica" | "entorno") => (!s ? "" : det.influyen.includes(k) ? " (supuesta)" : " · no influye");
       return {
         ...base,
-        clase: "Fachadas",
-        titulo: det.columna === "con_revestimiento" ? "Fachada con revestimiento exterior" : "Fachada sin revestimiento exterior",
-        unidad: codigos(det.condiciones),
+        clase: det.rol === "fachada-pb" ? "Fachada de la planta baja" : "Fachadas",
+        titulo: det.sol.nombre,
+        unidad: det.cumple ? codigos(det.condiciones) : `falta ${codigos(det.faltan)}`,
         manda: `La zona pluviométrica ${det.zona.valor} y la exposición al viento ${det.exposicion} dan el grado ${det.grado} (tabla 2.5). La exposición sale de la altura de coronación, ${n1(det.altura_m)} m, ${det.eolica.supuesto && !det.influyen.includes("eolica") ? `y el entorno ${det.entorno.valor} (tabla 2.6); a esta altura la zona eólica no influye.` : `el entorno ${det.entorno.valor} y la zona eólica ${det.eolica.valor} (tabla 2.6).`}`,
         nota:
           det.grado === CARPINTERIA_GRADO_5.datos.grado
@@ -316,8 +316,19 @@ export function franjaDe(el: ElementoHs1, j: JustificacionHs1, estado: EstadoPre
           { k: "Zona eólica", v: det.eolica.supuesto && !det.influyen.includes("eolica") ? "sin indicar · no influye" : `${det.eolica.valor}${sup(det.eolica.supuesto, "eolica")}` },
           { k: "Entorno", v: `${det.entorno.valor}${det.terrenoTipo ? ` · terreno tipo ${det.terrenoTipo}` : ""}${sup(det.entorno.supuesto, "entorno")}` },
           { k: "Exposición al viento", v: det.exposicion },
-          ...filasCondiciones(det.condiciones, "fachada"),
+          { k: "Tipo", v: `CEC ${det.sol.codigo}, p. ${det.sol.pagina} · El edificio` },
+          {
+            k: "Lo que aporta",
+            v: `${det.columna === "con_revestimiento" ? `revestimiento R${det.niveles.R}` : "sin revestimiento"} · ${det.niveles.B > 0 ? `B${det.niveles.B}` : "sin barrera"}${det.hidrofilo ? " (aislante hidrófilo)" : ""} · C${det.niveles.C} · ${det.unaHoja ? "una hoja" : "dos hojas"}`,
+          },
+          ...(det.cumple
+            ? [
+                ...(det.gradoOpcion > det.grado ? [{ k: "Combinación", v: `la del grado ${det.gradoOpcion}, que vale para el ${det.grado}` }] : []),
+                ...filasCondiciones(det.condiciones, "fachada"),
+              ]
+            : [{ k: "No llega", v: `falta ${codigos(det.faltan)} (tabla 2.7)` }]),
           ...(det.hojaUnicaAplicada ? [{ k: "Una sola hoja", v: "C1 pasa a C2 (nota de la tabla 2.7)" }] : []),
+          ...(det.cec ? [{ k: "Contraste CEC", v: `con ${det.cec.clave}, grado ${det.cec.grado}; por la tabla 2.7, ${det.gradoMax}` }] : []),
         ],
       };
     }
@@ -422,6 +433,16 @@ export function textoIncumplimiento(el: ElementoHs1): { titulo: string; detalle:
   if (det.clase === "suelo" && det.condiciones === null) {
     return { titulo: `${mayuscula(solucionSuelo(det.tipo, det.intervencion))}: no vale con grado ${det.grado}.`, detalle: noAceptableSuelo(det) };
   }
+  if (det.clase === "fachada" && !det.cumple) {
+    const falta = det.faltan.map((c) => `${c} (${CONDICIONES.fachada[c]?.corto.toLowerCase() ?? c})`).join(" y ");
+    return {
+      titulo: `${det.rol === "fachada-pb" ? "La fachada de la planta baja" : "La fachada"} no llega al grado ${det.grado}.`,
+      detalle:
+        det.arreglo === "habitual"
+          ? `${det.sol.nombre} (CEC ${det.sol.codigo}) con lo declarado: falta ${falta}. Con lo propuesto, sí cumple.`
+          : `${det.sol.nombre} (CEC ${det.sol.codigo}) no llega ni declarando lo máximo: falta ${falta}. Elige otra fachada en El edificio.`,
+    };
+  }
   return null;
 }
 
@@ -442,7 +463,7 @@ export function fraseHs1(j: JustificacionHs1): string {
     if (d.clase === "muro" || d.clase === "suelo") {
       partes.push(`${partes.length === 0 ? "grado " : ""}${d.grado} en ${d.clase === "muro" ? "los" : "el"} ${e.nombre.toLowerCase()}`);
     }
-    if (d.clase === "fachada") partes.push(`${partes.length === 0 ? "grado " : ""}${d.grado} en las fachadas`);
+    if (d.clase === "fachada" && d.rol === "fachada") partes.push(`${partes.length === 0 ? "grado " : ""}${d.grado} en las fachadas`);
   }
   const c = j.cubierta;
   const pend = textoPendiente(c);
@@ -456,7 +477,7 @@ export function metricasHs1(j: JustificacionHs1): string {
     const d = e.detalle;
     if (d.clase === "muro") xs.push(`muro G${d.grado}`);
     if (d.clase === "suelo") xs.push(`suelo G${d.grado}`);
-    if (d.clase === "fachada") xs.push(`fachada G${d.grado}`);
+    if (d.clase === "fachada" && d.rol === "fachada") xs.push(`fachada G${d.grado}`);
   }
   return [...new Set(xs)].join(" · ");
 }
@@ -527,6 +548,19 @@ export function textoAviso(a: Aviso): TextoAviso {
         titulo: "Más de 100 m de altura: fuera de la tabla 2.6.",
         detalle: "La exposición al viento se estudia según el DB SE-AE; aquí se ha tomado la última fila de la tabla.",
       };
+    default:
+      if (a.id.startsWith("cec-")) {
+        return {
+          titulo: `El Catálogo da a ${String(a.datos.codigo)} un grado menor que la tabla 2.7.`,
+          detalle: `Con ${String(a.datos.clave)}, el CEC le da grado ${String(a.datos.cec)}; por sus rasgos y la tabla 2.7 llega a ${String(a.datos.gradoMax)}, y el exigido es ${String(a.datos.grado)}. Manda el DB-HS1: el grado del Catálogo es solo un contraste (criterio). Revisa la sección si hay dudas.`,
+        };
+      }
+      return textoAvisoResto(a);
+  }
+}
+
+function textoAvisoResto(a: Aviso): TextoAviso {
+  switch (a.id) {
     case "coronacion-peto":
       return {
         titulo: "Un peto podría cambiar la exposición al viento.",

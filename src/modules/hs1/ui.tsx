@@ -115,6 +115,12 @@ export function Hs1Module() {
           setField("muroImper", a.imper === j.habituales.muroImper ? "habitual" : a.imper);
         },
       };
+    } else if (det.clase === "fachada" && det.arreglo === "habitual") {
+      const clave = det.rol === "fachada-pb" ? "pb" : "general";
+      accion = {
+        etiqueta: "Volver a lo propuesto",
+        onClick: () => setField("fachadaDeclara", { ...(state.fachadaDeclara ?? {}), [clave]: undefined }),
+      };
     } else if (det.clase === "suelo" && det.arreglo) {
       const a = det.arreglo;
       accion = {
