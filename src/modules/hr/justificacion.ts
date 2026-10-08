@@ -14,18 +14,26 @@
 //     hojas de RA ≥ 45; compartida, tabla 3.1, tabla 3.2 y tabla I.1;
 //   - siempre, las condiciones de uniones e instalaciones (3.1.4 y 3.3), que se
 //     declaran.
+//
+// La fachada, la ventana, la cubierta y el forjado son los de El edificio
+// (feature-26). Con la planta baja distinta, su fachada y su ventana se
+// comprueban con los recintos de la planta 0 y la general con los demás
+// (K-CER.1); los flancos de las separaciones, con la fachada general.
 // =============================================================================
 
 import type { Aviso } from "../../lib/cte/resultado";
 import type { Veredicto } from "../../lib/pdf/renderFicha";
 import type { ProyectoSi } from "../si/definicion";
 import type { ElementoSi, JustificacionSiBase } from "../si/tipos";
+import { cerramientosDe } from "../../lib/constructivo/cerramientos";
+import { plantasDe } from "../../lib/edificio/derivar";
 import {
   CAPIALZADOS,
   dRASuelo,
   dRATecho,
   dRATrasdosado,
   FRACCION_CAJA,
+  RAtrCubierta,
   solucionDe,
   valor,
   type Capialzado,
@@ -184,6 +192,39 @@ function hueco(ventana: Eleccion, caja: Capialzado) {
   return { ...usada(s, ventana), ventanaRAtr, caja: cp, RAtr };
 }
 
+/** Una fachada con su ventana, y las plantas cuyos recintos protegidos dan a ella. */
+export interface GrupoExterior {
+  /** "" para la general (o la única); "-pb" para la de la planta baja. */
+  sufijo: "" | "-pb";
+  fachada: Eleccion;
+  ventana: Eleccion;
+}
+
+/**
+ * La fachada y la ventana de El edificio con las que se comprueba el ruido
+ * exterior: la general y, si la planta baja es distinta y tiene recintos
+ * protegidos (viviendas; despachos en un edificio sin viviendas), la suya
+ * (K-CER.1). Si solo la planta baja los tiene, la suya es la única.
+ */
+export function gruposExterior(p: ProyectoSi, tipologia: Tipologia): GrupoExterior[] {
+  const c = cerramientosDe(p.edificio);
+  const general = { fachada: c.fachada.eleccion, ventana: c.ventana.eleccion };
+  const pb = { fachada: c.fachadaPB?.eleccion ?? general.fachada, ventana: c.ventanaPB?.eleccion ?? general.ventana };
+  const clave = (x: { fachada: Eleccion; ventana: Eleccion }) =>
+    JSON.stringify([x.fachada.id, x.fachada.valores ?? null, x.ventana.id, x.ventana.valores ?? null]);
+  const protegido = (uso: string) => (tipologia === "otros" ? uso === "oficinas" : uso === "viviendas" || uso === "vivienda_unifamiliar");
+  const niveles = plantasDe(p.edificio)
+    .filter((pl) => pl.zonas.some((z) => protegido(z.uso)))
+    .map((pl) => pl.nivel);
+  const conPB = niveles.includes(0);
+  if (!conPB || clave(pb) === clave(general)) return [{ sufijo: "", ...general }];
+  if (niveles.every((n) => n === 0)) return [{ sufijo: "", ...pb }];
+  return [
+    { sufijo: "", ...general },
+    { sufijo: "-pb", ...pb },
+  ];
+}
+
 /** El Ld de la zona: el de los datos de la obra o los 60 dBA del DB sin datos oficiales. */
 export function ldDe(p: ProyectoSi): { valor: number; supuesto: boolean; aeronaves: boolean } {
   const dado = numero(p.datosGenerales.ldZona);
@@ -207,8 +248,11 @@ export function justificarHr(estado: HrEstado, p: ProyectoSi, comparar = true): 
   // ── Soluciones ─────────────────────────────────────────────────────────────
   const tabS = solucionDe("tabiqueria", st.tabiqueria.id);
   const tab = tipoTabiqueria(tabS, st.apoyo);
-  const fa = fachada(st.fachada, medios);
-  const fj = forjado(st.forjado);
+  const cer = cerramientosDe(p.edificio);
+  const grupos = gruposExterior(p, tipologia);
+  // Los flancos de las separaciones, con la fachada general (criterio).
+  const fa = fachada(grupos[0].fachada, medios);
+  const fj = forjado(cer.forjado.eleccion);
   const sf = suelo(st.suelo, fj.m);
   const ts = techo(st.techo, fj.m);
   const tsBajo = techo(st.techoBajo, fj.m);
@@ -429,35 +473,43 @@ export function justificarHr(estado: HrEstado, p: ProyectoSi, comparar = true): 
   }
 
   // ── Fachada y cubierta frente al ruido exterior (tablas 2.1 y 3.4) ─────────
-  const hu = hueco(st.ventana, st.capialzado);
-  const exterior = (recinto: "dormitorios" | "estancias" | "administrativo") => {
+  const exterior = (recinto: "dormitorios" | "estancias" | "administrativo", g: GrupoExterior) => {
+    const fg = fachada(g.fachada, medios);
+    const hu = hueco(g.ventana, st.capialzado);
     const dado = numero(recinto === "dormitorios" ? st.huecosDormitorio : st.huecosEstancia);
     const pct = Math.min(100, dado ?? (recinto === "dormitorios" ? HUECOS_SUPUESTOS.dormitorio : HUECOS_SUPUESTOS.estancia));
     const ex = exigenciaExterior(ld.valor, recinto, ld.aeronaves, st.noExpuesta);
-    const r = comprobarFachada(ex.D, fa.ciega.RAtr, hu.RAtr, pct);
+    const r = comprobarFachada(ex.D, fg.ciega.RAtr, hu.RAtr, pct);
+    const nombre = recinto === "dormitorios" ? "Fachada de los dormitorios" : recinto === "estancias" ? "Fachada de las estancias" : "Fachada de los despachos";
     elementos.push({
-      id: recinto === "dormitorios" ? "fachada-dormitorios" : "fachada-estancias",
-      nombre: recinto === "dormitorios" ? "Fachada de los dormitorios" : recinto === "estancias" ? "Fachada de las estancias" : "Fachada de los despachos",
+      id: `${recinto === "dormitorios" ? "fachada-dormitorios" : "fachada-estancias"}${g.sufijo}`,
+      nombre: `${nombre}${g.sufijo ? " de la planta baja" : ""}`,
       tipo: "ruido",
       veredicto: r.cumple ? "ok" : "fail",
       valor: { valor: hu.RAtr, unidad: "dBA" },
       ...(r.huecoExigido !== null ? { limite: { valor: r.huecoExigido, unidad: "dBA" } } : {}),
       manda: { tipo: "grado_tabla", tabla: "Tabla 3.4", entradas: [{ k: "D2m,nT,Atr", v: `${ex.D} dBA` }, { k: "Huecos", v: `${pct} %` }] },
       cita: ["HR · tablas 2.1 y 3.4", "HR · ap. 3.1.2.5"],
-      detalle: { clase: "exterior", recinto, ldZona: ld.valor, ldSupuesto: ld.supuesto, ld: ex.ld, aeronaves: ld.aeronaves, noExpuesta: st.noExpuesta, D: ex.D, pct, pctSupuesto: dado === null, ciega: fa.ciega, hueco: hu, r },
+      detalle: { clase: "exterior", recinto, ldZona: ld.valor, ldSupuesto: ld.supuesto, ld: ex.ld, aeronaves: ld.aeronaves, noExpuesta: st.noExpuesta, D: ex.D, pct, pctSupuesto: dado === null, ciega: fg.ciega, hueco: hu, r },
     });
     return dado === null;
   };
-  const supDorm = tipologia === "otros" ? false : exterior("dormitorios");
-  const supEst = exterior(tipologia === "otros" ? "administrativo" : "estancias");
+  let supDorm = false;
+  let supEst = false;
+  for (const g of grupos) {
+    if (tipologia !== "otros") supDorm = exterior("dormitorios", g) || supDorm;
+    supEst = exterior(tipologia === "otros" ? "administrativo" : "estancias", g) || supEst;
+  }
   if (supDorm || supEst) avisos.push({ id: "huecos", tipo: "supuesto", elementoId: supDorm ? "fachada-dormitorios" : "fachada-estancias", datos: {} });
   if (ld.supuesto) avisos.push({ id: "ld", tipo: "supuesto", elementoId: "fachada-dormitorios", datos: {} });
   const supuestas = sep.colindancias.filter((c) => c.supuesta).length;
   if (supuestas > 0) avisos.push({ id: "colindancias", tipo: "supuesto", datos: { n: supuestas } });
 
   if (sep.cubierta) {
-    const cuS = solucionDe("cubierta", st.cubierta?.id ?? (p.edificio.cubierta.tipo === "inclinada" ? "cu-incl-fu-bovhorm-250" : "cu-plana-fu-bovhorm-300"));
-    const cuRAtr = propio(st.cubierta, "RAtr") ?? cuS.RAtr;
+    // El paquete de El edificio sobre su forjado (K-CER.10).
+    const cuE = cer.cubierta.eleccion;
+    const cuS = cer.cubierta.sol;
+    const cuRAtr = propio(cuE, "RAtr") ?? RAtrCubierta(cuS, cer.forjado.sol);
     const ex = exigenciaExterior(ld.valor, tipologia === "otros" ? "administrativo" : "dormitorios", ld.aeronaves, false);
     const r = comprobarFachada(ex.D, cuRAtr, null, 0);
     elementos.push({
@@ -471,7 +523,7 @@ export function justificarHr(estado: HrEstado, p: ProyectoSi, comparar = true): 
       cita: ["HR · tablas 2.1 y 3.4", "HR · ap. 3.1.2.5"],
       detalle: {
         clase: "exterior", recinto: "cubierta", ldZona: ld.valor, ldSupuesto: ld.supuesto, ld: ex.ld, aeronaves: ld.aeronaves, noExpuesta: false, D: ex.D, pct: 0, pctSupuesto: false,
-        ciega: { ...usada(cuS, st.cubierta), RAtr: cuRAtr }, hueco: null, r,
+        ciega: { ...usada(cuS, cuE), RAtr: cuRAtr }, hueco: null, r,
       },
     });
   }

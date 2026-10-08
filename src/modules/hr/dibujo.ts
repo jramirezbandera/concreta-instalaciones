@@ -136,6 +136,8 @@ export function dibujoHr(j: JustificacionHr, edificio: Edificio): DibujoSi {
     "forjado-adosada",
     "separacion",
     "separacion-actividad",
+    "fachada-estancias-pb",
+    "fachada-dormitorios-pb",
     "fachada-estancias",
     "fachada-dormitorios",
     "cubierta",

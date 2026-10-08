@@ -171,6 +171,7 @@ export interface RasgosHs1 {
 
 export interface SolCubierta extends Base {
   categoria: "cubierta";
+  /** El RA,tr que tabula el CEC con su forjado de referencia: contraste de `RAtrCubierta`. */
   RAtr: number;
   /** El apartado del CEC (4.1.1…). */
   apartado: string;
@@ -421,6 +422,14 @@ export function solucionDe<C extends Categoria>(categoria: C, id: string): Extra
  */
 export function indiceFuera(f: SolFachada): number {
   return f.capas.findIndex((c) => c.rol !== "AT" && c.material === "camara_ventilada");
+}
+
+/**
+ * El RA,tr de una cubierta sobre un forjado: el del forjado (3.18) y + 2 dBA con
+ * formación de pendientes de hormigón ligero (4.1.1 nota 4, K-CER.10).
+ */
+export function RAtrCubierta(c: SolCubierta, forjado: SolForjado): number {
+  return forjado.RAtr + (c.pendientesLigero ? 2 : 0);
 }
 
 /** ΔRA de un trasdosado sobre un elemento base de masa m (K-CEC.4: columna inmediatamente superior). */

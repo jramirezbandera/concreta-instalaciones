@@ -51,4 +51,12 @@ describe("HR · Protección frente al ruido (feature-25)", () => {
     await waitFor(() => expect(getByRole("region", { name: "Qué entra" })).not.toHaveTextContent("Actividad e instalaciones"));
     expect(getByRole("region", { name: "Avisos" })).toHaveTextContent("2 colindancias supuestas.");
   });
+
+  it("la fachada, la ventana, la cubierta y el forjado se ven aquí y se cambian en El edificio (feature-26)", async () => {
+    const { getByRole } = await renderModulo();
+    const decisiones = getByRole("region", { name: "Decisiones" });
+    expect(within(decisiones).getAllByRole("link", { name: "Cambiar en El edificio" })).toHaveLength(4);
+    expect(within(decisiones).queryByRole("combobox", { name: /^\d+\s*Fachada/ })).toBeNull();
+    expect(decisiones).toHaveTextContent("Enfoscado + LP ½ pie + cámara + aislante + LHD 7 + enlucido");
+  });
 });

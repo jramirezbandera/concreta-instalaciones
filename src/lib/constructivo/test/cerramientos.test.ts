@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { edificioDeCaso } from "../../edificio/casos";
 import { setCubierta } from "../../edificio/editar";
-import { hrEstadoDefaults } from "../../../modules/hr/estado";
 import { PSI_HUECO_TABLA_10, UF_REFERENCIA_CEC } from "../../../modules/he1/tablas";
 import { FACHADA_HABITUAL, solucionDe } from "../catalogo";
 import {
@@ -40,14 +39,14 @@ describe("cerramientos de El edificio (feature-26)", () => {
     expect(avisosCerramientos(e)).toEqual([]);
   });
 
-  it("los habituales son los de HR: los mismos valores acústicos (K-CER.15), así no cambia ningún veredicto", () => {
+  it("los habituales son los que usaba HR: F 3.2 vale en HR lo mismo que su F 3.1 (K-CER.15), así no cambia ningún veredicto", () => {
     const f = solucionDe("fachada", CERRAMIENTOS_HABITUALES.fachada.id);
-    const hr = solucionDe("fachada", hrEstadoDefaults.fachada.id);
+    const hr = solucionDe("fachada", "fa-enf-lp115-at-lhd70"); // la fachada habitual de HR hasta feature-26
     expect(f.RAtr).toEqual(hr.RAtr);
     expect(f.principal).toEqual(hr.principal);
-    expect(f.clase).toBe(hr.clase);
-    expect(CERRAMIENTOS_HABITUALES.ventana.id).toBe(hrEstadoDefaults.ventana.id);
-    expect(CERRAMIENTOS_HABITUALES.forjado.id).toBe(hrEstadoDefaults.forjado.id);
+    expect([f.clase, f.interior, f.aislExterior, f.hojaInterior]).toEqual([hr.clase, hr.interior, hr.aislExterior, hr.hojaInterior]);
+    expect(CERRAMIENTOS_HABITUALES.ventana.id).toBe("ve-4-c-6-batiente");
+    expect(CERRAMIENTOS_HABITUALES.forjado.id).toBe("fu-bovhorm-300");
   });
 
   it("los siete marcos son los del 3.16 (Uf de HE1) y su familia está en la Tabla 10 del DA/1", () => {

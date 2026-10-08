@@ -1,6 +1,8 @@
 // =============================================================================
 // DB-HR — Lo que guarda el módulo (feature-25): las soluciones constructivas que
-// El edificio no describe. Cada una es una solución del Catálogo (`catalogo.ts`)
+// El edificio no describe. La fachada, la ventana, la cubierta y el forjado se
+// eligen en El edificio (feature-26, `edificio.cerramientos`): HR los lee de
+// allí, y sus valores propios se guardan en esa misma elección. Cada una es una solución del Catálogo (`catalogo.ts`)
 // con, si el proyectista quiere, sus valores propios (los de su ensayo o su
 // fabricante). Solo tipos y valores por defecto.
 //
@@ -8,10 +10,9 @@
 // tabiquería de LHD con bandas elásticas; entre viviendas, la de dos hojas de
 // ½ pie y LH con bandas (P3.2, tipo 2), que cumple la tabla 3.2 con fábrica sin
 // trasdosado; hacia un recinto de actividad o de instalaciones, hormigón de
-// 16 cm con trasdosado autoportante; forjado unidireccional de 30 cm; suelo
-// flotante de mortero sobre polietileno; techo suspendido con lana en el local
-// o el garaje; fachada de dos hojas de ½ pie y LHD; ventana batiente con caja
-// de persiana CP1.
+// 16 cm con trasdosado autoportante; suelo flotante de mortero sobre
+// polietileno; techo suspendido con lana en el local o el garaje; caja de
+// persiana CP1.
 // =============================================================================
 
 import type { Capialzado } from "../../lib/constructivo/catalogo";
@@ -43,22 +44,17 @@ export type HrEstado = {
   separacionActividad: Eleccion;
   trasdosadoActividad: Eleccion | null;
   unaCaraActividad: boolean;
-  forjado: Eleccion;
   suelo: Eleccion;
   /** Techo suspendido entre viviendas (en la de abajo). */
   techo: Eleccion | null;
   /** Techo suspendido en el local, el garaje, el cuarto o el portal bajo las viviendas. */
   techoBajo: Eleccion | null;
-  fachada: Eleccion;
   /** La fachada del recinto más desfavorable no está expuesta (patio cerrado, entorno tranquilo): Ld − 10. */
   noExpuesta: boolean;
-  ventana: Eleccion;
   capialzado: Capialzado;
   /** % de huecos del dormitorio y de la estancia más desfavorables; null = supuesto. */
   huecosDormitorio: number | null;
   huecosEstancia: number | null;
-  /** null = la de la cubierta de El edificio (plana o inclinada). */
-  cubierta: Eleccion | null;
   medianeria: Eleccion;
   /** La puerta de entrada de la vivienda abre a un vestíbulo (habitable) o a una estancia (protegido). */
   puertaAbre: "vestibulo" | "estancia";
@@ -85,17 +81,13 @@ export const hrEstadoDefaults: HrEstado = {
   separacionActividad: { id: "sv-ha160" },
   trasdosadoActividad: { id: "tr-autoportante-pyl-lm" },
   unaCaraActividad: false,
-  forjado: { id: "fu-bovhorm-300" },
   suelo: { id: "sf-mortero-per5" },
   techo: null,
   techoBajo: { id: "ts-pyl15-lm50-c100" },
-  fachada: { id: "fa-enf-lp115-at-lhd70" },
   noExpuesta: false,
-  ventana: { id: "ve-4-c-6-batiente" },
   capialzado: "cp1",
   huecosDormitorio: null,
   huecosEstancia: null,
-  cubierta: null,
   medianeria: { id: "sv-lp240-yeso" },
   puertaAbre: "vestibulo",
   puertaRA: null,

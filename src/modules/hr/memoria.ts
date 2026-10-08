@@ -129,7 +129,7 @@ function linea(d: DetalleHr, nombre: string): Trozo[] | null {
         return [`Cubierta: ${solucionEnFrase(d.ciega)}, `, { v: `RA,tr = ${dBA(d.ciega.RAtr)}` }, ` ≥ ${d.r.ciegaExigida ?? "—"} dBA (tabla 3.4, sin huecos). ${CUMPLE(d.r.cumple)}`];
       }
       return [
-        `Fachada de los ${d.recinto === "dormitorios" ? "dormitorios" : d.recinto === "estancias" ? "estancias" : "despachos"} (recinto más desfavorable, ${d.pct} % de huecos, ${TRAMOS_HUECOS[tramoHuecos(d.pct)]}): parte ciega ${solucionEnFrase(d.ciega)}, `,
+        `${nombre} (recinto más desfavorable, ${d.pct} % de huecos, ${TRAMOS_HUECOS[tramoHuecos(d.pct)]}): parte ciega ${solucionEnFrase(d.ciega)}, `,
         { v: `RA,tr = ${dBA(d.ciega.RAtr)}` },
         d.r.ciegaExigida !== null ? ` ≥ ${d.r.ciegaExigida} dBA` : "",
         `; huecos ${d.hueco ? solucionEnFrase(d.hueco) : ""}${d.hueco?.caja ? ` con caja de persiana ${d.hueco.caja.codigo}` : ""}, `,

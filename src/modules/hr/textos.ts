@@ -140,7 +140,12 @@ export function queEntraHr(j: JustificacionHr, estados: Record<string, EstadoPre
     titulo: "Ruido exterior",
     detalle: `Ld ${dBA(j.ld.valor)}${j.ld.supuesto ? ", sin datos oficiales" : ""}${j.ld.aeronaves ? " · aeronaves" : ""}`,
     trato: "tablas 2.1 y 3.4",
-    estado: trato(estados["fachada-dormitorios"] ?? estados["fachada-estancias"]),
+    // La peor de las fachadas (con la de la planta baja, si la hay).
+    estado: trato(
+      j.elementos.filter((e) => e.id.startsWith("fachada-")).map((e) => estados[e.id]).find((x) => x === "ko") ??
+        estados["fachada-dormitorios"] ??
+        estados["fachada-estancias"],
+    ),
     elementoId: j.elementos.some((e) => e.id === "fachada-dormitorios") ? "fachada-dormitorios" : "fachada-estancias",
   });
   if (s.medianeras) filas.push({ id: "medianeras", titulo: "Medianeras", detalle: "las de SI 2", trato: "RA ≥ 45 dBA", estado: trato(estados.medianeria), elementoId: "medianeria" });
@@ -156,7 +161,7 @@ export function piezasHr(j: JustificacionHr): { texto: string; acento: boolean }
   if (j.elementos.some((e) => sep.includes(e.id))) piezas.push({ texto: j.tipologia === "adosada" ? "entre adosadas" : "separaciones", acento: mal(sep) });
   const fj = ["forjado-viviendas", "forjado-comun", "forjado-actividad", "forjado-encima", "forjado-adosada"];
   if (j.elementos.some((e) => fj.includes(e.id))) piezas.push({ texto: "forjados", acento: mal(fj) });
-  piezas.push({ texto: "fachadas", acento: mal(["fachada-dormitorios", "fachada-estancias", "cubierta", "medianeria"]) });
+  piezas.push({ texto: "fachadas", acento: mal(["fachada-dormitorios", "fachada-estancias", "fachada-dormitorios-pb", "fachada-estancias-pb", "cubierta", "medianeria"]) });
   return piezas;
 }
 

@@ -1,7 +1,9 @@
 // DB-HR — Pantalla de la protección frente al ruido (feature-25). La pantalla es
 // la común (`PantallaSi`); aquí van las decisiones que El edificio no describe:
 // la solución constructiva de cada elemento, elegida del Catálogo de Elementos
-// Constructivos (con valores propios si el proyectista los tiene), el
+// Constructivos (con valores propios si el proyectista los tiene). La fachada,
+// la ventana, la cubierta y el forjado se eligen en El edificio (feature-26):
+// aquí se ven, y sus valores propios se guardan en esa elección. También el
 // porcentaje de huecos, la puerta de entrada, el ascensor y si se usan los
 // valores medios del Catálogo. El Ld y las aeronaves son datos de la obra.
 
@@ -11,9 +13,11 @@ import { CampoNumero } from "../../components/edificio/controles";
 import { Decision, DecisionValor, Opciones } from "../../components/justificacion/Decision";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import { PantallaSi, type PropsDecisionesSi } from "../si/PantallaSi";
-import { CAPIALZADOS, deCategoria, solucionDe, valor, type Capialzado, type Categoria, type Solucion } from "../../lib/constructivo/catalogo";
+import { CAPIALZADOS, deCategoria, RAtrCubierta, solucionDe, valor, type Capialzado, type Categoria, type Solucion } from "../../lib/constructivo/catalogo";
+import { CERRAMIENTOS_HABITUALES, cerramientosDe, cubiertaHabitual, eleccionesDe, setCerramientos } from "../../lib/constructivo/cerramientos";
 import { hr } from "./definicion";
 import { conValoresPropios, HUECOS_SUPUESTOS, hrEstadoDefaults, numero, type Eleccion, type HrEstado, type ParametroHr } from "./estado";
+import { gruposExterior } from "./justificacion";
 import type { DetalleHr, JustificacionHr } from "./justificacion";
 import type { ColindanciaHr } from "./edificio";
 import { dB, dBA, kg, RELACION_HR, TABIQUERIA } from "./textos";
@@ -71,6 +75,8 @@ function DecisionSolucion({
   texto,
   ninguna,
   extra,
+  deEdificio,
+  linea,
 }: {
   numero: number;
   pregunta: string;
@@ -83,6 +89,10 @@ function DecisionSolucion({
   /** Rótulo de la opción «ninguno» (trasdosado, techo), si la hay. */
   ninguna?: string;
   extra?: ReactNode;
+  /** Se elige en El edificio (feature-26): sin desplegable, con el enlace. */
+  deEdificio?: string;
+  /** Los valores del Catálogo, si no son los de la solución sola (la cubierta, con su forjado). */
+  linea?: string;
 }): JSX.Element {
   const [abierto, setAbierto] = useState(false);
   const opciones = deCategoria(categoria);
@@ -92,22 +102,39 @@ function DecisionSolucion({
   const idSel = `hr-${categoria}-${num}`;
   return (
     <div className="border-border-sub border-t pt-3 pb-3.5">
-      <label htmlFor={idSel} className="text-text-primary mb-2 flex items-baseline gap-2 text-[13px] font-medium">
-        <span className="text-text-disabled font-mono text-[10.5px] font-medium">{num}</span>
-        {pregunta}
-      </label>
-      <select id={idSel} value={eleccion?.id ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : { id: e.target.value })} className={SELECT}>
-        {ninguna && <option value="">{ninguna}</option>}
-        {opciones.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.nombre}
-          </option>
-        ))}
-      </select>
+      {deEdificio ? (
+        <>
+          <div className="text-text-primary mb-2 flex items-baseline gap-2 text-[13px] font-medium">
+            <span className="text-text-disabled font-mono text-[10.5px] font-medium">{num}</span>
+            {pregunta}
+          </div>
+          <div className="border-border-main bg-bg-surface flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-[12.5px]">
+            <span className="text-text-primary min-w-0">{s?.nombre ?? "—"}</span>
+            <Link to={deEdificio} className="text-accent hover:text-accent-hover shrink-0 text-[11.5px] underline">
+              Cambiar en El edificio
+            </Link>
+          </div>
+        </>
+      ) : (
+        <>
+          <label htmlFor={idSel} className="text-text-primary mb-2 flex items-baseline gap-2 text-[13px] font-medium">
+            <span className="text-text-disabled font-mono text-[10.5px] font-medium">{num}</span>
+            {pregunta}
+          </label>
+          <select id={idSel} value={eleccion?.id ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : { id: e.target.value })} className={SELECT}>
+            {ninguna && <option value="">{ninguna}</option>}
+            {opciones.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.nombre}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
       {s && eleccion && (
         <div className="text-text-secondary mt-1.5 flex items-center justify-between gap-2 text-[11.5px]">
           <span className="font-mono tabular-nums">
-            {propios ? "Valores propios" : valoresCatalogo(s, medios)} · CEC {s.codigo}, p. {s.pagina}
+            {propios ? "Valores propios" : (linea ?? valoresCatalogo(s, medios))} · CEC {s.codigo}, p. {s.pagina}
           </span>
           <button type="button" aria-expanded={abierto || propios} onClick={() => setAbierto((v) => !v)} className="text-accent hover:text-accent-hover shrink-0 underline">
             {propios ? "Editar" : "Valores propios"}
@@ -148,7 +175,13 @@ function detalle<C extends DetalleHr["clase"]>(j: JustificacionHr, id: string): 
   return (j.elementos.find((e) => e.id === id)?.detalle as Extract<DetalleHr, { clase: C }> | undefined) ?? null;
 }
 
-function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, JustificacionHr>): JSX.Element {
+/** Escribe los valores propios de una elección de El edificio, sin tocar el marco de la ventana. */
+function conValores<T extends Eleccion>(actual: T, e: Eleccion): T {
+  const { valores: _, ...resto } = actual;
+  return { ...resto, id: e.id, ...(e.valores ? { valores: e.valores } : {}) } as T;
+}
+
+function DecisionesHr({ state, setField, j, edificio, cambiarEdificio }: PropsDecisionesSi<HrEstado, JustificacionHr>): JSX.Element {
   const { proyecto } = useProyecto();
   const D = hrEstadoDefaults;
   const medios = state.medios === true;
@@ -165,7 +198,13 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
   const soloMinimo = j.tipologia === "aislada" || (adosada && state.estructura === "independiente");
   const forjados = ["forjado-viviendas", "forjado-comun", "forjado-actividad", "forjado-encima", "forjado-adosada"].some((id) => ids.has(id));
   const conActividad = ids.has("separacion-actividad") || asc?.modo === "hueco";
-  const cubiertaHabitual = proyecto.edificio.cubierta.tipo === "inclinada" ? "cu-incl-fu-bovhorm-250" : "cu-plana-fu-bovhorm-300";
+  const c = eleccionesDe(edificio);
+  const r = cerramientosDe(edificio);
+  const H = CERRAMIENTOS_HABITUALES;
+  const aEdificio = `/p/${proyecto.id}/edificio`;
+  const guardar = (patch: Parameters<typeof setCerramientos>[1]) => cambiarEdificio(setCerramientos(edificio, patch));
+  const conPB = gruposExterior({ edificio, datosGenerales: proyecto.datosGenerales }, j.tipologia).some((g) => g.sufijo === "-pb");
+  const nota = "Se elige en El edificio: la leen también HE1 y HS1.";
 
   // Números fijos: con el React Compiler, un contador mutado en el JSX se memoriza mal.
   const colindancias = j.separaciones.colindancias;
@@ -180,7 +219,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
     forjados && (ids.has("forjado-viviendas") || ids.has("forjado-encima")),
     forjados && (ids.has("forjado-actividad") || ids.has("forjado-comun")),
     true,
+    conPB,
     true,
+    conPB,
     ids.has("cubierta"),
     ids.has("medianeria"),
     !!puerta,
@@ -315,11 +356,12 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
           numero={n[6]}
           pregunta="Forjado y suelo flotante"
           categoria="forjado"
-          eleccion={state.forjado}
-          onChange={(e) => e && setField("forjado", e)}
-          habitual={D.forjado.id}
+          eleccion={r.forjado.eleccion}
+          onChange={(e) => e && guardar({ forjado: conValores(c.forjado, e) })}
+          habitual={H.forjado.id}
+          deEdificio={aEdificio}
           medios={medios}
-          texto="La masa de la sección tipo, sin vigas ni ábacos, decide la fila de la tabla 3.3."
+          texto={`La masa de la sección tipo, sin vigas ni ábacos, decide la fila de la tabla 3.3. ${nota}`}
           extra={
             <div className="mt-2.5">
               <DecisionSolucionSimple label="Suelo flotante" categoria="suelo" eleccion={state.suelo} onChange={(e) => e && setField("suelo", e)} medios={medios} />
@@ -359,13 +401,14 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
       {visibles[9] && (
         <DecisionSolucion
           numero={n[9]}
-          pregunta="Fachada"
+          pregunta={conPB ? "Fachada de las demás plantas" : "Fachada"}
           categoria="fachada"
-          eleccion={state.fachada}
-          onChange={(e) => e && setField("fachada", e)}
-          habitual={D.fachada.id}
+          eleccion={r.fachada.eleccion}
+          onChange={(e) => e && guardar({ fachada: conValores(c.fachada, e) })}
+          habitual={H.fachada.id}
+          deEdificio={aEdificio}
           medios={medios}
-          texto="Su parte ciega frente al ruido exterior (tabla 3.4) y como flanco de las separaciones."
+          texto={`Su parte ciega frente al ruido exterior (tabla 3.4) y como flanco de las separaciones. ${nota}`}
           extra={
             <div className="mt-2">
               <Opciones<"si" | "no">
@@ -386,11 +429,26 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
       {visibles[10] && (
         <DecisionSolucion
           numero={n[10]}
-          pregunta="Ventanas"
+          pregunta="Fachada de la planta baja"
+          categoria="fachada"
+          eleccion={(r.fachadaPB ?? r.fachada).eleccion}
+          onChange={(e) => e && guardar({ fachadaPB: conValores(c.fachadaPB ?? c.fachada, e) })}
+          habitual={H.fachada.id}
+          deEdificio={aEdificio}
+          medios={medios}
+          texto="Se comprueba con los recintos de la planta baja; la de las demás plantas, con los suyos."
+        />
+      )}
+
+      {visibles[11] && (
+        <DecisionSolucion
+          numero={n[11]}
+          pregunta={conPB ? "Ventanas de las demás plantas" : "Ventanas"}
           categoria="ventana"
-          eleccion={state.ventana}
-          onChange={(e) => e && setField("ventana", e)}
-          habitual={D.ventana.id}
+          eleccion={r.ventana.eleccion}
+          onChange={(e) => e && guardar({ ventana: conValores(c.ventana, e) })}
+          habitual={H.ventana.id}
+          deEdificio={aEdificio}
           medios={medios}
           texto={
             <>
@@ -429,22 +487,38 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[11] && (
-        <DecisionSolucion
-          numero={n[11]}
-          pregunta="Cubierta"
-          categoria="cubierta"
-          eleccion={state.cubierta ?? { id: cubiertaHabitual }}
-          onChange={(e) => setField("cubierta", e && e.id === cubiertaHabitual && !conValoresPropios(e) ? null : e)}
-          habitual={cubiertaHabitual}
-          medios={medios}
-          texto="Sobre los recintos de la última planta, sin lucernarios: la columna de parte ciega al 100 % de la tabla 3.4."
-        />
-      )}
-
       {visibles[12] && (
         <DecisionSolucion
           numero={n[12]}
+          pregunta="Ventanas de la planta baja"
+          categoria="ventana"
+          eleccion={(r.ventanaPB ?? r.ventana).eleccion}
+          onChange={(e) => e && guardar({ ventanaPB: conValores(c.ventanaPB ?? c.ventana, e) })}
+          habitual={H.ventana.id}
+          deEdificio={aEdificio}
+          medios={medios}
+          texto="Se comprueban con los recintos de la planta baja, con la misma caja de persiana y los mismos huecos."
+        />
+      )}
+
+      {visibles[13] && (
+        <DecisionSolucion
+          numero={n[13]}
+          pregunta="Cubierta"
+          categoria="cubierta"
+          eleccion={r.cubierta.eleccion}
+          onChange={(e) => e && guardar({ cubierta: e })}
+          habitual={cubiertaHabitual(edificio.cubierta.tipo)}
+          deEdificio={aEdificio}
+          linea={`RA,tr ${dBA(RAtrCubierta(r.cubierta.sol, r.forjado.sol))} con el forjado de El edificio`}
+          medios={medios}
+          texto={`Sobre los recintos de la última planta, sin lucernarios: la columna de parte ciega al 100 % de la tabla 3.4. ${nota}`}
+        />
+      )}
+
+      {visibles[14] && (
+        <DecisionSolucion
+          numero={n[14]}
           pregunta="Medianería"
           categoria="base"
           eleccion={state.medianeria}
@@ -455,9 +529,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[13] && puerta && (
+      {visibles[15] && puerta && (
         <Decision<"vestibulo" | "estancia">
-          numero={n[13]}
+          numero={n[15]}
           pregunta="Puerta de entrada a la vivienda"
           opciones={[
             { valor: "vestibulo", label: "Abre a un vestíbulo" },
@@ -476,9 +550,9 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
         />
       )}
 
-      {visibles[14] && asc && (
+      {visibles[16] && asc && (
         <Decision<"hueco" | "cuarto">
-          numero={n[14]}
+          numero={n[16]}
           pregunta="Maquinaria del ascensor"
           opciones={[
             { valor: "hueco", label: "En el hueco" },
@@ -496,7 +570,7 @@ function DecisionesHr({ state, setField, j }: PropsDecisionesSi<HrEstado, Justif
       )}
 
       <DecisionValor
-        numero={n[15]}
+        numero={n[17]}
         pregunta="Valores del Catálogo"
         marca={medios ? { texto: "medios", aviso: true } : { texto: "mínimos" }}
         control={

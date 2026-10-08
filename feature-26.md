@@ -209,6 +209,35 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
 4. **HR**: lee fachada, ventana, cubierta y forjado de El edificio y quita esos campos de
    `HrEstado`. La fachada de la planta baja se comprueba con los recintos de la planta 0; la
    general, con los demás.
+
+   **Hecho (2026-10-08), paso 4:**
+   - `HrEstado` pierde `fachada`, `ventana`, `cubierta` y `forjado`: HR los lee de
+     `cerramientosDe(edificio)`. Lo que guardaba un proyecto en esos campos se ignora.
+   - `gruposExterior`: con la planta baja distinta y viviendas en ella (despachos, en un
+     edificio sin viviendas), su fachada y su ventana se comprueban aparte
+     (`fachada-dormitorios-pb`, `fachada-estancias-pb`); si solo la planta baja las tiene, la
+     suya es la única. Una ventana de planta baja que solo cambia de marco no añade nada.
+   - Los flancos de las separaciones, con la fachada general.
+   - Cubierta: `RAtrCubierta(cubierta, forjado)` = RA,tr del forjado de El edificio + 2 dBA si
+     hay pendientes de hormigón ligero (4.1.1 nota 4, K-CER.10). Con el forjado de referencia
+     reproduce el 52 de C 1.3 y el 48 de C 9.3. La inclinada sobre el forjado habitual de 30 cm
+     pasa de 48 a 50 (solo puede mejorar el veredicto).
+   - Pantalla: la fachada, la ventana, la cubierta y el forjado se ven en solo lectura con
+     «Cambiar en El edificio»; los valores propios se siguen editando aquí y se guardan en la
+     elección de El edificio (como SUA 9 escribe el ascensor). Con la planta baja distinta,
+     dos decisiones más: su fachada y su ventana. «Lo usan» de El edificio ya marca HR.
+   - Tests: `hr/test/cerramientos.test.ts` (8) y uno de pantalla; 1292 en verde. Comprobado
+     en el navegador con el Plurifamiliar y SATE en la planta baja.
+
+   **Decisiones a validar:**
+   - Los valores de fachada, ventana, cubierta y forjado que hubiera guardado HR en un
+     proyecto se pierden (HR salió el 2026-10-05; no hay migración).
+   - Los flancos (condiciones de fachada de las tablas 3.2 y 3.3) se comprueban solo con la
+     fachada general, también para las separaciones de la planta baja.
+   - El porcentaje de huecos, la caja de persiana y «fachada no expuesta» son los mismos para
+     la planta baja y las demás.
+   - C 5.3, C 2.3 y C 12.3 siguen fuera: HE1 calcula la cubierta por capas según su tipo y
+     aún no distingue grava, solado flotante ni bajo cubierta ventilado.
 5. **HS1**: `fachadaHojas`, `fachadaRevestimiento` y la combinación de la tabla 2.7 se deducen de
    los rasgos de la fachada. El grado del CEC se usa como contraste y avisa si difiere. Con la
    planta baja distinta, se comprueban las dos.

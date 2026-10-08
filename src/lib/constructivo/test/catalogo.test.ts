@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CATALOGO, deCategoria, indiceFuera } from "../catalogo";
+import { CATALOGO, deCategoria, indiceFuera, RAtrCubierta, solucionDe } from "../catalogo";
 import { MATERIALES_CEC } from "../materiales";
 
 describe("catálogo común (feature-26)", () => {
@@ -56,5 +56,13 @@ describe("catálogo común (feature-26)", () => {
       ["C 1.3", 0.27, true],
       ["C 9.3", 0.19, false],
     ]);
+  });
+
+  it("el RA,tr de una cubierta sale de su forjado y reproduce el del CEC con el de referencia (K-CER.10)", () => {
+    const plana = solucionDe("cubierta", "cu-plana-fu-bovhorm-300");
+    const incl = solucionDe("cubierta", "cu-incl-fu-bovhorm-250");
+    expect(RAtrCubierta(plana, solucionDe("forjado", "fu-bovhorm-300"))).toBe(plana.RAtr);
+    expect(RAtrCubierta(incl, solucionDe("forjado", "fu-bovhorm-250"))).toBe(incl.RAtr);
+    expect(RAtrCubierta(incl, solucionDe("forjado", "losa-ha-250"))).toBe(59);
   });
 });
