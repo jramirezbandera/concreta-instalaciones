@@ -1,4 +1,5 @@
 import type { JSX, ReactNode } from "react";
+import type { LoUsa } from "../../lib/edificio/usos";
 
 // =============================================================================
 // Controles del editor de El edificio (feature-12): el paso a paso «− 3 +» y el
@@ -204,5 +205,43 @@ export function BotonSec(props: {
     >
       {props.children}
     </button>
+  );
+}
+
+/** La tarjeta del editor: lo que es («ZONA · PB») y su título. */
+export function Tarjeta(props: { k: string; titulo: string; children: ReactNode }): JSX.Element {
+  return (
+    <div className="border-border-main bg-bg-primary m-3.5 rounded border pb-1">
+      <div className="text-text-disabled px-3.5 pt-3 text-[10px] font-semibold tracking-[0.09em] uppercase">
+        {props.k}
+      </div>
+      <h2 className="text-text-primary px-3.5 pt-[3px] pb-3 text-[15px] leading-snug font-semibold">
+        {props.titulo}
+      </h2>
+      {props.children}
+    </div>
+  );
+}
+
+const COLOR_TRATO: Record<LoUsa["trato"], string> = {
+  si: "text-text-primary",
+  otra: "text-accent",
+  no: "text-text-disabled",
+};
+
+/** «Lo usan»: qué hace cada justificación con lo seleccionado. */
+export function LoUsan({ filas }: { filas: LoUsa[] }): JSX.Element {
+  return (
+    <ul>
+      {filas.map((f) => (
+        <li
+          key={f.codigo + f.texto}
+          className="border-border-sub grid grid-cols-[46px_minmax(0,1fr)] gap-2.5 border-t px-3.5 py-[7px] text-[12.5px] leading-[1.4]"
+        >
+          <b className="text-text-secondary pt-px font-mono text-[11px] font-semibold">{f.codigo}</b>
+          <span className={COLOR_TRATO[f.trato]}>{f.texto}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

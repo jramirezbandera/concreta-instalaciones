@@ -150,7 +150,7 @@ describe("justificarHe1 · el Demo (Cáceres, zona C)", () => {
     });
     expect(j.propuesta.minimos).toEqual({ fachada: 50, cubierta: 80, suelo: 40 });
     expect(j.elementos.map((e) => [e.id, e.veredicto, resultadoLista(e)])).toEqual([
-      ["fachada", "ok", "0,38 ≤ 0,49"],
+      ["fachada", "ok", "0,40 ≤ 0,49"],
       ["cubierta", "ok", "0,30 ≤ 0,40"],
       ["suelo", "ok", "0,45 ≤ 0,70"],
       ["ventanas", "ok", "1,99 ≤ 2,10"],
@@ -166,12 +166,12 @@ describe("justificarHe1 · el Demo (Cáceres, zona C)", () => {
     );
     const f = franjaDe(cerramientoDe(j, "fachada"), j, "ok");
     expect(f.titulo).toBe("½ pie de ladrillo, XPS, cámara y tabique");
-    expect(f.manda).toBe("El aislante: con 60 mm se lleva el 68 % de la resistencia del muro. Cumple desde 50 mm.");
+    expect(f.manda).toBe("El aislante: con 60 mm se lleva el 71 % de la resistencia del muro. Cumple desde 50 mm.");
     const filas = filasQueEntraHe1(j, "C4", estadosElementos(j.elementos, j.avisos, []));
     expect(filas.map((x) => [x.titulo, x.trato])).toEqual([
       ["Zona climática", "C4"],
       ["Envolvente", "4 cerramientos"],
-      ["Fachada", "0,38 / 0,49"],
+      ["Fachada", "0,40 / 0,49"],
       ["Cubierta", "0,30 / 0,40"],
       ["Forjado sobre el local", "0,45 / 0,70"],
       ["Ventanas", "1,99 / 2,10"],
@@ -210,7 +210,7 @@ describe("justificarHe1 · lo que no cumple y su arreglo", () => {
     );
     expect(textoIncumplimiento(cerramientoDe(j, "fachada"), j)).toEqual({
       titulo: "La fachada no cumple",
-      detalle: "Con 30 mm de XPS, U 0,58 > 0,49. Cumple desde 50 mm.",
+      detalle: "Con 30 mm de XPS, U 0,62 > 0,49. Cumple desde 50 mm.",
       cambio: { etiqueta: "Poner 50 mm", aplicar: { aislanteFachada_mm: 50 } },
     });
     expect(textoIncumplimiento(cerramientoDe(j, "ventanas"), j)?.cambio).toEqual({
@@ -259,7 +259,7 @@ describe("el dibujo", () => {
   it("la fachada a escala: seis capas, 305 mm y la curva de temperaturas que baja", () => {
     const g = calcularDibujoHe1(j, "fachada");
     if (g.tipo !== "muro") throw new Error("no es la fachada");
-    expect(g.capas.map((c) => c.espesor_mm)).toEqual([15, 70, 30, 60, 115, 15]);
+    expect(g.capas.map((c) => c.espesor_mm)).toEqual([15, 70, 60, 30, 115, 15]);
     expect(g.cota.texto).toBe("305 mm");
     const ys = g.curva.split(" ").map((p) => Number(p.split(",")[1]));
     for (let i = 1; i < ys.length; i++) expect(ys[i]).toBeGreaterThanOrEqual(ys[i - 1]);

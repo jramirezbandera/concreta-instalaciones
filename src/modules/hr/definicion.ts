@@ -8,7 +8,7 @@ import { citaDe } from "../../lib/cte/tabla";
 import type { FichaData, FilaDato } from "../../lib/pdf/renderFicha";
 import type { DefinicionSi } from "../si/definicion";
 import { fichaSi, ORIGEN_CRITERIO, ORIGEN_DECISION, ORIGEN_EDIFICIO, ORIGEN_SUPUESTO } from "../si/ficha";
-import { solucionDe } from "./catalogo";
+import { solucionDe } from "../../lib/constructivo/catalogo";
 import { dibujoHr } from "./dibujo";
 import { hrEstadoDefaults, type HrEstado } from "./estado";
 import { justificarHr, type ElementoHr, type JustificacionHr } from "./justificacion";

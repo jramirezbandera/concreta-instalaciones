@@ -27,11 +27,11 @@ import {
   dRATrasdosado,
   FRACCION_CAJA,
   solucionDe,
-  tipoTabiqueria,
   valor,
   type Capialzado,
   type SolBase,
-} from "./catalogo";
+  type SolTabiqueria,
+} from "../../lib/constructivo/catalogo";
 import {
   columnaHorizontal,
   columnaVertical,
@@ -52,6 +52,11 @@ import { conValoresPropios, HUECOS_SUPUESTOS, hrEstadoDefaults, numero, propio, 
 import { EXTERIOR_HR, exigenciaExterior, LIMITES_HR, mixto, TABIQUERIA_HR, type ColumnaHorizontal, type TipoTabiqueria } from "./tablas";
 
 const L = LIMITES_HR.datos;
+
+/** El tipo de tabiquería de la tabla 3.1: el material y, si es de fábrica, cómo apoya. */
+function tipoTabiqueria(s: SolTabiqueria, apoyo: "directo" | "bandas"): TipoTabiqueria {
+  return s.material === "entramado" ? "entramado" : apoyo === "bandas" ? "bandas" : "apoyo";
+}
 
 /** Una solución resuelta, para los textos: su nombre, su código del CEC y si lleva valores propios. */
 export interface SolucionUsada {

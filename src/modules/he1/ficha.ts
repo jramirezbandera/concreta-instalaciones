@@ -148,7 +148,7 @@ export function toFichaData(j: JustificacionHe1, o: OpcionesFichaHe1): FichaData
   });
   observaciones.push(
     `Composiciones tipo, de dentro afuera. Fachada: ${capasDe(j, "fachada")} mm. Cubierta: ${capasDe(j, "cubierta")} mm. ${cerramientoDe(j, "suelo").nombre}: ${capasDe(j, "suelo")} mm.`,
-    "Predimensionado por elementos con composiciones tipo: λ, µ, Ug y Uf son orientativos del Catálogo de Elementos Constructivos y se sustituyen por los declarados por el fabricante (HE1 ap. 5.1).",
+    "Predimensionado por elementos con composiciones tipo: λ, µ, Ug y Uf son orientativos del Catálogo de Elementos Constructivos y se sustituyen por los declarados por el fabricante (HE1 ap. 5.1). Las fábricas entran con la R de la pieza del Catálogo (apartado 3.17), no con una λ.",
     "Criterio: los forjados se calculan con la λ del hormigón armado y el contacto con espacios no habitables con b = 1 (lado seguro, DA DB-HE/1 ec. 6).",
     `Criterio: el forjado sobre ${suelo.suelo?.tipo === "terreno" ? "la cámara sanitaria" : suelo.suelo?.tipo === "garaje" ? "el garaje" : "el local"} no comprueba fRsi por la escasa producción de vapor del espacio inferior (DA DB-HE/2 §4.1.1); a los huecos no se les aplican fRsi ni Glaser.`,
     "Criterio: la ventana tipo es de 1,20 × 1,40 m de dos hojas; la fracción de marco es 0,25 (DB-HE Anejo A) y la junta, el perímetro de los vidrios.",

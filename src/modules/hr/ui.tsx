@@ -11,7 +11,7 @@ import { CampoNumero } from "../../components/edificio/controles";
 import { Decision, DecisionValor, Opciones } from "../../components/justificacion/Decision";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import { PantallaSi, type PropsDecisionesSi } from "../si/PantallaSi";
-import { CAPIALZADOS, deCategoria, solucionDe, valor, type Capialzado, type Categoria, type Solucion } from "./catalogo";
+import { CAPIALZADOS, deCategoria, solucionDe, valor, type Capialzado, type Categoria, type Solucion } from "../../lib/constructivo/catalogo";
 import { hr } from "./definicion";
 import { conValoresPropios, HUECOS_SUPUESTOS, hrEstadoDefaults, numero, type Eleccion, type HrEstado, type ParametroHr } from "./estado";
 import type { DetalleHr, JustificacionHr } from "./justificacion";

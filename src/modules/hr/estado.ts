@@ -14,16 +14,13 @@
 // de persiana CP1.
 // =============================================================================
 
-import type { Capialzado } from "./catalogo";
+import type { Capialzado } from "../../lib/constructivo/catalogo";
+import type { Eleccion, ParametroAcustico } from "../../lib/constructivo/tipos";
+
+export type { Eleccion };
 
 /** Un valor propio que sustituye al del Catálogo. */
-export type ParametroHr = "m" | "RA" | "dRA" | "dLw" | "RAtr";
-
-/** Una solución elegida: la del Catálogo y, si se dan, valores propios. */
-export interface Eleccion {
-  id: string;
-  valores?: Partial<Record<ParametroHr, number>>;
-}
+export type ParametroHr = ParametroAcustico;
 
 export type ModoAscensor = "hueco" | "cuarto";
 

@@ -31,8 +31,10 @@ import {
 import { deduccionesTipo, deduccionesZona, dondeEstaTipo, loUsanZona } from "../../lib/edificio/deducciones";
 import { cambiarAscensor } from "../../modules/sua/editar";
 import type { Edificio, OrigenDocumento, TipoCubierta, UnidadTipo, UsoZona } from "../../lib/edificio/tipos";
-import { ORDEN_USOS, USOS, type LoUsa } from "../../lib/edificio/usos";
-import { BotonSec, CampoNumero, Fila, ParKV, PasoAPaso, Sub } from "./controles";
+import { ORDEN_USOS, USOS } from "../../lib/edificio/usos";
+import { cerramientosDe } from "../../lib/constructivo/cerramientos";
+import { EditorCerramientos } from "./EditorCerramientos";
+import { BotonSec, CampoNumero, Fila, LoUsan, ParKV, PasoAPaso, Sub, Tarjeta } from "./controles";
 import { ETIQUETA_CUBIERTA, type Seleccion } from "./presentacion";
 
 // =============================================================================
@@ -52,45 +54,9 @@ interface Props {
 const SELECT =
   "border-border-main bg-bg-primary text-text-primary focus:border-accent h-[34px] rounded border px-2 text-[13px] focus:outline-none";
 
-function Tarjeta(props: { k: string; titulo: string; children: ReactNode }): JSX.Element {
-  return (
-    <div className="border-border-main bg-bg-primary m-3.5 rounded border pb-1">
-      <div className="text-text-disabled px-3.5 pt-3 text-[10px] font-semibold tracking-[0.09em] uppercase">
-        {props.k}
-      </div>
-      <h2 className="text-text-primary px-3.5 pt-[3px] pb-3 text-[15px] leading-snug font-semibold">
-        {props.titulo}
-      </h2>
-      {props.children}
-    </div>
-  );
-}
-
 function Acciones({ children }: { children: ReactNode }): JSX.Element {
   return (
     <div className="border-border-sub flex flex-wrap gap-1.5 border-t px-3.5 py-3">{children}</div>
-  );
-}
-
-const COLOR_TRATO: Record<LoUsa["trato"], string> = {
-  si: "text-text-primary",
-  otra: "text-accent",
-  no: "text-text-disabled",
-};
-
-function LoUsan({ filas }: { filas: LoUsa[] }): JSX.Element {
-  return (
-    <ul>
-      {filas.map((f) => (
-        <li
-          key={f.codigo + f.texto}
-          className="border-border-sub grid grid-cols-[46px_minmax(0,1fr)] gap-2.5 border-t px-3.5 py-[7px] text-[12.5px] leading-[1.4]"
-        >
-          <b className="text-text-secondary pt-px font-mono text-[11px] font-semibold">{f.codigo}</b>
-          <span className={COLOR_TRATO[f.trato]}>{f.texto}</span>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -158,6 +124,8 @@ export function EditorSeleccion(props: Props): JSX.Element {
       return <EditorUnidad {...props} tipoId={seleccion.id} />;
     case "cubierta":
       return <EditorCubierta {...props} />;
+    case "cerramientos":
+      return <EditorCerramientos edificio={props.edificio} onCambiar={props.onCambiar} />;
   }
 }
 
@@ -602,7 +570,8 @@ function EditorUnidad(props: Props & { tipoId: string }): JSX.Element | null {
 const CUBIERTAS: TipoCubierta[] = ["plana_no_transitable", "plana_transitable", "inclinada"];
 
 function EditorCubierta(props: Props): JSX.Element {
-  const { edificio: e, onCambiar } = props;
+  const { edificio: e, onCambiar, onSeleccionar } = props;
+  const solucion = cerramientosDe(e).cubierta.sol;
   return (
     <Tarjeta k="Cubierta" titulo={ETIQUETA_CUBIERTA[e.cubierta.tipo]}>
       <Fila etiqueta="Tipo" htmlFor="ed-cub" columna>
@@ -626,6 +595,15 @@ function EditorCubierta(props: Props): JSX.Element {
           unidad="m²"
           onChange={(v) => onCambiar(setCubierta(e, { superficie_m2: v }))}
         />
+      </Fila>
+      <Fila etiqueta="Solución constructiva">
+        <button
+          type="button"
+          onClick={() => onSeleccionar({ tipo: "cerramientos" })}
+          className="text-accent hover:text-accent-hover text-right font-mono text-[12px]"
+        >
+          CEC {solucion.codigo} · en Cerramientos
+        </button>
       </Fila>
       <Sub>Lo usan</Sub>
       <LoUsan

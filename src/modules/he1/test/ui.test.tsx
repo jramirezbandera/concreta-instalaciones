@@ -47,7 +47,7 @@ describe("HE1 · desde El edificio (feature-15)", () => {
     expect(within(decisiones).getByRole("button", { name: "Bajo emisivo" })).toHaveAttribute("aria-pressed", "true");
 
     const aside = await findByRole("complementary", { name: FACHADA });
-    expect(aside).toHaveTextContent(/El aislante: con 60 mm se lleva el 68 % de la resistencia del muro\. Cumple desde 50 mm\./);
+    expect(aside).toHaveTextContent(/El aislante: con 60 mm se lleva el 71 % de la resistencia del muro\. Cumple desde 50 mm\./);
   });
 
   it("bajar el aislante a 40 mm no cumple; «Poner 50 mm» lo arregla", async () => {

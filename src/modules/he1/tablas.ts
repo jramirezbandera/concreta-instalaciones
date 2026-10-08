@@ -379,15 +379,19 @@ export const LAMBDA_REFERENCIA = tablaCTE(PROC_LAMBDA_REF, {
       descripcion: "Placa de yeso laminado PYL / cartón-yeso (≈900 kg/m³)",
       nota: "trasdosados",
     },
+    // El CEC no da λ de las fábricas, sino la R de la pieza con su mortero
+    // (3.17, p. 26): LP ½ pie 0,18; LHD 7 cm 0,16 (feature-26, K-CER.5). HE1 usa
+    // esa R directa; este λ es el equivalente para el espesor tipo (e/R), por si
+    // una capa se declara solo con el material.
     ladrillo_ceramico_perforado: {
-      lambda_W_mK: 0.49,
+      lambda_W_mK: 0.64,
       descripcion: "Ladrillo cerámico perforado (LP)",
-      nota: "fábrica de ½ pie habitual",
+      nota: "equivalente de R 0,18 en 115 mm (CEC 3.17)",
     },
     ladrillo_ceramico_hueco: {
-      lambda_W_mK: 0.32,
+      lambda_W_mK: 0.44,
       descripcion: "Ladrillo cerámico hueco (LH)",
-      nota: "tabiquería",
+      nota: "equivalente de R 0,16 en 70 mm (CEC 3.17)",
     },
     ladrillo_ceramico_macizo: {
       lambda_W_mK: 0.87,
@@ -410,9 +414,9 @@ export const LAMBDA_REFERENCIA = tablaCTE(PROC_LAMBDA_REF, {
       nota: "carpintería/estructura ligera",
     },
     eps: {
-      lambda_W_mK: 0.037,
+      lambda_W_mK: 0.039,
       descripcion: "EPS — poliestireno expandido",
-      nota: "rango catálogo 0,029–0,046",
+      nota: "valor recomendado del CEC (3.8.1, nota 1); rango 0,029–0,039",
     },
     xps: {
       lambda_W_mK: 0.034,
@@ -641,6 +645,7 @@ export type MaterialDifusion =
   | "ladrillo_ceramico"
   | "ladrillo_macizo"
   | "placa_yeso_laminado"
+  | "enlucido_yeso"
   | "eps"
   | "xps"
   | "pur_pir"
@@ -682,11 +687,9 @@ export const MU_REFERENCIA = tablaCTE(PROC_MU_REF, {
       nota: "muy permeable al vapor",
     },
     hormigon_armado: {
-      mu: 95,
-      muMin: 70,
-      muMax: 120,
+      mu: 80,
       descripcion: "Hormigón armado",
-      nota: "según densidad",
+      nota: "CEC, p. 17 (2 300 < ρ ≤ 2 500)",
     },
     mortero_cemento: {
       mu: 10,
@@ -701,10 +704,14 @@ export const MU_REFERENCIA = tablaCTE(PROC_MU_REF, {
       descripcion: "Ladrillo cerámico macizo",
     },
     placa_yeso_laminado: {
-      mu: 8,
-      muMin: 6,
-      muMax: 10,
-      descripcion: "Placa de yeso laminado / yeso",
+      mu: 4,
+      descripcion: "Placa de yeso laminado",
+      nota: "CEC 3.6.2, p. 20",
+    },
+    enlucido_yeso: {
+      mu: 6,
+      descripcion: "Enlucido de yeso",
+      nota: "CEC 3.7, p. 20 (1 000 ≤ ρ ≤ 1 300)",
     },
     eps: {
       mu: 60,
@@ -715,7 +722,7 @@ export const MU_REFERENCIA = tablaCTE(PROC_MU_REF, {
     xps: {
       mu: 150,
       muMin: 100,
-      muMax: 2200,
+      muMax: 220,
       descripcion: "XPS — poliestireno extruido",
       nota: "alta resistencia al vapor (barrera intrínseca)",
     },

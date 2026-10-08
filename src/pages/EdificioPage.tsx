@@ -4,10 +4,12 @@ import { Sparkles } from "lucide-react";
 import { Topbar } from "../components/layout/Topbar";
 import { useDrawer } from "../components/layout/AppShell";
 import { Avisos } from "../components/justificacion/ModuleLayout";
+import { CerramientosEdificio } from "../components/edificio/CerramientosEdificio";
 import { EditorSeleccion } from "../components/edificio/EditorSeleccion";
 import { SeccionEdificio } from "../components/edificio/SeccionEdificio";
 import type { Seleccion } from "../components/edificio/presentacion";
 import { TiposRepetidos } from "../components/edificio/TiposRepetidos";
+import { avisosCerramientos } from "../lib/constructivo/cerramientos";
 import { CASOS_EDIFICIO, edificioDeCaso, type CasoEdificio } from "../lib/edificio/casos";
 import { fraseEdificio, renumerar, validarEdificio } from "../lib/edificio/derivar";
 import { anadirPlantaArriba, anadirSotano, anadirZona, buscarZona } from "../lib/edificio/editar";
@@ -52,13 +54,15 @@ function existe(e: Edificio, s: Seleccion): boolean {
     case "unidad":
       return e.unidades.some((u) => u.id === s.id);
     case "cubierta":
+    case "cerramientos":
       return true;
   }
 }
 
-/** Caso al que corresponde el edificio tal cual (para marcarlo en el selector). */
+/** Caso al que corresponde el edificio tal cual (para marcarlo en el selector). Los cerramientos no cuentan. */
 function casoActual(e: Edificio): CasoEdificio | null {
-  const actual = JSON.stringify(renumerar(e));
+  const { cerramientos: _, ...resto } = renumerar(e);
+  const actual = JSON.stringify(resto);
   return CASOS_EDIFICIO.find((c) => JSON.stringify(edificioDeCaso(c.key)) === actual)?.key ?? null;
 }
 
@@ -89,13 +93,18 @@ export function EdificioPage(): JSX.Element {
   };
 
   const sel = seleccion && existe(edificio, seleccion) ? seleccion : seleccionInicial(edificio);
-  const avisos = useMemo(() => validarEdificio(edificio), [edificio]);
+  const avisos = useMemo(() => [...validarEdificio(edificio), ...avisosCerramientos(edificio)], [edificio]);
   const frase = useMemo(() => fraseEdificio(edificio), [edificio]);
   const caso = useMemo(() => casoActual(edificio), [edificio]);
 
   const cambiar = (e: Edificio) => actualizarEdificio(e, new Date().toISOString());
 
-  const aplicarCuadro = (nuevo: Edificio, documento: string) => {
+  /** Un caso o un cuadro sustituye las plantas y los tipos; los cerramientos elegidos se quedan. */
+  const conCerramientos = (nuevo: Edificio): Edificio =>
+    edificio.cerramientos ? { ...nuevo, cerramientos: edificio.cerramientos } : nuevo;
+
+  const aplicarCuadro = (leido: Edificio, documento: string) => {
+    const nuevo = conCerramientos(leido);
     setDeshacer({ anterior: edificio, aplicado: nuevo, documento });
     cambiar(nuevo);
     setSeleccion(seleccionInicial(nuevo));
@@ -103,7 +112,7 @@ export function EdificioPage(): JSX.Element {
   };
 
   const partirDe = (c: CasoEdificio) => {
-    const nuevo = edificioDeCaso(c);
+    const nuevo = conCerramientos(edificioDeCaso(c));
     cambiar(nuevo);
     setSeleccion(seleccionInicial(nuevo));
     setCasoPendiente(null);
@@ -298,6 +307,7 @@ export function EdificioPage(): JSX.Element {
               onCambiar={cambiar}
               onSeleccionar={seleccionar}
             />
+            <CerramientosEdificio edificio={edificio} seleccion={sel} onSeleccionar={seleccionar} />
           </section>
         </div>
       </div>

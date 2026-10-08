@@ -4,7 +4,7 @@ import { edificioDeCaso } from "../../../lib/edificio/casos";
 import type { Edificio } from "../../../lib/edificio/tipos";
 import { crearProyectoDemo } from "../../../lib/proyecto/demo";
 import type { DatosGenerales, Proyecto } from "../../../lib/proyecto/tipos";
-import { dRASuelo, dRATecho, dRATrasdosado, solucionDe } from "../catalogo";
+import { dRASuelo, dRATecho, dRATrasdosado, solucionDe } from "../../../lib/constructivo/catalogo";
 import { comprobarFachada, comprobarHorizontal, comprobarVertical, type EntradaVertical, type FachadaFlanco } from "../comprobar";
 import { hr } from "../definicion";
 import { hrEstadoDefaults, type HrEstado } from "../estado";

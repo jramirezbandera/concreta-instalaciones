@@ -6,7 +6,7 @@
 // ficha, que es dato del DB).
 // =============================================================================
 
-import type { ClaseFachada } from "./catalogo";
+import type { ClaseFachada } from "../../lib/constructivo/catalogo";
 import {
   ADOSADAS_HR,
   exigenciaHueco,

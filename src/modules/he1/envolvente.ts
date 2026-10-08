@@ -3,8 +3,10 @@
 //
 // Función PURA y DETERMINISTA. Del edificio y las decisiones salen los cuatro
 // cerramientos que se predimensionan, cada uno con una composición tipo:
-//   - la FACHADA de lo que se protege (½ pie de ladrillo, aislante, cámara y
-//     tabique): el espesor del aislante es la decisión 1;
+//   - la FACHADA de lo que se protege, con las capas del catálogo común
+//     (src/lib/constructivo, feature-26): la habitual es la F 3.2 del CEC (½ pie
+//     de ladrillo, cámara, aislante y tabique); el espesor del aislante es la
+//     decisión 1;
 //   - la CUBIERTA (plana invertida o inclinada, según El edificio);
 //   - el SUELO de la envolvente (con el aislante bajo el forjado, en su cara
 //     fría), según lo que haya debajo de la planta más baja que se protege: un local sin uso (decisión 2: no habitable, UT, u otra
@@ -20,12 +22,15 @@
 // el primero que cumple. Criterios de proyecto (en la ficha):
 //   - lo que se protege son las viviendas o las oficinas (sus plantas);
 //   - λ y µ orientativos del CEC; Ug y Uf orientativos del CEC;
+//   - fábricas con la R de la pieza del CEC (3.17), no con un λ (K-CER.5);
 //   - forjados con λ del hormigón armado (lado seguro);
 //   - b = 1 en el contacto con no habitables (lado seguro, DA/1 Tabla 7);
 //   - el forjado sobre un local en bruto, un garaje o una cámara sanitaria no
 //     comprueba fRsi (escasa producción de vapor, DA/2 §4.1.1).
 // =============================================================================
 
+import { FACHADA_HABITUAL, indiceFuera, solucionDe, type SolFachada } from "../../lib/constructivo/catalogo";
+import { MATERIALES_CEC, type ClaveMaterial } from "../../lib/constructivo/materiales";
 import { etiquetaNivel, plantasDe } from "../../lib/edificio/derivar";
 import type { Edificio, TipoCubierta, UsoZona } from "../../lib/edificio/tipos";
 import { calcHE1, espesorMinimoCapa_m, type CapaInput, type CerramientoInput, type HE1Inputs, type HuecoInput } from "./calc";
@@ -37,6 +42,7 @@ import {
   UF_REFERENCIA_CEC,
   UG_REFERENCIA_CEC,
   type ClaseHigrometria,
+  type MaterialReferencia,
   type ZonaClimatica,
 } from "./tablas";
 
@@ -158,40 +164,75 @@ export const CAPA_AISLANTE: Record<Exclude<RolCerramiento, "ventanas">, string> 
   suelo: "suelo-aislante",
 };
 
-function fachada(e_mm: number): CerramientoInput {
+/** El material de HE1 de cada material del catálogo (para el dibujo de la sección). */
+const MATERIAL_HE1: Partial<Record<ClaveMaterial, MaterialReferencia>> = {
+  mortero: "mortero_cemento",
+  enlucido: "enlucido_yeso",
+  pyl: "placa_yeso_laminado",
+  lp_medio_pie: "ladrillo_ceramico_perforado",
+  lp_un_pie: "ladrillo_ceramico_perforado",
+  lhd: "ladrillo_ceramico_hueco",
+  bh_ad_140: "bloque_hormigon",
+  xps: "xps",
+  eps: "eps",
+  lana_mineral: "lana_mineral",
+};
+
+/**
+ * Las capas de HE1 de una fachada del catálogo, con su aislante de `e_mm`. Cada
+ * capa lleva la R o el λ y el µ del CEC; la cámara sin ventilar, la R de la
+ * Tabla 2 del DA/1 por su espesor; lo que queda por fuera de una cámara muy
+ * ventilada no cuenta (K-CER.9).
+ */
+export function capasDeFachada(f: SolFachada, prefijo: string, e_mm: number): CapaInput[] {
+  const iFuera = indiceFuera(f);
+  return f.capas.map((c, i): CapaInput => {
+    const clave: ClaveMaterial = c.rol === "AT" ? f.aislante : c.material;
+    const m = MATERIALES_CEC[clave];
+    const espesor_m = (c.rol === "AT" ? e_mm : c.espesor_mm) / 1000;
+    const base = { id: `${prefijo}-${c.clave}`, nombre: (c.rol !== "AT" && c.nombre) || m.nombre, material: MATERIAL_HE1[clave], espesor_m };
+    if (iFuera >= 0 && i >= iFuera) return { ...base, fueraDelCalculo: true };
+    const t = m.termico;
+    switch (t.tipo) {
+      case "R":
+        return { ...base, resistencia_m2K_W: t.R_m2K_W, mu: m.mu };
+      case "camara":
+        return { ...base, resistencia_m2K_W: rCamaraDe(espesor_m, "horizontal"), mu: m.mu };
+      case "lambda":
+        return { ...base, lambda_W_mK: t.lambda_W_mK, mu: m.mu };
+      case "fuera":
+        return { ...base, fueraDelCalculo: true };
+    }
+  });
+}
+
+/** Una fachada del catálogo como cerramiento de HE1. */
+export function fachadaDe(f: SolFachada, e_mm: number, id = "fachada", nombre = "Fachada"): CerramientoInput {
   return {
-    id: "fachada",
-    nombre: "Fachada",
+    id,
+    nombre,
     tipoElemento: "muro_suelo_exterior",
     direccionFlujo: "horizontal",
-    capas: [
-      { id: "fachada-enlucido", nombre: "Enlucido de yeso", material: "enlucido_yeso", materialDifusion: "placa_yeso_laminado", espesor_m: 0.015 },
-      { id: "fachada-tabique", nombre: "Tabique de ladrillo hueco", material: "ladrillo_ceramico_hueco", espesor_m: 0.07 },
-      {
-        id: "fachada-camara",
-        nombre: "Cámara de aire sin ventilar",
-        materialDifusion: "camara_aire_sin_ventilar",
-        espesor_m: 0.03,
-        resistencia_m2K_W: rCamaraDe(0.03, "horizontal"),
-      },
-      { id: CAPA_AISLANTE.fachada, nombre: "XPS", material: "xps", espesor_m: e_mm / 1000 },
-      { id: "fachada-ladrillo", nombre: "½ pie de ladrillo perforado", material: "ladrillo_ceramico_perforado", espesor_m: 0.115 },
-      { id: "fachada-enfoscado", nombre: "Enfoscado de mortero", material: "mortero_cemento", espesor_m: 0.015 },
-    ],
+    camaraMuyVentilada: indiceFuera(f) >= 0,
+    capas: capasDeFachada(f, id, e_mm),
   };
+}
+
+function fachada(e_mm: number): CerramientoInput {
+  return fachadaDe(solucionDe("fachada", FACHADA_HABITUAL), e_mm);
 }
 
 function cubierta(tipo: TipoCubierta, e_mm: number): CerramientoInput {
   const capas: CapaInput[] =
     tipo === "inclinada"
       ? [
-          { id: "cubierta-enlucido", nombre: "Enlucido de yeso", material: "enlucido_yeso", materialDifusion: "placa_yeso_laminado", espesor_m: 0.015 },
+          { id: "cubierta-enlucido", nombre: "Enlucido de yeso", material: "enlucido_yeso", espesor_m: 0.015 },
           { id: "cubierta-forjado", nombre: "Forjado inclinado", material: "hormigon_armado", espesor_m: 0.25 },
           { id: CAPA_AISLANTE.cubierta, nombre: "XPS", material: "xps", espesor_m: e_mm / 1000 },
           { id: "cubierta-mortero", nombre: "Capa de mortero", material: "mortero_cemento", espesor_m: 0.03 },
         ]
       : [
-          { id: "cubierta-enlucido", nombre: "Enlucido de yeso", material: "enlucido_yeso", materialDifusion: "placa_yeso_laminado", espesor_m: 0.015 },
+          { id: "cubierta-enlucido", nombre: "Enlucido de yeso", material: "enlucido_yeso", espesor_m: 0.015 },
           { id: "cubierta-forjado", nombre: "Forjado", material: "hormigon_armado", espesor_m: 0.3 },
           { id: "cubierta-pendientes", nombre: "Hormigón de pendientes", material: "hormigon_masa_aridos_densos", materialDifusion: "hormigon_armado", espesor_m: 0.1 },
           // Lámina bituminosa: Sd del producto (orientativo, criterio).

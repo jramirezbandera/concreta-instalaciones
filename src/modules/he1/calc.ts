@@ -164,6 +164,11 @@ export interface CapaInput {
    * Sd al método Glaser y NO se usa µ·e. Para una barrera, usar el Sd del producto.
    */
   sd_m?: number;
+  /**
+   * La capa no cuenta ni en la U ni en Glaser: la cámara muy ventilada y lo que
+   * queda por fuera de ella (K-CER.9). Se dibuja igual.
+   */
+  fueraDelCalculo?: boolean;
 }
 
 /** Un cerramiento (elemento de la envolvente) con sus capas, de interior a exterior. */
@@ -182,6 +187,11 @@ export interface CerramientoInput {
    * `false` salvo para `contacto_no_habitable_terreno`, donde se asume `true`.
    */
   caraInterior?: boolean;
+  /**
+   * Fachada con cámara muy ventilada: Rse = Rsi, y las capas por fuera de la
+   * cámara van con `fueraDelCalculo` (K-CER.9, la regla que siguen las R0 del CEC).
+   */
+  camaraMuyVentilada?: boolean;
   /** Capas del cerramiento, de INTERIOR a EXTERIOR. */
   capas: CapaInput[];
   /** Hueco por la ec. (10) del DA DB-HE/1 (solo `tipoElemento: "hueco"`). */
@@ -417,12 +427,13 @@ export interface HE1Result {
 
 // -----------------------------------------------------------------------------
 // DEFAULTS — muro de fachada multicapa (ejemplo del research, zona D, flujo
-// horizontal) que da CUMPLE en U (≈0,384 ≤ 0,41), CUMPLE en fRsi y SIN
+// horizontal) que da CUMPLE en U (≈0,401 ≤ 0,41), CUMPLE en fRsi y SIN
 // condensación intersticial en enero; + una cubierta plana y un hueco, para que
 // el caso ilustre los 3 tipos de verificación. Vivienda → clase 3 o inferior.
 //
 // Muro (research §BLOQUE 3): enfoscado 15 mm · LP 115 mm · XPS 60 mm · cámara
-// 30 mm (R directa) · LH 70 mm · enlucido 15 mm. RT ≈ 2,606 → U ≈ 0,384 W/m²K.
+// 30 mm (R directa) · LH 70 mm · enlucido 15 mm. RT ≈ 2,49 → U ≈ 0,401 W/m²K
+// (fábricas con el λ equivalente de la R del CEC, feature-26).
 // -----------------------------------------------------------------------------
 export const he1Defaults: HE1Inputs = {
   zonaClimatica: "D",
@@ -510,6 +521,20 @@ function psat_Pa(theta_C: number): number {
  */
 function resolverCapa(c: CapaInput): ResultadoCapaHE1 {
   const espesor_m = espesorDe(c);
+  if (c.fueraDelCalculo) {
+    return {
+      id: c.id,
+      nombre: c.nombre ?? c.material ?? c.id,
+      material: c.material ?? null,
+      espesor_m,
+      lambda_W_mK: null,
+      resistencia_m2K_W: 0,
+      mu: null,
+      sd_m: 0,
+      lambdaOrientativa: false,
+      muOrientativo: false,
+    };
+  }
 
   // --- Término térmico (R efectiva) ------------------------------------------
   let lambda_W_mK: number | null = null;
@@ -639,6 +664,8 @@ function materialDifusionDe(material: MaterialReferencia | undefined): MaterialD
       return "mortero_cemento";
     case "placa_yeso_laminado":
       return "placa_yeso_laminado";
+    case "enlucido_yeso":
+      return "enlucido_yeso";
     case "ladrillo_ceramico_perforado":
     case "ladrillo_ceramico_hueco":
       return "ladrillo_ceramico";
@@ -655,7 +682,7 @@ function materialDifusionDe(material: MaterialReferencia | undefined): MaterialD
     case "madera_densidad_media":
       return "madera";
     default:
-      // enlucido_yeso, hormigon_masa, bloque_hormigon, baldosa, betún…:
+      // hormigon_masa, bloque_hormigon, baldosa, betún…:
       // sin clave de difusión directa → el motor pedirá µ explícito si hace falta.
       return null;
   }
@@ -762,6 +789,7 @@ function calcularCerramiento(
   for (let i = 0; i < cer.capas.length; i++) {
     const cIn = cer.capas[i];
     const cOut = capas[i];
+    if (cIn.fueraDelCalculo) continue;
     if (cOut.resistencia_m2K_W === 0 && cIn.resistencia_m2K_W === undefined) {
       warnings.push(
         `Cerramiento "${cer.id}", capa "${cOut.id}": sin λ ni R válidos (R=0). ` +
@@ -783,7 +811,7 @@ function calcularCerramiento(
     cer.caraInterior ?? cer.tipoElemento === "contacto_no_habitable_terreno";
   const sup = rsiRseDe(cer.direccionFlujo, usarInterior);
   const rsi_m2K_W = sup.rsi_m2K_W;
-  const rse_m2K_W = sup.rse_m2K_W;
+  const rse_m2K_W = cer.camaraMuyVentilada ? sup.rsi_m2K_W : sup.rse_m2K_W;
 
   // --- Transmitancia U = b/RT (RT = Rsi + ΣRi + Rse) -------------------------
   // Un hueco con `hueco` va por la ec. (10) del DA DB-HE/1: su RT es 1/UH.

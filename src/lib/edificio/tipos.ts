@@ -11,6 +11,8 @@
 // se muestra.
 // =============================================================================
 
+import type { Cerramientos } from "../constructivo/tipos";
+
 /** Tipo de cubierta: discrimina exigencias de HS1, HS5 (pluviales) y SUA. */
 export type TipoCubierta = "plana_transitable" | "plana_no_transitable" | "inclinada";
 
@@ -178,6 +180,12 @@ export interface Edificio {
    * él, se supone que lo hay solo cuando SUA 9 lo exige.
    */
   ascensor?: boolean;
+  /**
+   * Los tipos de fachada, ventana, cubierta y forjado (feature-26), del Catálogo
+   * de Elementos Constructivos. Lo leen HE1, HR y HS1. Sin él, los habituales
+   * (`lib/constructivo/cerramientos.ts`).
+   */
+  cerramientos?: Cerramientos;
   /** De ARRIBA abajo. Siempre hay al menos un grupo sobre rasante (la PB). */
   grupos: GrupoPlantas[];
   unidades: UnidadTipo[];
