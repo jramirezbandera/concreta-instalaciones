@@ -13,8 +13,9 @@
 
 import { fmt } from "../../lib/units/format";
 import type { ResultadoCapaHE1 } from "./calc";
-import { nombresProtegidos, VENTANA_TIPO, VIDRIOS, type RolCerramiento } from "./envolvente";
-import { cerramientoDe, type JustificacionHe1 } from "./justificacion";
+import { MARCOS } from "../../lib/constructivo/tipos";
+import { claseDe, esRol, nombresProtegidos, VENTANA_TIPO, VIDRIOS, type RolCerramiento } from "./envolvente";
+import { cerramientoDe, rolesDe, ventanaHe1De, type JustificacionHe1 } from "./justificacion";
 import { etiquetaNivel } from "../../lib/edificio/derivar";
 
 export const DIBUJO_HE1 = { W: 640, H: 400 } as const;
@@ -86,7 +87,7 @@ export interface DibujoVentana {
   tipo: "ventana";
   ancho: number;
   alto: number;
-  rol: "ventanas";
+  rol: "ventanas" | "ventanas-pb";
   marco: { x: number; y: number; w: number; h: number };
   vidrios: { x: number; y: number; w: number; h: number }[];
   montante: { x: number; y0: number; y1: number; w: number };
@@ -131,16 +132,17 @@ function patronDe(c: ResultadoCapaHE1): PatronCapa {
   }
 }
 
-/** Qué se dibuja según lo seleccionado: la condensación y lo de fuera, en la fachada. */
-export function vistaDe(seleccion: string | null): RolCerramiento {
-  return seleccion === "cubierta" || seleccion === "suelo" || seleccion === "ventanas" ? seleccion : "fachada";
+/** Qué se dibuja según lo seleccionado: la condensación y lo de fuera, en la fachada general. */
+export function vistaDe(seleccion: string | null, j?: JustificacionHe1): RolCerramiento {
+  if (!esRol(seleccion)) return "fachada";
+  return !j || rolesDe(j.propuesta).includes(seleccion) ? seleccion : "fachada";
 }
 
 // -----------------------------------------------------------------------------
 
-function muro(j: JustificacionHe1): DibujoMuro {
+function muro(j: JustificacionHe1, rol: "fachada" | "fachada-pb"): DibujoMuro {
   const { W, H } = DIBUJO_HE1;
-  const r = cerramientoDe(j, "fachada").detalle.r;
+  const r = cerramientoDe(j, rol).detalle.r;
   const total_mm = r.capas.reduce((a, c) => a + c.espesor_m * 1000, 0);
   const s = Math.min(1.4, 380 / Math.max(1, total_mm));
   const x0 = 110;
@@ -171,7 +173,7 @@ function muro(j: JustificacionHe1): DibujoMuro {
 
   const condensa = r.glaser.condensa.flatMap((c, k) => (c ? [{ x: xsInterfaz[k], y: Y(T[k] ?? te) }] : []));
   const etiquetas: EtiquetaHe1[] = [
-    { key: "et-fachada", elementoId: "fachada", x: (x0 + xe) / 2, y: 376 },
+    { key: `et-${rol}`, elementoId: rol, x: (x0 + xe) / 2, y: 376 },
     { key: "et-superficial", elementoId: "superficial", x: 58, y: 262 },
     { key: "et-intersticial", elementoId: "intersticial", x: (x0 + xe) / 2, y: 22 },
   ];
@@ -179,7 +181,7 @@ function muro(j: JustificacionHe1): DibujoMuro {
     tipo: "muro",
     ancho: W,
     alto: H,
-    rol: "fachada",
+    rol,
     capas,
     x0,
     xe,
@@ -261,9 +263,9 @@ function horizontal(j: JustificacionHe1, rol: "cubierta" | "suelo"): DibujoHoriz
   };
 }
 
-function ventana(j: JustificacionHe1): DibujoVentana {
+function ventana(j: JustificacionHe1, rol: "ventanas" | "ventanas-pb"): DibujoVentana {
   const { W, H } = DIBUJO_HE1;
-  const r = cerramientoDe(j, "ventanas").detalle.r;
+  const r = cerramientoDe(j, rol).detalle.r;
   const h = r.hueco!;
   const k = 200; // px por metro
   const x = 120;
@@ -278,7 +280,7 @@ function ventana(j: JustificacionHe1): DibujoVentana {
     tipo: "ventana",
     ancho: W,
     alto: H,
-    rol: "ventanas",
+    rol,
     marco: { x, y, w, h: hh },
     vidrios: [
       { x: x + b, y: y + b, w: vw, h: vh },
@@ -288,7 +290,8 @@ function ventana(j: JustificacionHe1): DibujoVentana {
     textos: [
       { x: 406, y: 116, texto: `${v.corto} · Ug ${n1(h.ug_W_m2K)}`, fuerte: true },
       { x: 406, y: 132, texto: `vidrio · ${n0((1 - h.fraccionMarco) * 100)} % del hueco` },
-      { x: 406, y: 258, texto: `Marco PVC · Uf ${n1(h.uf_W_m2K)}`, fuerte: true },
+      { x: 406, y: 258, texto: `${MARCOS[ventanaHe1De(j, rol).marco].nombre.replace(" con RPT", " RPT")}`, fuerte: true },
+      { x: 406, y: 242, texto: `Marco · Uf ${n1(h.uf_W_m2K)}` },
       { x: 406, y: 274, texto: `${n0(h.fraccionMarco * 100)} % del hueco` },
       { x: 406, y: 318, texto: `Junta Ψ ${n2(h.psi_W_mK)} · ${n1(h.lg_m)} m` },
     ],
@@ -300,14 +303,14 @@ function ventana(j: JustificacionHe1): DibujoVentana {
       { x: x + w / 2, y: y + hh + 22, texto: `${n2(VENTANA_TIPO.ancho_m)} m`, ancla: "middle" },
       { x: x + w + 10, y: y + hh / 2 + 4, texto: `${n2(VENTANA_TIPO.alto_m)} m`, ancla: "start" },
     ],
-    etiquetas: [{ key: "et-ventanas", elementoId: "ventanas", x: x + w / 2, y: 24 }],
+    etiquetas: [{ key: `et-${rol}`, elementoId: rol, x: x + w / 2, y: 24 }],
   };
 }
 
 export function calcularDibujoHe1(j: JustificacionHe1, rol: RolCerramiento): DibujoHe1Geo {
   if (rol === "cubierta" || rol === "suelo") return horizontal(j, rol);
-  if (rol === "ventanas") return ventana(j);
-  return muro(j);
+  if (rol === "ventanas" || rol === "ventanas-pb") return ventana(j, rol);
+  return muro(j, claseDe(rol) === "fachada" ? rol : "fachada");
 }
 
 /** Tamaño nativo del dibujo de HE1. Lo usa la ficha. */

@@ -9,9 +9,23 @@ import type { DetalleElemento, EstadoPresentacion } from "../../lib/cte/presenta
 import { listaY, mayuscula } from "../../lib/cte/redaccion";
 import type { Aviso } from "../../lib/cte/resultado";
 import { fmt } from "../../lib/units/format";
-import { nombresProtegidos, rangoNiveles, VENTANA_TIPO, VIDRIOS, type DecisionesEfectivasHe1, type RolCerramiento } from "./envolvente";
+import { MATERIALES_CEC } from "../../lib/constructivo/materiales";
+import { MARCOS } from "../../lib/constructivo/tipos";
+import { uHueco } from "./calc";
+import {
+  aislanteDe,
+  CAMPO_AISLANTE,
+  claseDe,
+  huecoDe,
+  nombresProtegidos,
+  rangoNiveles,
+  VENTANA_TIPO,
+  VIDRIOS,
+  type DecisionesEfectivasHe1,
+  type RolCerramiento,
+} from "./envolvente";
 import type { He1Estado } from "./estado";
-import { cerramientoDe, type ElementoHe1, type JustificacionHe1 } from "./justificacion";
+import { cerramientoDe, fachadaHe1De, ventanaHe1De, type ElementoHe1, type JustificacionHe1 } from "./justificacion";
 
 function n0(v: number): string {
   return fmt(v, undefined, 0);
@@ -31,10 +45,17 @@ const CLASE: Record<DecisionesEfectivasHe1["higrometria"], string> = {
 
 const NOMBRE_ROL: Record<RolCerramiento, string> = {
   fachada: "la fachada",
+  "fachada-pb": "la fachada de la planta baja",
   cubierta: "la cubierta",
   suelo: "el forjado",
   ventanas: "las ventanas",
+  "ventanas-pb": "las ventanas de la planta baja",
 };
+
+/** «PVC de tres cámaras» → «PVC de tres cámaras»; «Madera de 500 kg/m³» → «madera de 500 kg/m³». */
+function marcoMinuscula(nombre: string): string {
+  return nombre.startsWith("PVC") ? nombre : nombre[0].toLowerCase() + nombre.slice(1);
+}
 
 /** «Cáceres, 459 m». */
 export function lugar(j: JustificacionHe1): string {
@@ -55,7 +76,7 @@ export function valorCorto(el: ElementoHe1): string {
 export function textoEtiqueta(el: ElementoHe1): string {
   switch (el.detalle.clase) {
     case "cerramiento":
-      return `${el.id === "ventanas" ? "UH" : "U"} ${valorCorto(el)} W/m²K`;
+      return `${claseDe(el.detalle.rol) === "ventanas" ? "UH" : "U"} ${valorCorto(el)} W/m²K`;
     case "superficial":
       return `fRsi ${valorCorto(el)}`;
     case "intersticial":
@@ -65,18 +86,20 @@ export function textoEtiqueta(el: ElementoHe1): string {
   }
 }
 
-/** «ladrillo + XPS 60», «plana invertida · XPS 100», «EPS 60», «PVC · bajo emisivo». */
+/** «F 3.2 · XPS 60», «plana invertida · XPS 100», «EPS 60», «PVC de tres cámaras · bajo emisivo». */
 export function composicionCorta(j: JustificacionHe1, rol: RolCerramiento): string {
   const d = j.propuesta.decisiones;
-  switch (rol) {
-    case "fachada":
-      return `ladrillo + XPS ${d.aislanteFachada_mm}`;
+  switch (claseDe(rol)) {
+    case "fachada": {
+      const f = fachadaHe1De(j, rol).sol;
+      return `${f.codigo} · ${MATERIALES_CEC[f.aislante].nombre} ${aislanteDe(d, rol as "fachada" | "fachada-pb")}`;
+    }
     case "cubierta":
       return `${j.propuesta.envolvente.cubierta === "inclinada" ? "inclinada" : "plana invertida"} · XPS ${d.aislanteCubierta_mm}`;
     case "suelo":
       return `${cerramientoDe(j, "suelo").detalle.aislante?.nombre ?? "aislante"} ${d.aislanteSuelo_mm} bajo el forjado`;
     case "ventanas":
-      return `PVC · ${VIDRIOS[d.vidrio].corto}`;
+      return `${MARCOS[ventanaHe1De(j, rol).marco].nombre} · ${VIDRIOS[d.vidrio].corto}`;
   }
 }
 
@@ -132,17 +155,19 @@ export function franjaDe(el: ElementoHe1, j: JustificacionHe1, estado: EstadoPre
           ? ` Con la humedad interior de ${CLASE[d.higrometria]}, manda la condensación superficial: U ≤ ${n2(det.manda.u)}.`
           : "";
 
-      if (det.rol === "fachada") {
+      if (claseDe(det.rol) === "fachada") {
+        const f = fachadaHe1De(j, det.rol).sol;
         return {
           ...base,
-          clase: "Fachada · muro",
-          titulo: "½ pie de ladrillo, XPS, cámara y tabique",
+          clase: det.rol === "fachada-pb" ? "Fachada de la planta baja · muro" : "Fachada · muro",
+          titulo: f.nombre,
           unidad,
-          manda: `El aislante: con ${a?.espesor_mm ?? 0} mm se lleva el ${n0((a?.parteR ?? 0) * 100)} % de la resistencia del muro.${desde}${porFRsi}`,
+          manda: `El aislante: con ${a?.espesor_mm ?? 0} mm de ${a?.nombre ?? "aislante"} se lleva el ${n0((a?.parteR ?? 0) * 100)} % de la resistencia del muro.${desde}${porFRsi}`,
           filas: [
             limite,
+            { k: "Tipo", v: `CEC ${f.codigo}, p. ${f.pagina} · El edificio` },
             { k: "Cara interior en enero", v: `${n1(r.glaser.temperatura_C[0] ?? 20)} °C` },
-            ...filasCondensacion(j, "fachada"),
+            ...filasCondensacion(j, det.rol),
           ],
           nota: "λ orientativos del Catálogo de Elementos Constructivos: en proyecto, los del fabricante.",
         };
@@ -155,7 +180,11 @@ export function franjaDe(el: ElementoHe1, j: JustificacionHe1, estado: EstadoPre
           titulo: inclinada ? "Cubierta inclinada" : "Cubierta plana invertida",
           unidad,
           manda: `El aislante: XPS de ${a?.espesor_mm ?? 0} mm ${inclinada ? "sobre el forjado, bajo la teja" : "sobre la impermeabilización"}.${desde}${porFRsi}`,
-          filas: [limite, ...filasCondensacion(j, "cubierta")],
+          filas: [
+            limite,
+            { k: "Forjado", v: `${j.propuesta.tipos.forjado.nombre} · R ${n2(j.propuesta.tipos.forjado.R)}` },
+            ...filasCondensacion(j, "cubierta"),
+          ],
         };
       }
       if (det.rol === "suelo") {
@@ -174,7 +203,10 @@ export function franjaDe(el: ElementoHe1, j: JustificacionHe1, estado: EstadoPre
         } else {
           manda = `Sobre una cámara sanitaria, el forjado da a un espacio no habitable: límite de UT, ${n2(lim ?? 0)}.`;
         }
-        const filas = [{ k: "Aislante", v: `${a?.nombre ?? "Aislante"} ${a?.espesor_mm ?? 0} mm bajo el forjado` }];
+        const filas = [
+          { k: "Aislante", v: `${a?.nombre ?? "Aislante"} ${a?.espesor_mm ?? 0} mm bajo el forjado` },
+          { k: "Forjado", v: `${j.propuesta.tipos.forjado.nombre} · R ${n2(j.propuesta.tipos.forjado.R)}` },
+        ];
         if (s.otroLimite !== null) {
           filas.push({ k: "Con el otro criterio", v: `${n2(r.u_W_m2K)} ${r.u_W_m2K <= s.otroLimite ? "≤" : ">"} ${n2(s.otroLimite)}` });
         }
@@ -191,11 +223,12 @@ export function franjaDe(el: ElementoHe1, j: JustificacionHe1, estado: EstadoPre
       // Ventanas
       const h = r.hueco!;
       const v = VIDRIOS[d.vidrio];
+      const marco = MARCOS[ventanaHe1De(j, det.rol).marco].nombre;
       const pctVidrio = n0((1 - h.fraccionMarco) * 100);
       return {
         ...base,
-        clase: "Huecos",
-        titulo: "Ventanas de PVC",
+        clase: det.rol === "ventanas-pb" ? "Huecos de la planta baja" : "Huecos",
+        titulo: `Ventanas de ${marcoMinuscula(marco)}`,
         unidad,
         manda:
           d.vidrio === "doble"
@@ -204,7 +237,7 @@ export function franjaDe(el: ElementoHe1, j: JustificacionHe1, estado: EstadoPre
         nota: "Ug y Uf orientativos del Catálogo de Elementos Constructivos: en proyecto, los del fabricante.",
         filas: [
           { k: "Vidrio", v: `${v.corto} · Ug ${n1(h.ug_W_m2K)}` },
-          { k: "Marco", v: `PVC tres cámaras · Uf ${n1(h.uf_W_m2K)} · ${n0(h.fraccionMarco * 100)} %` },
+          { k: "Marco", v: `${marco} · Uf ${n1(h.uf_W_m2K)} · ${n0(h.fraccionMarco * 100)} %` },
           { k: "Junta vidrio-marco", v: `Ψ ${n2(h.psi_W_mK)} · ${n1(h.lg_m)} m` },
           { k: "Ventana tipo", v: `${n2(VENTANA_TIPO.ancho_m)} × ${n2(VENTANA_TIPO.alto_m)} · dos hojas` },
         ],
@@ -221,7 +254,7 @@ export function franjaDe(el: ElementoHe1, j: JustificacionHe1, estado: EstadoPre
         nota: "El DB-HE 2019 solo cuantifica la condensación intersticial; esta es la del DA DB-HE/2.",
         filas: det.filas.map((f) => ({
           k: mayuscula(cerramientoDe(j, f.id).nombre),
-          v: f.fRsi === null ? (f.id === "ventanas" ? "no procede" : "no se comprueba") : `${n2(f.fRsi)}`,
+          v: f.fRsi === null ? (claseDe(f.id) === "ventanas" ? "no procede" : "no se comprueba") : `${n2(f.fRsi)}`,
         })),
       };
 
@@ -274,14 +307,16 @@ export function fraseHe1(j: JustificacionHe1): string {
   const partes: string[] = [];
   if (buenos.length > 0) partes.push(`${mayuscula(listaY(buenos))} ${buenos.length === 1 && !buenos[0].endsWith("s") ? "cumple" : "cumplen"}.`);
   for (const e of malos) {
-    if (e.id === "ventanas") {
+    const rol = e.id as RolCerramiento;
+    if (claseDe(rol) === "ventanas") {
+      const quien = mayuscula(NOMBRE_ROL[rol]);
       partes.push(
         j.propuesta.decisiones.vidrio === "doble"
-          ? `Las ventanas no: con vidrio sin capa bajo emisiva pasan del límite de zona ${j.zona}.`
-          : `Las ventanas no: con ${VIDRIOS[j.propuesta.decisiones.vidrio].corto} pasan del límite de zona ${j.zona}.`,
+          ? `${quien} no: con vidrio sin capa bajo emisiva pasan del límite de zona ${j.zona}.`
+          : `${quien} no: con ${VIDRIOS[j.propuesta.decisiones.vidrio].corto} pasan del límite de zona ${j.zona}.`,
       );
-    } else if (e.id === "fachada") {
-      partes.push(`La fachada no, con ${j.propuesta.decisiones.aislanteFachada_mm} mm de aislante.`);
+    } else if (claseDe(rol) === "fachada") {
+      partes.push(`${mayuscula(NOMBRE_ROL[rol])} no, con ${aislanteDe(j.propuesta.decisiones, rol as "fachada" | "fachada-pb")} mm de aislante.`);
     } else {
       partes.push(`${mayuscula(NOMBRE_ROL[e.id as RolCerramiento])} no: U ${valorCorto(e)} pasa del límite.`);
     }
@@ -337,23 +372,26 @@ function guardar<K extends keyof DecisionesEfectivasHe1>(j: JustificacionHe1, k:
   return { [k]: v === j.propuesta.habituales[k] ? "habitual" : v } as Partial<He1Estado>;
 }
 
-const CAMPO_AISLANTE = {
-  fachada: "aislanteFachada_mm",
-  cubierta: "aislanteCubierta_mm",
-  suelo: "aislanteSuelo_mm",
-} as const;
-
 export function textoIncumplimiento(el: ElementoHe1, j: JustificacionHe1): TextoIncumplimiento | null {
   if (el.veredicto !== "fail") return null;
   const det = el.detalle;
   if (det.clase === "cerramiento") {
     const r = det.r;
     const lim = r.ulim_W_m2K ?? 0;
-    if (det.rol === "ventanas") {
-      const habitual = j.propuesta.habituales.vidrio;
-      const otro = habitual === j.propuesta.decisiones.vidrio ? "bajo_emisivo_plus" : habitual;
+    if (det.rol === "ventanas" || det.rol === "ventanas-pb") {
+      const titulo = `${mayuscula(NOMBRE_ROL[det.rol])} no cumplen`;
+      const marco = ventanaHe1De(j, det.rol).marco;
+      // El primer vidrio mejor que el puesto con el que esta ventana entra en el límite.
+      const orden = ["doble", "bajo_emisivo", "bajo_emisivo_plus"] as const;
+      const otro = orden.slice(orden.indexOf(j.propuesta.decisiones.vidrio) + 1).find((v) => uHueco(huecoDe(v, marco)).uh_W_m2K <= lim);
+      if (!otro) {
+        return {
+          titulo,
+          detalle: `UH ${n2(r.u_W_m2K)} > ${n2(lim)}. Ni con el mejor vidrio entra en el límite: con un marco ${marcoMinuscula(MARCOS[marco].nombre)} (Uf ${n1(r.hueco!.uf_W_m2K)}) hace falta otro marco, que se elige en El edificio.`,
+        };
+      }
       return {
-        titulo: "Las ventanas no cumplen",
+        titulo,
         detalle: `UH ${n2(r.u_W_m2K)} > ${n2(lim)}. Con vidrio ${VIDRIOS[otro].corto}, la ventana entra en el límite.`,
         cambio: { etiqueta: otro === "bajo_emisivo" ? "Cambiar a bajo emisivo" : "Cambiar a bajo emisivo + borde cálido", aplicar: guardar(j, "vidrio", otro) },
       };
@@ -369,7 +407,7 @@ export function textoIncumplimiento(el: ElementoHe1, j: JustificacionHe1): Texto
   }
   if (det.clase === "superficial") {
     const peor = det.filas.filter((f) => f.fRsi !== null).sort((a, b) => (a.fRsi ?? 1) - (b.fRsi ?? 1))[0];
-    if (!peor || peor.id === "ventanas") return { titulo: "La condensación superficial no cumple", detalle: "" };
+    if (!peor || peor.id === "ventanas" || peor.id === "ventanas-pb") return { titulo: "La condensación superficial no cumple", detalle: "" };
     const c = cerramientoDe(j, peor.id);
     const min = c.detalle.aislante?.minimo_mm ?? null;
     return {
@@ -387,9 +425,10 @@ export function textoIncumplimiento(el: ElementoHe1, j: JustificacionHe1): Texto
 /** La descripción del dibujo para el lector de pantalla. */
 export function describirDibujoHe1(j: JustificacionHe1, rol: RolCerramiento): string {
   const el = cerramientoDe(j, rol);
-  if (rol === "ventanas") {
+  if (rol === "ventanas" || rol === "ventanas-pb") {
     const h = el.detalle.r.hueco!;
-    return `Alzado de la ventana tipo de ${n2(VENTANA_TIPO.ancho_m)} por ${n2(VENTANA_TIPO.alto_m)} m, de dos hojas: el vidrio ocupa el ${n0((1 - h.fraccionMarco) * 100)} % y el marco de PVC el ${n0(h.fraccionMarco * 100)} %. UH ${n2(h.uh_W_m2K)} W/m²K, ${resultadoLista(el)}.`;
+    const marco = marcoMinuscula(MARCOS[ventanaHe1De(j, rol).marco].nombre);
+    return `Alzado de la ventana tipo de ${n2(VENTANA_TIPO.ancho_m)} por ${n2(VENTANA_TIPO.alto_m)} m, de dos hojas: el vidrio ocupa el ${n0((1 - h.fraccionMarco) * 100)} % y el marco de ${marco} el ${n0(h.fraccionMarco * 100)} %. UH ${n2(h.uh_W_m2K)} W/m²K, ${resultadoLista(el)}.`;
   }
   const capas = el.detalle.r.capas.map((c) => `${c.nombre} ${n0(c.espesor_m * 1000)} mm`).join(", ");
   return `Sección de ${NOMBRE_ROL[rol]} por capas, de dentro afuera: ${capas}. U ${n2(el.detalle.r.u_W_m2K)} W/m²K, ${resultadoLista(el)}.`;

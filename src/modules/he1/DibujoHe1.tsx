@@ -187,12 +187,12 @@ function Muro({ g, c }: { g: DibujoMuro; c: Ctx }): JSX.Element {
       </text>
       {c.pulsable(
         "muro",
-        "fachada",
+        g.rol,
         <>
           {g.capas.map((k) => (
             <rect key={k.id} x={k.x0} y={g.yTop} width={k.x1 - k.x0} height={h} fill={relleno(k.patron, c)} stroke={P.ink} strokeWidth={0.6} />
           ))}
-          <rect x={g.x0} y={g.yTop} width={g.xe - g.x0} height={h} fill="none" stroke={c.color("fachada", "transparent")} strokeWidth={2} />
+          <rect x={g.x0} y={g.yTop} width={g.xe - g.x0} height={h} fill="none" stroke={c.color(g.rol, "transparent")} strokeWidth={2} />
         </>,
       )}
       {g.capas.map((k) => {
@@ -289,9 +289,9 @@ function Ventana({ g, c }: { g: DibujoVentana; c: Ctx }): JSX.Element {
     <>
       {c.pulsable(
         "ventana",
-        "ventanas",
+        g.rol,
         <>
-          <rect x={g.marco.x} y={g.marco.y} width={g.marco.w} height={g.marco.h} fill={P.slab} stroke={c.color("ventanas", P.ink)} strokeWidth={1.4} />
+          <rect x={g.marco.x} y={g.marco.y} width={g.marco.w} height={g.marco.h} fill={P.slab} stroke={c.color(g.rol, P.ink)} strokeWidth={1.4} />
           <rect x={g.montante.x} y={g.montante.y0} width={g.montante.w} height={g.montante.y1 - g.montante.y0} fill={P.slab} stroke={P.ink} strokeWidth={0.6} />
           {g.vidrios.map((v, i) => (
             <rect key={i} x={v.x} y={v.y} width={v.w} height={v.h} fill={c.tinte(P.accent, 9)} stroke={P.ink} strokeWidth={0.8} />

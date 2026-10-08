@@ -155,8 +155,8 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
    - La fachada habitual es **F 3.2**, no F 3.1 como decía este plan: es la que HE1 calcula
      desde el paso 1, y en HR vale lo mismo que F 3.1 (K-CER.15; lo comprueba un test). En el
      paso 4, un proyecto con F 3.1 guardado en HR tendrá que decidir qué manda.
-   - «Planta baja dentro de HE1» = tiene alguna zona que `usos.ts` mete en la envolvente:
-     viviendas, unifamiliar, oficinas **y vestíbulo** (el plan decía viviendas u oficinas).
+   - ~~«Planta baja dentro de HE1» con el vestíbulo~~: corregido en el paso 3. Es lo que
+     protege HE1 (viviendas, unifamiliar u oficinas), como decía el plan.
    - La planta baja distinta empieza igual que la general; el interruptor cubre fachada y
      ventana juntas.
    - Los valores propios no se editan en El edificio: el tipo los guarda, y en el paso 4 HR
@@ -169,6 +169,43 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
    suelo con el forjado elegido; ventana o ventanas). Cada fachada con aislante propone su
    mínimo y lo decide aparte: `aislanteFachada_mm` pasa a ser por tipo. Las decisiones, el
    dibujo de la sección y la ficha cubren uno o dos tipos de fachada y de ventana.
+
+   **Hecho (2026-10-08), paso 3:**
+   - `envolvente.ts`: `tiposHe1(e, env)` saca de El edificio las fachadas, las ventanas, la
+     cubierta y el forjado que entran. Roles nuevos `fachada-pb` y `ventanas-pb` (con
+     `claseDe`, `esRol`, `capaAislante`, `aislanteDe`, `CAMPO_AISLANTE`); los cuatro ids de
+     siempre no cambian.
+   - La fachada de la planta baja es un cerramiento aparte si la planta 0 se protege y es
+     otro tipo; si solo se protege la planta baja, su fachada es la única («fachada»). Las
+     ventanas de la planta baja, si cambia el **marco** (el vidrio es de HE1 y el tipo
+     acústico no cambia la UH).
+   - Aislante por fachada: `aislanteFachada_mm` (la general) y `aislanteFachadaPB_mm`
+     (opcional, «habitual» por defecto). Cada una propone su mínimo y su arreglo escribe su
+     campo.
+   - Cubierta y suelo: la capa de forjado es el de El edificio, con su R y su µ del 3.18
+     (K-CER.10/11), en vez del hormigón armado con λ. Contraste: la cubierta plana por capas
+     queda del lado seguro y a menos de 0,03 del R0 del CEC; la inclinada, a menos de 0,01.
+   - Ventanas: Uf del 3.16 por el marco y Ψ de la Tabla 10 por su familia. El vidrio habitual
+     es el primero con el que cumplen todas; el arreglo solo ofrece un vidrio que lo arregle
+     de verdad y, si ninguno basta, pide otro marco en El edificio.
+   - Decisiones, «Qué entra», dibujo, franja, ficha y memoria con una o dos fachadas y
+     ventanas, cada una con su código del CEC. El aviso de El edificio sobre la planta baja
+     usa ya lo que protege HE1 (viviendas u oficinas, sin el vestíbulo).
+   - **Cifras que cambian** en todos los proyectos, por el forjado del CEC (R 0,21 del
+     unidireccional de 30 cm frente a 0,13 del hormigón armado): en el Demo, U de la cubierta
+     de 0,30 a 0,29 y del suelo de 0,45 a 0,43; mínimos de 80 a 70 mm (cubierta) y de 40 a
+     30 mm (suelo). Lo propuesto no cambia (100 y 60 mm son los espesores de partida). Un
+     espesor fijado solo puede pasar de no cumplir a cumplir.
+   - Tests: `he1/test/cerramientos.test.ts` (28 nuevos); 1282 en verde. Comprobado en el
+     navegador con el Plurifamiliar, planta baja con SATE y marco metálico con RPT.
+
+   **Decisiones a validar:**
+   - El aislante es **por fachada** (general y planta baja), no por id de tipo: si se
+     cambia el tipo, un espesor fijado a mano se mantiene (y se ve «No es lo habitual»).
+   - Un solo vidrio para todas las ventanas.
+   - La cubierta sigue por capas (la necesita Glaser); el paquete del CEC solo contrasta.
+     La plana queda 0,026 por debajo del R0 del CEC (no cuenta solado ni mortero).
+   - El forjado elegido sirve también a la cubierta inclinada (antes, hormigón de 25 cm).
 4. **HR**: lee fachada, ventana, cubierta y forjado de El edificio y quita esos campos de
    `HrEstado`. La fachada de la planta baja se comprueba con los recintos de la planta 0; la
    general, con los demás.

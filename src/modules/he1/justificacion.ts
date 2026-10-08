@@ -3,7 +3,9 @@
 // El edificio, verificada por `calcHE1`, con el contrato de resultado de
 // REDISENO-V4 §3.2. PURA y DETERMINISTA; no redacta.
 //
-// Elementos: los cuatro cerramientos (U frente a su límite), la condensación
+// Elementos: los cerramientos (U frente a su límite: la fachada, la cubierta, el
+// suelo y las ventanas, y la fachada y las ventanas de la planta baja si son
+// otras, feature-26), la condensación
 // superficial (comprobación complementaria del DA DB-HE/2), la intersticial
 // (Glaser, enero, ap. 3.3) y el coeficiente global y el control solar, que se
 // justifican con la herramienta oficial (fuera de alcance).
@@ -14,12 +16,15 @@ import type { Edificio } from "../../lib/edificio/tipos";
 import type { Veredicto } from "../../lib/pdf/renderFicha";
 import { calcHE1, type HE1Result, type ResultadoCerramientoHE1 } from "./calc";
 import {
-  CAPA_AISLANTE,
+  capaAislante,
+  claseDe,
   limiteQueManda,
   propuestaHe1,
+  type FachadaHe1,
   type PropuestaHe1,
   type RolCerramiento,
   type SueloEnvolvente,
+  type VentanaHe1,
 } from "./envolvente";
 import type { He1Estado } from "./estado";
 import { climaEneroDe, ulimDe, ulimParticionDe, type ZonaClimatica } from "./tablas";
@@ -72,7 +77,10 @@ export interface JustificacionHe1 {
   veredicto: Veredicto;
 }
 
-const ROLES: RolCerramiento[] = ["fachada", "cubierta", "suelo", "ventanas"];
+/** Los cerramientos que entran, en el orden de la lista. */
+export function rolesDe(p: PropuestaHe1): RolCerramiento[] {
+  return [...p.tipos.fachadas.map((f) => f.rol), "cubierta", "suelo", ...p.tipos.ventanas.map((v) => v.rol)];
+}
 
 export function nombreSuelo(tipo: SueloEnvolvente["tipo"]): string {
   switch (tipo) {
@@ -90,7 +98,7 @@ export function nombreSuelo(tipo: SueloEnvolvente["tipo"]): string {
 }
 
 function citaDe(rol: RolCerramiento, r: ResultadoCerramientoHE1): string[] {
-  switch (rol) {
+  switch (claseDe(rol)) {
     case "fachada":
       return ["HE 1 · tabla 3.1.1.a · UM", "DA DB-HE/1 ec. (1)"];
     case "cubierta":
@@ -121,19 +129,20 @@ export function justificarHe1(estado: He1Estado, edificio: Edificio, obra: ObraH
   const avisos: Aviso[] = [];
   const porId = (id: RolCerramiento) => resultado.porCerramiento.find((x) => x.id === id)!;
 
-  // ── Los cuatro cerramientos ─────────────────────────────────────────────────
+  // ── Los cerramientos ────────────────────────────────────────────────────────
+  const ROLES = rolesDe(propuesta);
   for (const rol of ROLES) {
     const r = porId(rol);
-    const opaco = rol !== "ventanas";
+    const clase = claseDe(rol);
     let aislante: Extract<DetalleHe1, { clase: "cerramiento" }>["aislante"] = null;
-    if (opaco) {
-      const capa = r.capas.find((x) => x.id === CAPA_AISLANTE[rol]);
+    if (rol !== "ventanas" && rol !== "ventanas-pb") {
+      const capa = r.capas.find((x) => x.id === capaAislante(rol));
       if (capa && capa.lambda_W_mK) {
         aislante = {
           nombre: capa.nombre,
           espesor_mm: Math.round(capa.espesor_m * 1000),
           lambda_W_mK: capa.lambda_W_mK,
-          minimo_mm: propuesta.minimos[rol],
+          minimo_mm: propuesta.minimos[rol] ?? null,
           parteR: r.rt_m2K_W > 0 ? capa.resistencia_m2K_W / r.rt_m2K_W : 0,
         };
       }
@@ -153,14 +162,14 @@ export function justificarHe1(estado: He1Estado, edificio: Edificio, obra: ObraH
         : undefined;
     elementos.push({
       id: rol,
-      nombre: rol === "fachada" ? "Fachada" : rol === "cubierta" ? "Cubierta" : rol === "suelo" ? nombreSuelo(propuesta.envolvente.suelo.tipo) : "Ventanas",
+      nombre: rol === "suelo" ? nombreSuelo(propuesta.envolvente.suelo.tipo) : r.nombre,
       tipo: "cerramiento",
       veredicto: r.cumpleU ? "ok" : "fail",
       valor: { valor: r.u_W_m2K, unidad: "W/m²K" },
       limite: r.ulim_W_m2K !== null ? { valor: r.ulim_W_m2K, unidad: "W/m²K" } : undefined,
       manda: {
         tipo: "formula",
-        formula: rol === "ventanas" ? "UH = (Ag·Ug + Af·Uf + lg·Ψ)/Aw" : r.b !== 1 ? "U = b/ΣR" : "U = 1/ΣR",
+        formula: clase === "ventanas" ? "UH = (Ag·Ug + Af·Uf + lg·Ψ)/Aw" : r.b !== 1 ? "U = b/ΣR" : "U = 1/ΣR",
         resultado: { valor: r.u_W_m2K, unidad: "W/m²K" },
       },
       cita: citaDe(rol, r),
@@ -169,7 +178,7 @@ export function justificarHe1(estado: He1Estado, edificio: Edificio, obra: ObraH
         rol,
         r,
         aislante,
-        manda: opaco ? limiteQueManda(r.ulim_W_m2K, r.fRsiAplica, d.higrometria, zona) : null,
+        manda: clase !== "ventanas" ? limiteQueManda(r.ulim_W_m2K, r.fRsiAplica, d.higrometria, zona) : null,
         suelo,
       },
     });
@@ -238,4 +247,14 @@ export function justificarHe1(estado: He1Estado, edificio: Edificio, obra: ObraH
 export function cerramientoDe(j: JustificacionHe1, rol: RolCerramiento): ElementoHe1 & { detalle: Extract<DetalleHe1, { clase: "cerramiento" }> } {
   const el = j.elementos.find((e) => e.id === rol)!;
   return el as ElementoHe1 & { detalle: Extract<DetalleHe1, { clase: "cerramiento" }> };
+}
+
+/** La fachada de un rol de fachada, con su tipo de El edificio. */
+export function fachadaHe1De(j: JustificacionHe1, rol: RolCerramiento): FachadaHe1 {
+  return j.propuesta.tipos.fachadas.find((f) => f.rol === rol) ?? j.propuesta.tipos.fachadas[0];
+}
+
+/** Las ventanas de un rol de ventanas, con su tipo y su marco de El edificio. */
+export function ventanaHe1De(j: JustificacionHe1, rol: RolCerramiento): VentanaHe1 {
+  return j.propuesta.tipos.ventanas.find((v) => v.rol === rol) ?? j.propuesta.tipos.ventanas[0];
 }

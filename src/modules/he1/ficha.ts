@@ -6,7 +6,8 @@
 // Trazabilidad (SPEC §4/§8): cada dato declara su ORIGEN y cada verificación
 // cita su apartado. Lo orientativo (λ, µ, Ug, Uf del CEC) y los criterios de
 // proyecto (composiciones tipo, b = 1, la ventana tipo, la altitud de la
-// capital) se rotulan. El vidrio y el marco se declaran por separado (HE1 ap. 4
+// capital) se rotulan. Los tipos de fachada, marco y forjado vienen de El
+// edificio, con su código y su página del CEC (feature-26). El vidrio y el marco se declaran por separado (HE1 ap. 4
 // párr. 3 d).
 // =============================================================================
 
@@ -18,7 +19,8 @@ import type { Edificio } from "../../lib/edificio/tipos";
 import type { CitaNormativa, FichaData, FilaDato, FilaVerificacion } from "../../lib/pdf/renderFicha";
 import { fmt } from "../../lib/units/format";
 import { ENGINE_VERSION } from "../../lib/version";
-import { VIDRIOS, type RolCerramiento } from "./envolvente";
+import { MARCOS } from "../../lib/constructivo/tipos";
+import { claseDe, VIDRIOS, type RolCerramiento } from "./envolvente";
 import type { He1Estado } from "./estado";
 import { cerramientoDe, type ElementoHe1, type JustificacionHe1 } from "./justificacion";
 import { memoriaHe1 } from "./memoria";
@@ -62,7 +64,7 @@ function verificacion(el: ElementoHe1): FilaVerificacion {
   let limite = "—";
   switch (det.clase) {
     case "cerramiento":
-      valor = `${el.id === "ventanas" ? "UH" : "U"} ${n2(det.r.u_W_m2K)} W/m²K`;
+      valor = `${claseDe(det.rol) === "ventanas" ? "UH" : "U"} ${n2(det.r.u_W_m2K)} W/m²K`;
       limite = det.r.ulim_W_m2K === null ? "—" : `≤ ${n2(det.r.ulim_W_m2K)}`;
       break;
     case "superficial":
@@ -89,6 +91,7 @@ export interface OpcionesFichaHe1 {
 
 export function toFichaData(j: JustificacionHe1, o: OpcionesFichaHe1): FichaData {
   const d = j.propuesta.decisiones;
+  const t = j.propuesta.tipos;
   const suelo = cerramientoDe(j, "suelo").detalle;
   const ventana = cerramientoDe(j, "ventanas").detalle.r.hueco!;
 
@@ -122,9 +125,18 @@ export function toFichaData(j: JustificacionHe1, o: OpcionesFichaHe1): FichaData
       origen: `${ORIGEN_DECISION} · DA DB-HE/2 §2.2.2`,
     },
     { concepto: "Envolvente", valor: descripcionEnvolvente(j), origen: ORIGEN_EDIFICIO },
-    { concepto: "Fachada", valor: composicionCorta(j, "fachada"), origen: "Composición tipo · aislante: decisión" },
+    ...t.fachadas.map((f) => ({
+      concepto: f.nombre,
+      valor: `${composicionCorta(j, f.rol)} mm · ${f.sol.nombre} (CEC p. ${f.sol.pagina})`,
+      origen: `${ORIGEN_EDIFICIO} · aislante: decisión`,
+    })),
     { concepto: "Cubierta", valor: composicionCorta(j, "cubierta"), origen: ORIGEN_TIPO },
     { concepto: cerramientoDe(j, "suelo").nombre, valor: composicionCorta(j, "suelo"), origen: ORIGEN_TIPO },
+    {
+      concepto: "Forjado",
+      valor: `${t.forjado.nombre} · R ${n2(t.forjado.R)} m²K/W · µ ${n0(t.forjado.mu)}`,
+      origen: `${ORIGEN_EDIFICIO} · CEC ${t.forjado.codigo}, p. ${t.forjado.pagina}`,
+    },
   ];
   if (suelo.suelo?.tipo === "local") {
     datosPartida.push({
@@ -136,8 +148,14 @@ export function toFichaData(j: JustificacionHe1, o: OpcionesFichaHe1): FichaData
   datosPartida.push(
     { concepto: "Ventana tipo", valor: `${n2(1.2)} × ${n2(1.4)} m · dos hojas · lg ${n1(ventana.lg_m)} m`, origen: "Criterio de proyecto" },
     { concepto: "Vidrio", valor: `${VIDRIOS[d.vidrio].nombre} · Ug ${n1(ventana.ug_W_m2K)} · ${n2(ventana.ag_m2)} m²`, origen: `${ORIGEN_DECISION} · Ug orientativo CEC` },
-    { concepto: "Marco", valor: `PVC tres cámaras · Uf ${n1(ventana.uf_W_m2K)} · ${n2(ventana.af_m2)} m²`, origen: "Uf orientativo CEC" },
-    { concepto: "Junta vidrio-marco", valor: `Ψ ${n2(ventana.psi_W_mK)} W/mK`, origen: "DA DB-HE/1 Tabla 10" },
+    ...t.ventanas.flatMap((v) => {
+      const h = cerramientoDe(j, v.rol).detalle.r.hueco!;
+      const pb = v.rol === "ventanas-pb" ? " de la planta baja" : "";
+      return [
+        { concepto: `Marco${pb}`, valor: `${MARCOS[v.marco].nombre} · Uf ${n1(h.uf_W_m2K)} · ${n2(h.af_m2)} m²`, origen: `${ORIGEN_EDIFICIO} · Uf orientativo CEC 3.16` },
+        { concepto: `Junta vidrio-marco${pb}`, valor: `Ψ ${n2(h.psi_W_mK)} W/mK`, origen: "DA DB-HE/1 Tabla 10" },
+      ];
+    }),
   );
 
   const verificaciones = j.elementos.map(verificacion);
@@ -147,9 +165,9 @@ export function toFichaData(j: JustificacionHe1, o: OpcionesFichaHe1): FichaData
     return `${t.titulo} ${t.detalle} — ${o.revisados.includes(a.id) ? "Revisado por el proyectista." : "Pendiente de revisar."}`;
   });
   observaciones.push(
-    `Composiciones tipo, de dentro afuera. Fachada: ${capasDe(j, "fachada")} mm. Cubierta: ${capasDe(j, "cubierta")} mm. ${cerramientoDe(j, "suelo").nombre}: ${capasDe(j, "suelo")} mm.`,
+    `Composiciones, de dentro afuera. ${t.fachadas.map((f) => `${f.nombre} (CEC ${f.sol.codigo}): ${capasDe(j, f.rol)} mm.`).join(" ")} Cubierta: ${capasDe(j, "cubierta")} mm. ${cerramientoDe(j, "suelo").nombre}: ${capasDe(j, "suelo")} mm.`,
     "Predimensionado por elementos con composiciones tipo: λ, µ, Ug y Uf son orientativos del Catálogo de Elementos Constructivos y se sustituyen por los declarados por el fabricante (HE1 ap. 5.1). Las fábricas entran con la R de la pieza del Catálogo (apartado 3.17), no con una λ.",
-    "Criterio: los forjados se calculan con la λ del hormigón armado y el contacto con espacios no habitables con b = 1 (lado seguro, DA DB-HE/1 ec. 6).",
+    `Los forjados de la cubierta y del suelo son el elegido en El edificio y entran con la R y la µ de su fila del Catálogo (apartado 3.18). Criterio: el contacto con espacios no habitables, con b = 1 (lado seguro, DA DB-HE/1 ec. 6).`,
     `Criterio: el forjado sobre ${suelo.suelo?.tipo === "terreno" ? "la cámara sanitaria" : suelo.suelo?.tipo === "garaje" ? "el garaje" : "el local"} no comprueba fRsi por la escasa producción de vapor del espacio inferior (DA DB-HE/2 §4.1.1); a los huecos no se les aplican fRsi ni Glaser.`,
     "Criterio: la ventana tipo es de 1,20 × 1,40 m de dos hojas; la fracción de marco es 0,25 (DB-HE Anejo A) y la junta, el perímetro de los vidrios.",
   );

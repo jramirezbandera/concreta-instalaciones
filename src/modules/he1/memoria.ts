@@ -8,8 +8,10 @@ import type { MemoriaDoc, Trozo } from "../../lib/cte/presentacion";
 import { listaY } from "../../lib/cte/redaccion";
 import { fmt } from "../../lib/units/format";
 import { ENGINE_VERSION } from "../../lib/version";
-import { nombresProtegidos, rangoNiveles, VIDRIOS } from "./envolvente";
-import { cerramientoDe, type JustificacionHe1 } from "./justificacion";
+import { MATERIALES_CEC } from "../../lib/constructivo/materiales";
+import { MARCOS } from "../../lib/constructivo/tipos";
+import { aislanteDe, claseDe, nombresProtegidos, rangoNiveles, VIDRIOS, type RolCerramiento } from "./envolvente";
+import { cerramientoDe, fachadaHe1De, rolesDe, ventanaHe1De, type JustificacionHe1 } from "./justificacion";
 import { lugar } from "./textos";
 
 function n0(v: number): string {
@@ -26,17 +28,42 @@ function cumple(u: number, lim: number | null): string {
   return lim === null ? "" : ` ${u <= lim ? "≤" : ">"} ${n2(lim)}`;
 }
 
-function linea(j: JustificacionHe1, rol: "fachada" | "cubierta" | "suelo" | "ventanas"): Trozo[] {
+/** «PVC de tres cámaras», «madera de 500 kg/m³». */
+function minuscula(nombre: string): string {
+  return nombre.startsWith("PVC") ? nombre : nombre[0].toLowerCase() + nombre.slice(1);
+}
+
+/** «forjado unidireccional, bovedilla de hormigón, 30 cm», «losa maciza de hormigón armado 20 cm». */
+function forjadoEnTexto(nombre: string): string {
+  const n = nombre[0].toLowerCase() + nombre.slice(1);
+  return n.startsWith("losa") ? n : `forjado ${n}`;
+}
+
+/** «lana mineral», pero «XPS». */
+function aislanteEnTexto(nombre: string): string {
+  return nombre === nombre.toUpperCase() ? nombre : nombre.toLowerCase();
+}
+
+function linea(j: JustificacionHe1, rol: RolCerramiento): Trozo[] {
   const el = cerramientoDe(j, rol);
   const r = el.detalle.r;
   const d = j.propuesta.decisiones;
   const u: Trozo = { v: `${n2(r.u_W_m2K)} W/m²K` };
-  switch (rol) {
-    case "fachada":
-      return ["– Fachada de ½ pie de ladrillo perforado, XPS de ", { v: `${d.aislanteFachada_mm} mm` }, ", cámara y tabique: U = ", u, `${cumple(r.u_W_m2K, r.ulim_W_m2K)}.`];
+  switch (claseDe(rol)) {
+    case "fachada": {
+      const f = fachadaHe1De(j, rol);
+      const donde = rol === "fachada-pb" ? " de la planta baja" : "";
+      return [
+        `– Fachada${donde}: ${f.sol.nombre} (CEC ${f.sol.codigo}), con ${MATERIALES_CEC[f.sol.aislante].nombre} de `,
+        { v: `${aislanteDe(d, rol as "fachada" | "fachada-pb")} mm` },
+        ": U = ",
+        u,
+        `${cumple(r.u_W_m2K, r.ulim_W_m2K)}.`,
+      ];
+    }
     case "cubierta":
       return [
-        `– Cubierta ${j.propuesta.envolvente.cubierta === "inclinada" ? "inclinada" : "plana invertida"} con XPS de `,
+        `– Cubierta ${j.propuesta.envolvente.cubierta === "inclinada" ? "inclinada" : "plana invertida"} sobre ${forjadoEnTexto(j.propuesta.tipos.forjado.nombre)} (CEC ${j.propuesta.tipos.forjado.codigo}), con XPS de `,
         { v: `${d.aislanteCubierta_mm} mm` },
         ": U = ",
         u,
@@ -56,12 +83,13 @@ function linea(j: JustificacionHe1, rol: "fachada" | "cubierta" | "suelo" | "ven
               : s.tipo === "zona_comun"
                 ? "sobre el portal, partición con zona común (tabla 3.2),"
                 : "sanitario sobre cámara ventilada, espacio no habitable,";
-      return [`– Forjado de ${rangoNiveles([j.propuesta.envolvente.niveles[0] ?? 0])} ${que} con ${(el.detalle.aislante?.nombre ?? "aislante").toLowerCase()} de `, { v: `${d.aislanteSuelo_mm} mm` }, " bajo el forjado: U = ", u, `${cumple(r.u_W_m2K, r.ulim_W_m2K)}.`];
+      return [`– Forjado de ${rangoNiveles([j.propuesta.envolvente.niveles[0] ?? 0])} ${que} con ${aislanteEnTexto(el.detalle.aislante?.nombre ?? "aislante")} de `, { v: `${d.aislanteSuelo_mm} mm` }, " bajo el forjado: U = ", u, `${cumple(r.u_W_m2K, r.ulim_W_m2K)}.`];
     }
     case "ventanas": {
       const h = r.hueco!;
+      const donde = rol === "ventanas-pb" ? " de la planta baja" : "";
       return [
-        `– Ventanas de PVC de tres cámaras con ${VIDRIOS[d.vidrio].nombre} (Ug ${n1(h.ug_W_m2K)}, Uf ${n1(h.uf_W_m2K)}, Ψ ${n2(h.psi_W_mK)}, fracción de marco ${n0(h.fraccionMarco * 100)} %): UH = `,
+        `– Ventanas${donde} de ${minuscula(MARCOS[ventanaHe1De(j, rol).marco].nombre)} con ${VIDRIOS[d.vidrio].nombre} (Ug ${n1(h.ug_W_m2K)}, Uf ${n1(h.uf_W_m2K)}, Ψ ${n2(h.psi_W_mK)}, fracción de marco ${n0(h.fraccionMarco * 100)} %): UH = `,
         { v: `${n2(r.u_W_m2K)} W/m²K` },
         `${cumple(r.u_W_m2K, r.ulim_W_m2K)}.`,
       ];
@@ -90,17 +118,14 @@ export function memoriaHe1(j: JustificacionHe1): MemoriaDoc {
       : `La condensación intersticial se comprueba por el método de Glaser en el mes de enero, a falta del clima de la obra con ${n0(j.resultado.tempExteriorEnero_C)} °C y ${n0(j.resultado.hrExterior_pct)} % en el exterior (lado seguro): `,
     condensan.length === 0
       ? "no se producen."
-      : `puede haberlas en ${listaY(condensan.map((r) => (r === "suelo" ? "el forjado" : `la ${r}`)))}, y se justifica aparte el balance anual de evaporación.`,
+      : `puede haberlas en ${listaY(condensan.map((r) => (r === "suelo" ? "el forjado" : r === "fachada-pb" ? "la fachada de la planta baja" : `la ${r}`)))}, y se justifica aparte el balance anual de evaporación.`,
   ];
   return {
     titulo: "Envolvente térmica",
     norma: "DB-HE 1",
     parrafos: [
       p1,
-      linea(j, "fachada"),
-      linea(j, "cubierta"),
-      linea(j, "suelo"),
-      linea(j, "ventanas"),
+      ...rolesDe(j.propuesta).map((rol) => linea(j, rol)),
       condensacion,
       [
         "Esta comprobación es un predimensionado por elementos. El coeficiente global de transmisión y el control solar se justifican con la herramienta oficial, que se adjunta como documento independiente.",

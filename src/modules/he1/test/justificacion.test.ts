@@ -142,17 +142,18 @@ describe("justificarHe1 · el Demo (Cáceres, zona C)", () => {
     expect(j.clima).toMatchObject({ provincia: "Cáceres", temp_C: 7.8, hr_pct: 78, corregido: false });
     expect(j.propuesta.decisiones).toEqual({
       aislanteFachada_mm: 60,
+      aislanteFachadaPB_mm: null,
       local: "no_habitable",
       higrometria: "clase_3_o_inferior",
       vidrio: "bajo_emisivo",
       aislanteCubierta_mm: 100,
       aislanteSuelo_mm: 60,
     });
-    expect(j.propuesta.minimos).toEqual({ fachada: 50, cubierta: 80, suelo: 40 });
+    expect(j.propuesta.minimos).toEqual({ fachada: 50, cubierta: 70, suelo: 30 });
     expect(j.elementos.map((e) => [e.id, e.veredicto, resultadoLista(e)])).toEqual([
       ["fachada", "ok", "0,40 ≤ 0,49"],
-      ["cubierta", "ok", "0,30 ≤ 0,40"],
-      ["suelo", "ok", "0,45 ≤ 0,70"],
+      ["cubierta", "ok", "0,29 ≤ 0,40"],
+      ["suelo", "ok", "0,43 ≤ 0,70"],
       ["ventanas", "ok", "1,99 ≤ 2,10"],
       ["superficial", "ok", "fRsi 0,90 ≥ 0,56"],
       ["intersticial", "ok", "no hay"],
@@ -165,15 +166,15 @@ describe("justificarHe1 · el Demo (Cáceres, zona C)", () => {
       "Todos los elementos de la envolvente están por debajo de los límites de zona C y no hay condensaciones. El coeficiente global se justifica con HULC.",
     );
     const f = franjaDe(cerramientoDe(j, "fachada"), j, "ok");
-    expect(f.titulo).toBe("½ pie de ladrillo, XPS, cámara y tabique");
-    expect(f.manda).toBe("El aislante: con 60 mm se lleva el 71 % de la resistencia del muro. Cumple desde 50 mm.");
+    expect(f.titulo).toBe("Enfoscado + LP ½ pie + cámara + aislante + LHD 7 + enlucido");
+    expect(f.manda).toBe("El aislante: con 60 mm de XPS se lleva el 71 % de la resistencia del muro. Cumple desde 50 mm.");
     const filas = filasQueEntraHe1(j, "C4", estadosElementos(j.elementos, j.avisos, []));
     expect(filas.map((x) => [x.titulo, x.trato])).toEqual([
       ["Zona climática", "C4"],
       ["Envolvente", "4 cerramientos"],
       ["Fachada", "0,40 / 0,49"],
-      ["Cubierta", "0,30 / 0,40"],
-      ["Forjado sobre el local", "0,45 / 0,70"],
+      ["Cubierta", "0,29 / 0,40"],
+      ["Forjado sobre el local", "0,43 / 0,70"],
       ["Ventanas", "1,99 / 2,10"],
     ]);
   });
@@ -195,7 +196,7 @@ describe("justificarHe1 · el Demo (Cáceres, zona C)", () => {
     const f = toFichaData(j, { estado: he1EstadoDefaults, edificio: DEMO, revisados: [], svg: tamanoDibujoHe1() });
     expect(f.edicionDB).toBe("DB-HE (consolidado 14-06-2022)");
     expect(f.datosPartida.find((d) => d.concepto === "Clima exterior de enero")).toMatchObject({ valor: "7,8 °C · 78 %" });
-    expect(f.datosPartida.find((d) => d.concepto === "Marco")?.valor).toMatch(/^PVC tres cámaras · Uf 1,8/);
+    expect(f.datosPartida.find((d) => d.concepto === "Marco")?.valor).toMatch(/^PVC de tres cámaras · Uf 1,8/);
     expect(f.verificaciones).toHaveLength(7);
     expect(f.svg?.elementId).toBe(HE1_PDF_SVG_ID);
   });

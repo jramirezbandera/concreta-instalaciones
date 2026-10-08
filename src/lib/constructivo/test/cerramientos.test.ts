@@ -110,7 +110,7 @@ describe("cerramientos de El edificio (feature-26)", () => {
   it("la fachada de una planta baja sin viviendas ni oficinas no entra en HE1 (K-CER.1: la planta 0)", () => {
     expect(plantaBajaEnHe1(edificioDeCaso("plurifamiliar"))).toBe(true);
     expect(plantaBajaEnHe1(edificioDeCaso("unifamiliar"))).toBe(true);
-    expect(plantaBajaEnHe1(edificioDeCaso("oficinas"))).toBe(true); // el vestíbulo está dentro de la envolvente
+    expect(plantaBajaEnHe1(edificioDeCaso("oficinas"))).toBe(false); // vestíbulo y local: HE1 no los protege
     const locales = edificioDeCaso("plurifamiliar_locales");
     expect(plantaBajaEnHe1(locales)).toBe(false);
     expect(avisosCerramientos(locales)).toEqual([]);

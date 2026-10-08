@@ -6,8 +6,7 @@
 
 import type { FilaQueEntra } from "../../components/justificacion/QueEntra";
 import type { EstadoPresentacion } from "../../lib/cte/presentacion";
-import type { RolCerramiento } from "./envolvente";
-import { cerramientoDe, type JustificacionHe1 } from "./justificacion";
+import { cerramientoDe, rolesDe, type JustificacionHe1 } from "./justificacion";
 import { composicionCorta, descripcionEnvolvente, lugar } from "./textos";
 
 function n2(v: number): string {
@@ -31,11 +30,11 @@ export function filasQueEntraHe1(
       id: "envolvente",
       titulo: "Envolvente",
       detalle: descripcionEnvolvente(j),
-      trato: "4 cerramientos",
+      trato: `${rolesDe(j.propuesta).length} cerramientos`,
       estado: "normal",
     },
   ];
-  for (const rol of ["fachada", "cubierta", "suelo", "ventanas"] as RolCerramiento[]) {
+  for (const rol of rolesDe(j.propuesta)) {
     const el = cerramientoDe(j, rol);
     const r = el.detalle.r;
     filas.push({

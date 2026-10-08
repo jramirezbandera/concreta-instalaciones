@@ -39,7 +39,7 @@ describe("HE1 · desde El edificio (feature-15)", () => {
 
     const entra = getByRole("region", { name: "Qué entra" });
     expect(entra).toHaveTextContent(/Zona climática.*Cáceres, 459 m.*C4/);
-    expect(entra).toHaveTextContent(/Forjado sobre el local.*0,45 \/ 0,70/);
+    expect(entra).toHaveTextContent(/Forjado sobre el local.*0,43 \/ 0,70/);
 
     const decisiones = getByRole("region", { name: "Decisiones" });
     expect(within(decisiones).getByRole("group", { name: "Aislante de la fachada" })).toHaveTextContent("60");
@@ -47,7 +47,7 @@ describe("HE1 · desde El edificio (feature-15)", () => {
     expect(within(decisiones).getByRole("button", { name: "Bajo emisivo" })).toHaveAttribute("aria-pressed", "true");
 
     const aside = await findByRole("complementary", { name: FACHADA });
-    expect(aside).toHaveTextContent(/El aislante: con 60 mm se lleva el 71 % de la resistencia del muro\. Cumple desde 50 mm\./);
+    expect(aside).toHaveTextContent(/El aislante: con 60 mm de XPS se lleva el 71 % de la resistencia del muro\. Cumple desde 50 mm\./);
   });
 
   it("bajar el aislante a 40 mm no cumple; «Poner 50 mm» lo arregla", async () => {
@@ -59,7 +59,7 @@ describe("HE1 · desde El edificio (feature-15)", () => {
     expect(await findByText("La fachada no cumple")).toBeInTheDocument();
     await user.click(getByRole("button", { name: "Poner 50 mm" }));
     const aside = await findByRole("complementary", { name: FACHADA });
-    await waitFor(() => expect(aside).toHaveTextContent(/con 50 mm se lleva/));
+    await waitFor(() => expect(aside).toHaveTextContent(/con 50 mm de XPS se lleva/));
   });
 
   it("el local como otra unidad cambia el límite del forjado; la ventana se ve en alzado", async () => {

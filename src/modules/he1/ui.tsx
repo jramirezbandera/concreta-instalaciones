@@ -55,10 +55,12 @@ import {
 type He1State = { [K in keyof He1Estado]: He1Estado[K] };
 
 const PISTA: Record<RolCerramiento, string> = {
-  fachada: "Cambia el espesor del aislante en la decisión 1: la U y las temperaturas se recalculan.",
+  fachada: "Cambia el espesor del aislante en las decisiones: la U y las temperaturas se recalculan. El tipo se elige en El edificio.",
+  "fachada-pb": "La planta baja lleva otra fachada: su aislante se decide aparte.",
   cubierta: "Pulsa la U para ver de dónde sale.",
   suelo: "El límite depende de lo que haya debajo.",
-  ventanas: "El vidrio manda: es el 75 % del hueco.",
+  ventanas: "El vidrio manda: es el 75 % del hueco. El marco se elige en El edificio.",
+  "ventanas-pb": "La planta baja lleva otro marco: el vidrio es el mismo.",
 };
 
 export function He1Module() {
@@ -85,7 +87,7 @@ export function He1Module() {
   const porDefecto = j.elementos.find((e) => e.veredicto === "fail" && e.detalle.clase === "cerramiento")?.id ?? "fachada";
   const selVigente = selectedId !== null && j.elementos.some((e) => e.id === selectedId) ? selectedId : porDefecto;
   const elementoSel = j.elementos.find((e) => e.id === selVigente) ?? null;
-  const rol = vistaDe(selVigente);
+  const rol = vistaDe(selVigente, j);
 
   const verEnDibujo = (id: string) => {
     setSelectedId(id);
@@ -184,11 +186,15 @@ export function He1Module() {
   const tituloDibujo =
     rol === "fachada"
       ? "Sección de la fachada · a escala"
-      : rol === "cubierta"
-        ? "Sección de la cubierta"
-        : rol === "suelo"
-          ? `Sección del ${nombreSuelo(j.propuesta.envolvente.suelo.tipo).toLowerCase()}`
-          : "Alzado de la ventana tipo";
+      : rol === "fachada-pb"
+        ? "Sección de la fachada de la planta baja · a escala"
+        : rol === "cubierta"
+          ? "Sección de la cubierta"
+          : rol === "suelo"
+            ? `Sección del ${nombreSuelo(j.propuesta.envolvente.suelo.tipo).toLowerCase()}`
+            : rol === "ventanas-pb"
+              ? "Alzado de la ventana tipo de la planta baja"
+              : "Alzado de la ventana tipo";
   const lienzo = (
     <LienzoAjustado anchoMin={560}>
       {(caja) => {

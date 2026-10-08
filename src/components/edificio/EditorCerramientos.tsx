@@ -235,7 +235,7 @@ export function EditorCerramientos(props: { edificio: Edificio; onCambiar: (e: E
       <Sub>Lo usan</Sub>
       <LoUsan
         filas={[
-          { codigo: "HE1", texto: "todavía con sus composiciones; el aislante y el vidrio se deciden allí", trato: "no" },
+          { codigo: "HE1", texto: "U de cada fachada, de la cubierta, del suelo y de las ventanas; el aislante y el vidrio se deciden allí", trato: "si" },
           { codigo: "HR", texto: "todavía con su propia elección; los valores propios se dan allí", trato: "no" },
           { codigo: "HS1", texto: "todavía con sus propias decisiones de fachada", trato: "no" },
         ]}

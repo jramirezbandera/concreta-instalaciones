@@ -15,8 +15,7 @@
 // =============================================================================
 
 import { renumerar } from "../edificio/derivar";
-import type { Edificio, TipoCubierta } from "../edificio/tipos";
-import { USOS } from "../edificio/usos";
+import type { Edificio, TipoCubierta, UsoZona } from "../edificio/tipos";
 import {
   FACHADA_HABITUAL,
   solucion,
@@ -150,10 +149,19 @@ export function setPlantaBajaDistinta(e: Edificio, distinta: boolean): Edificio 
 
 // -----------------------------------------------------------------------------
 
-/** La planta baja tiene algo dentro de la envolvente de HE1 (viviendas, oficinas, vestíbulo). */
+/** Lo que protege HE1: viviendas u oficinas (los mismos usos que `envolventeDe` de HE1). */
+const PROTEGIDOS_HE1: ReadonlySet<UsoZona> = new Set<UsoZona>(["viviendas", "vivienda_unifamiliar", "oficinas"]);
+
+/**
+ * La planta baja entra en HE1: tiene viviendas u oficinas o, si el edificio no
+ * tiene ninguna, es la que HE1 protege (un local).
+ */
 export function plantaBajaEnHe1(e: Edificio): boolean {
-  const pb = renumerar(e).grupos.find((g) => g.nivelInicial === 0);
-  return !!pb?.zonas.some((z) => USOS[z.uso].loUsan.some((l) => l.codigo === "HE1" && l.trato === "si"));
+  const grupos = renumerar(e).grupos;
+  const protege = (zs: { uso: UsoZona }[]) => zs.some((z) => PROTEGIDOS_HE1.has(z.uso));
+  if (!grupos.some((g) => protege(g.zonas))) return true;
+  const pb = grupos.find((g) => g.nivelInicial === 0);
+  return !!pb && protege(pb.zonas);
 }
 
 export function avisosCerramientos(e: Edificio): string[] {
