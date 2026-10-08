@@ -90,7 +90,7 @@ describe("la franja", () => {
   it("la cubierta: la pendiente y los elementos que exige", () => {
     const { j } = demo();
     const f = franjaDe(el(j, "cubierta"), j, "ok");
-    expect(f).toMatchObject({ titulo: "Cubierta plana no transitable, invertida, con grava", valor: "1–5 %", unidad: "de pendiente" });
+    expect(f).toMatchObject({ titulo: "Cubierta plana no transitable, con grava, invertida", valor: "1–5 %", unidad: "de pendiente" });
     expect(f.filas.map((x) => x.k)).toEqual(["a)", "d)", "f)", "h)", "i)", "k)"]);
   });
 });
@@ -123,12 +123,12 @@ describe("la memoria", () => {
     expect(t).toContain("I3 — Si el muro es de fábrica: revestimiento hidrófugo por la cara interior");
     expect(t).toContain("El suelo del sótano (470 m²) es una solera sin intervención en el terreno.");
     expect(t).toContain("en un entorno E1 (terreno tipo IV); con esa altura la zona eólica no influye");
-    expect(t).toContain("La cubierta es plana no transitable, invertida, con grava.");
+    expect(t).toContain("La cubierta es plana no transitable, con grava (CEC C 5.3, p. 41), invertida.");
     expect(m.tabla?.filas).toEqual([
       ["Muros del sótano", "1", "muro flexorresistente impermeabilizado por el exterior", "I2+I3+D1+D5"],
       ["Suelo del sótano", "2", "solera sin intervención en el terreno", "C2+C3+D1"],
       ["Fachadas", "5", "F 3.2 · R3", "R3+C1"],
-      ["Cubierta", "único", "plana no transitable, invertida, con grava", "pendiente del 1 al 5 %"],
+      ["Cubierta", "único", "C 5.3 · plana no transitable, con grava, invertida", "pendiente del 1 al 5 %"],
     ]);
     expect(m.fuente).toContain("tablas 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7 y 2.9");
   });

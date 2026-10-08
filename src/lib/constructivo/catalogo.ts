@@ -31,6 +31,7 @@
 //   - K-CER.12: el grado de impermeabilidad del CEC solo sirve de contraste.
 // =============================================================================
 
+import type { TipoCubierta } from "../edificio/tipos";
 import type { ClaveAislante, ClaveMaterial } from "./materiales";
 
 /** Un valor del CEC: el mínimo y, si lo da, el medio. */
@@ -175,8 +176,12 @@ export interface SolCubierta extends Base {
   RAtr: number;
   /** El apartado del CEC (4.1.1…). */
   apartado: string;
-  /** Plana o inclinada: la que casa con el tipo de cubierta de El edificio. */
-  forma: "plana" | "inclinada";
+  /** El tipo de cubierta de El edificio con el que casa. */
+  tipo: TipoCubierta;
+  /** La protección de la tabla 2.9 de HS1 (la plana); null en la inclinada. */
+  proteccion: "solado_fijo" | "solado_flotante" | "grava" | null;
+  /** El CEC solo la da invertida (el aislante sobre la impermeabilización). */
+  soloInvertida: boolean;
   /**
    * La parte constante de R0 sin el forjado: U = 1/(R0_paquete + R_forjado + e_AT/λ_AT).
    * El CEC la tabula con forjados de 250 mm; la diferencia de R0 es la misma en
@@ -371,15 +376,28 @@ export const CATALOGO: readonly Solucion[] = [
   },
 
   // ── Cubiertas (4.1): el paquete sobre el forjado del 3.18 ─────────────────
-  // R0_paquete: verificacion-cerramientos-cec.md, C.1.4. El RAtr, el del forjado
-  // de 30 cm (plana, + 2 dBA por las pendientes) o de 25 cm (inclinada).
+  // R0_paquete: verificacion-cerramientos-cec.md, C.1.4; capas y protección,
+  // C.2. El RAtr, el del forjado de 30 cm (plana, + 2 dBA por las pendientes)
+  // o de 25 cm (inclinada).
   {
-    categoria: "cubierta", id: "cu-plana-fu-bovhorm-300", codigo: "C 1.3", pagina: 37, apartado: "4.1.1", forma: "plana",
+    categoria: "cubierta", id: "cu-plana-fu-bovhorm-300", codigo: "C 1.3", pagina: 37, apartado: "4.1.1", tipo: "plana_transitable",
     nombre: "Plana transitable, no ventilada, con solado fijo", RAtr: 52, R0_paquete: 0.27, pendientesLigero: true,
+    proteccion: "solado_fijo", soloInvertida: false,
   },
   {
-    categoria: "cubierta", id: "cu-incl-fu-bovhorm-250", codigo: "C 9.3", pagina: 45, apartado: "4.1.9", forma: "inclinada",
+    categoria: "cubierta", id: "cu-plana-solado-flotante", codigo: "C 2.3", pagina: 38, apartado: "4.1.2", tipo: "plana_transitable",
+    nombre: "Plana transitable, invertida, con solado flotante", RAtr: 52, R0_paquete: 0.25, pendientesLigero: true,
+    proteccion: "solado_flotante", soloInvertida: true,
+  },
+  {
+    categoria: "cubierta", id: "cu-plana-grava", codigo: "C 5.3", pagina: 41, apartado: "4.1.5", tipo: "plana_no_transitable",
+    nombre: "Plana no transitable, con grava", RAtr: 52, R0_paquete: 0.25, pendientesLigero: true,
+    proteccion: "grava", soloInvertida: false,
+  },
+  {
+    categoria: "cubierta", id: "cu-incl-fu-bovhorm-250", codigo: "C 9.3", pagina: 45, apartado: "4.1.9", tipo: "inclinada",
     nombre: "Inclinada de tejas sobre forjado inclinado, no ventilada", RAtr: 48, R0_paquete: 0.19, pendientesLigero: false,
+    proteccion: null, soloInvertida: false,
   },
 
   // ── Ventanas (4.3.2) ──────────────────────────────────────────────────────

@@ -6,6 +6,7 @@
 
 import type { MemoriaDoc, Trozo } from "../../lib/cte/presentacion";
 import { listaY } from "../../lib/cte/redaccion";
+import { designacionEnFrase } from "../../lib/constructivo/textos";
 import { formatoCota } from "../../lib/edificio/derivar";
 import { fmt } from "../../lib/units/format";
 import { ENGINE_VERSION } from "../../lib/version";
@@ -183,7 +184,7 @@ function parrafosFachada(j: JustificacionHs1): Trozo[][] {
   ];
   const porFachada = fs.flatMap((x): Trozo[][] => {
     const quien = fs.length > 1 ? (x.rol === "fachada-pb" ? "La fachada de la planta baja" : "La fachada de las demás plantas") : "La fachada";
-    const tipo = `${quien}, ${x.sol.nombre} (CEC ${x.sol.codigo}), ${x.columna === "con_revestimiento" ? `con revestimiento exterior de resistencia R${x.niveles.R}` : "sin revestimiento exterior"}${x.unaHoja ? " y de una sola hoja" : ""}`;
+    const tipo = `${quien}, ${designacionEnFrase(x.sol)}, ${x.columna === "con_revestimiento" ? `con revestimiento exterior de resistencia R${x.niveles.R}` : "sin revestimiento exterior"}${x.unaHoja ? " y de una sola hoja" : ""}`;
     if (!x.cumple) return [[`${tipo}, no llega al grado exigido: le falta `, { v: codigos(x.faltan) }, " de la tabla 2.7."]];
     const t: Trozo[] = [
       `${tipo}, cumple las condiciones `,
@@ -235,7 +236,7 @@ function tablaResumen(j: JustificacionHs1): MemoriaDoc["tabla"] {
     if (d.clase === "muro") filas.push([el.nombre, String(d.grado), solucionMuro(d.tipo, d.imper), d.condiciones ? codigos(d.condiciones) : "no aceptable"]);
     if (d.clase === "suelo") filas.push([el.nombre, String(d.grado), unaSolucionSuelo(d.tipo, d.intervencion).replace(/^una? /, ""), d.condiciones ? codigos(d.condiciones) : "no aceptable"]);
     if (d.clase === "fachada") filas.push([el.nombre, String(d.grado), `${d.sol.codigo} · ${d.columna === "con_revestimiento" ? `R${d.niveles.R}` : "sin revestimiento"}`, d.cumple ? codigos(d.condiciones) : `no llega: falta ${codigos(d.faltan)}`]);
-    if (d.clase === "cubierta") filas.push([el.nombre, "único", solucionCubierta(d.cubierta), textoPendiente(d.cubierta) ? `pendiente ${textoPendiente(d.cubierta)}` : "ap. 2.4.2"]);
+    if (d.clase === "cubierta") filas.push([el.nombre, "único", `${d.cubierta.sol.codigo} · ${solucionCubierta(d.cubierta, false)}`, textoPendiente(d.cubierta) ? `pendiente ${textoPendiente(d.cubierta)}` : "ap. 2.4.2"]);
   }
   return { cabecera: ["Elemento", "Grado", "Solución", "Condiciones"], filas };
 }

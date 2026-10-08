@@ -11,10 +11,9 @@ import { Link } from "react-router";
 import { Decision, DecisionValor, Opciones } from "../../components/justificacion/Decision";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import { CONDICIONES, codigos } from "./condiciones";
-import { NOMBRE_PROTECCION } from "./cubierta";
+import { NOMBRE_PROTECCION, type CubiertaHs1 } from "./cubierta";
 import {
   INTERVENCIONES_TERRENO,
-  proteccionesDe,
   type AislantePlana,
   type DecisionesEfectivasHs1,
   type ImpermeabilizacionInclinada,
@@ -26,7 +25,7 @@ import {
 import type { Hs1Estado } from "./estado";
 import type { DeclaraFachada } from "./fachada";
 import type { DetalleHs1, JustificacionHs1 } from "./justificacion";
-import { PENDIENTES_CUBIERTA_INCLINADA_TABLA_2_10, type ProteccionPlana } from "./tablas";
+import { PENDIENTES_CUBIERTA_INCLINADA_TABLA_2_10 } from "./tablas";
 import { textoIncumplimiento, textoPendiente } from "./textos";
 
 interface DecisionesHs1Props {
@@ -61,6 +60,20 @@ function enPalabras(c: readonly string[], el: "muro" | "suelo" | "fachada"): str
 }
 
 type DetalleFachada = Extract<DetalleHs1, { clase: "fachada" }>;
+
+/** La cubierta de El edificio (feature-26): se ve aquí y se cambia allí. */
+function CubiertaDelEdificio({ c, enlace }: { c: CubiertaHs1; enlace: string }): JSX.Element {
+  return (
+    <div className="border-border-main bg-bg-surface flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-[12.5px]">
+      <span className="text-text-primary min-w-0">
+        {c.sol.nombre} <span className="text-text-disabled font-mono text-[11px]">CEC {c.sol.codigo}</span>
+      </span>
+      <Link to={enlace} className="text-accent hover:text-accent-hover shrink-0 text-[11.5px] underline">
+        Cambiar en El edificio
+      </Link>
+    </div>
+  );
+}
 
 /**
  * Una fachada de El edificio: su tipo (se cambia allí), lo que se declara y lo
@@ -276,30 +289,33 @@ export function DecisionesHs1({ state, setField, j }: DecisionesHs1Props): JSX.E
       ))}
 
       {j.cubierta.plana ? (
-        <Decision<ProteccionPlana>
+        <DecisionValor
           numero={++n}
           pregunta="La cubierta"
-          opciones={proteccionesDe(j.cubierta.tipo).map((p) => ({ valor: p, label: NOMBRE_PROTECCION[p] }))}
-          valor={d.cubiertaProteccion}
-          habitual={h.cubiertaProteccion}
-          onChange={(v) => elegir("cubiertaProteccion", v)}
-          esHabitual={d.cubiertaProteccion === h.cubiertaProteccion && d.cubiertaAislante === h.cubiertaAislante}
-          texto={`Pendiente ${textoPendiente(j.cubierta) ?? ""} (tabla 2.9).${j.cubierta.ajardinadaCriterio ? " La ajardinada es un uso aparte en la tabla 2.9: se trata con la no transitable (criterio)." : ""}`}
-          extra={
-            d.cubiertaProteccion !== "lamina_autoprotegida" ? (
-              <Fila rotulo="Aislante">
-                <Opciones<AislantePlana>
-                  etiqueta="Posición del aislante"
-                  pequenas
-                  valor={d.cubiertaAislante}
-                  onChange={(v) => elegir("cubiertaAislante", v)}
-                  opciones={[
-                    { valor: "sobre", label: "Invertida" },
-                    { valor: "bajo", label: "Convencional" },
-                  ]}
-                />
-              </Fila>
-            ) : undefined
+          control={
+            <div className="flex w-full flex-col gap-2">
+              <CubiertaDelEdificio c={j.cubierta} enlace={`/p/${proyecto.id}/edificio`} />
+              {j.cubierta.proteccion !== "lamina_autoprotegida" && !j.cubierta.sol.soloInvertida && (
+                <Fila rotulo="Aislante">
+                  <Opciones<AislantePlana>
+                    etiqueta="Posición del aislante"
+                    pequenas
+                    valor={d.cubiertaAislante}
+                    onChange={(v) => elegir("cubiertaAislante", v)}
+                    opciones={[
+                      { valor: "sobre", label: "Invertida" },
+                      { valor: "bajo", label: "Convencional" },
+                    ]}
+                  />
+                </Fila>
+              )}
+            </div>
+          }
+          texto={
+            <>
+              <b className="text-text-primary font-medium">{d.cubiertaAislante === h.cubiertaAislante || j.cubierta.sol.soloInvertida ? "Lo habitual." : "Decidido."}</b>{" "}
+              {`Con ${NOMBRE_PROTECCION[j.cubierta.proteccion!].toLowerCase()}: pendiente ${textoPendiente(j.cubierta) ?? ""} (tabla 2.9).${j.cubierta.sol.soloInvertida ? " El Catálogo solo la da invertida." : ""}`}
+            </>
           }
         />
       ) : (
@@ -320,20 +336,23 @@ export function DecisionesHs1({ state, setField, j }: DecisionesHs1Props): JSX.E
               : "Con capa de impermeabilización bajo el tejado, la tabla 2.10 no obliga."
           }
           extra={
-            <Fila rotulo="Tejado">
-              <select
-                aria-label="Tejado"
-                value={d.cubiertaTejado}
-                onChange={(e) => elegir("cubiertaTejado", Number(e.target.value))}
-                className={SELECT}
-              >
-                {PENDIENTES_CUBIERTA_INCLINADA_TABLA_2_10.datos.filas.map((f, i) => (
-                  <option key={i} value={i}>
-                    {f.grupo === "Teja" || f.grupo === "Pizarra" || f.grupo === "Cinc" ? f.pieza : `${f.grupo} · ${f.pieza.toLowerCase()}`} · {f.min_pct} %
-                  </option>
-                ))}
-              </select>
-            </Fila>
+            <>
+              <CubiertaDelEdificio c={j.cubierta} enlace={`/p/${proyecto.id}/edificio`} />
+              <Fila rotulo="Tejado">
+                <select
+                  aria-label="Tejado"
+                  value={d.cubiertaTejado}
+                  onChange={(e) => elegir("cubiertaTejado", Number(e.target.value))}
+                  className={SELECT}
+                >
+                  {PENDIENTES_CUBIERTA_INCLINADA_TABLA_2_10.datos.filas.map((f, i) => (
+                    <option key={i} value={i}>
+                      {f.grupo === "Teja" || f.grupo === "Pizarra" || f.grupo === "Cinc" ? f.pieza : `${f.grupo} · ${f.pieza.toLowerCase()}`} · {f.min_pct} %
+                    </option>
+                  ))}
+                </select>
+              </Fila>
+            </>
           }
         />
       )}

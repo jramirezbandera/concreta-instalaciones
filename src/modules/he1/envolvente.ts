@@ -37,6 +37,7 @@
 import { indiceFuera, type SolCubierta, type SolFachada, type SolForjado, type SolVentana } from "../../lib/constructivo/catalogo";
 import { cerramientosDe } from "../../lib/constructivo/cerramientos";
 import { MATERIALES_CEC, type ClaveMaterial } from "../../lib/constructivo/materiales";
+import { NOMBRE_CERRAMIENTO } from "../../lib/constructivo/textos";
 import { MARCOS, type Marco } from "../../lib/constructivo/tipos";
 import { etiquetaNivel, plantasDe } from "../../lib/edificio/derivar";
 import type { Edificio, TipoCubierta, UsoZona } from "../../lib/edificio/tipos";
@@ -245,12 +246,12 @@ export function tiposHe1(e: Edificio, env: EnvolventeHe1): TiposHe1 {
   return {
     fachadas: fs.map((f, i) => ({
       rol: i === 0 ? "fachada" : "fachada-pb",
-      nombre: i === 0 ? "Fachada" : "Fachada de la planta baja",
+      nombre: i === 0 ? NOMBRE_CERRAMIENTO.fachada : NOMBRE_CERRAMIENTO.fachadaPB,
       ...f,
     })),
     ventanas: vs.map((v, i) => ({
       rol: i === 0 ? "ventanas" : "ventanas-pb",
-      nombre: i === 0 ? "Ventanas" : "Ventanas de la planta baja",
+      nombre: i === 0 ? NOMBRE_CERRAMIENTO.ventana : NOMBRE_CERRAMIENTO.ventanaPB,
       ...v,
     })),
     cubierta: c.cubierta.sol,
@@ -380,10 +381,14 @@ function suelo(s: SueloEnvolvente, local: TratoLocal, e_mm: number, forjado: Sol
       };
 }
 
-/** Ug de cada vidrio (CEC) y su fila de la Tabla 10 del DA/1 para la Ψ, que depende del marco. */
+/**
+ * Ug de cada vidrio (CEC) y su fila de la Tabla 10 del DA/1 para la Ψ, que depende del marco.
+ * `tipo` es el vidrio sin las lunas: en las fichas, junto al tipo acústico de la ventana
+ * (4-cámara-6…), que es el que fija las lunas (feature-26).
+ */
 export const VIDRIOS: Record<
   Vidrio,
-  { ug: number; filaPsi: "doble_o_triple" | "doble_be_o_triple_2be"; separadorMejorado: boolean; nombre: string; corto: string }
+  { ug: number; filaPsi: "doble_o_triple" | "doble_be_o_triple_2be"; separadorMejorado: boolean; nombre: string; corto: string; tipo: string }
 > = {
   doble: {
     ug: UG_REFERENCIA_CEC.datos.doble_4_16_4.normal,
@@ -391,6 +396,7 @@ export const VIDRIOS: Record<
     separadorMejorado: false,
     nombre: "doble 4/16/4",
     corto: "4/16/4",
+    tipo: "doble",
   },
   bajo_emisivo: {
     ug: UG_REFERENCIA_CEC.datos.doble_4_16_4.be_0_03,
@@ -398,6 +404,7 @@ export const VIDRIOS: Record<
     separadorMejorado: false,
     nombre: "doble 4/16/4 bajo emisivo",
     corto: "bajo emisivo",
+    tipo: "doble bajo emisivo",
   },
   bajo_emisivo_plus: {
     ug: UG_REFERENCIA_CEC.datos.doble_4_16_4.be_menor_0_03,
@@ -405,6 +412,7 @@ export const VIDRIOS: Record<
     separadorMejorado: true,
     nombre: "doble 4/16/4 bajo emisivo reforzado con borde cálido",
     corto: "bajo emisivo + borde cálido",
+    tipo: "doble bajo emisivo reforzado con borde cálido",
   },
 };
 

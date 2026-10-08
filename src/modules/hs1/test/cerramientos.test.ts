@@ -38,8 +38,8 @@ describe("HS1 · la fachada de El edificio (feature-26)", () => {
     expect(pb.nombre).toBe("Fachada de la planta baja");
     expect(pb.detalle).toMatchObject({ sol: { codigo: "F 4.1" }, unaHoja: true, columna: "con_revestimiento", cumple: true });
     const t = textoPlanoMemoria(memoriaHs1(j));
-    expect(t).toContain("La fachada de la planta baja, SATE sobre LP ½ pie (CEC F 4.1)");
-    expect(t).toContain("La fachada de las demás plantas, Enfoscado + LP ½ pie + cámara + aislante + LHD 7 + enlucido (CEC F 3.2)");
+    expect(t).toContain("La fachada de la planta baja, SATE sobre LP ½ pie (CEC F 4.1, p. 64)");
+    expect(t).toContain("La fachada de las demás plantas, enfoscado + LP ½ pie + cámara + aislante + LHD 7 + enlucido (CEC F 3.2, p. 59)");
   });
 
   it("si la planta baja lleva la misma fachada, no hay nada aparte", () => {

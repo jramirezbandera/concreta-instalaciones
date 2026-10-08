@@ -191,12 +191,15 @@ describe("justificarHe1 · el Demo (Cáceres, zona C)", () => {
   it("la memoria y la ficha", () => {
     const t = textoPlanoMemoria(memoriaHe1(j));
     expect(t).toContain("de las viviendas (P1–P3) frente a los valores límite de la sección HE 1 del DB-HE para la zona climática C de invierno (Cáceres, 459 m)");
-    expect(t).toContain("– Ventanas de PVC de tres cámaras con doble 4/16/4 bajo emisivo (Ug 1,6, Uf 1,8, Ψ 0,08, fracción de marco 25 %): UH = 1,99 W/m²K ≤ 2,10.");
+    expect(t).toContain(
+      "– Ventanas: batiente, vidrio 4-cámara-6, clase 3 (CEC 4.3.2, p. 97), con marco de PVC de tres cámaras y vidrio doble bajo emisivo (Ug 1,6, Uf 1,8, Ψ 0,08, fracción de marco 25 %): UH = 1,99 W/m²K ≤ 2,10.",
+    );
     expect(t).toContain("con 7,8 °C y 78 % en el exterior (DA DB-HE/2, tabla C.1)");
     const f = toFichaData(j, { estado: he1EstadoDefaults, edificio: DEMO, revisados: [], svg: tamanoDibujoHe1() });
     expect(f.edicionDB).toBe("DB-HE (consolidado 14-06-2022)");
     expect(f.datosPartida.find((d) => d.concepto === "Clima exterior de enero")).toMatchObject({ valor: "7,8 °C · 78 %" });
-    expect(f.datosPartida.find((d) => d.concepto === "Marco")?.valor).toMatch(/^PVC de tres cámaras · Uf 1,8/);
+    expect(f.datosPartida.find((d) => d.concepto === "Ventanas")?.valor).toMatch(/\(CEC 4\.3\.2, p\. 97\) · PVC de tres cámaras · Uf 1,8/);
+    expect(f.datosPartida.find((d) => d.concepto === "Cubierta")?.valor).toBe("Plana no transitable, con grava (CEC C 5.3, p. 41) · invertida · XPS 100 mm");
     expect(f.verificaciones).toHaveLength(7);
     expect(f.svg?.elementId).toBe(HE1_PDF_SVG_ID);
   });

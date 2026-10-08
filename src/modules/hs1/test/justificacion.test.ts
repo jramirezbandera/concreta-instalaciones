@@ -192,12 +192,19 @@ describe("justificación", () => {
     expect(avisos(j)).toContain("suelo-elevado");
   });
 
-  it("la cubierta transitable se protege con solado; con lámina autoprotegida no lleva capa de protección", () => {
+  it("la cubierta es la de El edificio: transitable con solado fijo, no transitable con grava", () => {
     const e: Edificio = { ...E("plurifamiliar_locales"), cubierta: { tipo: "plana_transitable", superficie_m2: 210 } };
-    const j = justificarHs1(est({ cubiertaProteccion: "grava" }), e, OBRA);
-    expect(j.cubierta.proteccion).toBe("solado_fijo"); // la grava es de las no transitables: vuelve a lo habitual
-    const l = justificarHs1(est({ cubiertaProteccion: "lamina_autoprotegida" }), E("plurifamiliar_locales"), OBRA);
-    expect(l.cubierta.pendiente).toMatchObject({ min_pct: 1, max_pct: 15 });
-    expect(l.cubierta.capas.some((c) => c.letra === "i")).toBe(false);
+    const j = justificarHs1(est(), e, OBRA);
+    expect(j.cubierta).toMatchObject({ proteccion: "solado_fijo", invertida: true, sol: { codigo: "C 1.3" } });
+    const g = justificarHs1(est({ cubiertaAislante: "bajo" }), E("plurifamiliar_locales"), OBRA);
+    expect(g.cubierta).toMatchObject({ proteccion: "grava", invertida: false, sol: { codigo: "C 5.3" } });
+    expect(g.cubierta.capas.find((c) => c.letra === "g")).toMatchObject({ exigida: true });
+  });
+
+  it("con solado flotante (C 2.3) va invertida aunque se diga convencional", () => {
+    const e = setCerramientos({ ...E("plurifamiliar_locales"), cubierta: { tipo: "plana_transitable", superficie_m2: 210 } }, { cubierta: { id: "cu-plana-solado-flotante" } });
+    const j = justificarHs1(est({ cubiertaAislante: "bajo" }), e, OBRA);
+    expect(j.cubierta).toMatchObject({ proteccion: "solado_flotante", invertida: true });
+    expect(j.cubierta.capas.find((c) => c.letra === "h")).toMatchObject({ exigida: true });
   });
 });

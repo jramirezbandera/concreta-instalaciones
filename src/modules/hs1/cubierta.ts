@@ -1,11 +1,12 @@
 // =============================================================================
 // DB-HS1 — La cubierta (feature-17, ap. 2.4). Grado de impermeabilidad ÚNICO e
 // independiente del clima: lo alcanza cualquier solución que cumpla las
-// condiciones de 2.4.2 a 2.4.4. Aquí se resuelven, con el tipo de El edificio y
-// las decisiones, qué elementos a) a k) de 2.4.2 lleva y la pendiente de las
-// tablas 2.9 o 2.10. PURA.
+// condiciones de 2.4.2 a 2.4.4. Aquí se resuelven, con la cubierta de El
+// edificio (feature-26: su tipo y su protección) y las decisiones, qué elementos
+// a) a k) de 2.4.2 lleva y la pendiente de las tablas 2.9 o 2.10. PURA.
 // =============================================================================
 
+import type { SolCubierta } from "../../lib/constructivo/catalogo";
 import type { TipoCubierta } from "../../lib/edificio/tipos";
 import type { DecisionesEfectivasHs1 } from "./decisiones";
 import { PENDIENTES_CUBIERTA_INCLINADA_TABLA_2_10, PENDIENTES_CUBIERTA_PLANA_TABLA_2_9, type ProteccionPlana } from "./tablas";
@@ -32,6 +33,8 @@ export interface PendienteCubierta {
 }
 
 export interface CubiertaHs1 {
+  /** La de El edificio, para nombrarla como en HE1 y HR. */
+  sol: Pick<SolCubierta, "nombre" | "codigo" | "pagina" | "soloInvertida">;
   tipo: TipoCubierta;
   plana: boolean;
   proteccion: ProteccionPlana | null;
@@ -57,15 +60,18 @@ export const NOMBRE_PROTECCION: Record<ProteccionPlana, string> = {
   tierra_vegetal: "Tierra vegetal",
 };
 
-export function cubiertaDe(tipo: TipoCubierta, d: DecisionesEfectivasHs1): CubiertaHs1 {
+export function cubiertaDe(s: SolCubierta, d: DecisionesEfectivasHs1): CubiertaHs1 {
+  const tipo = s.tipo;
+  const sol = { nombre: s.nombre, codigo: s.codigo, pagina: s.pagina, soloInvertida: s.soloInvertida };
   const plana = tipo !== "inclinada";
   const capas: CapaCubierta[] = [];
   const add = (letra: CapaCubierta["letra"], elemento: string, porque: string, exigida: boolean) =>
     capas.push({ letra, elemento, porque, exigida });
 
-  if (plana) {
-    const p = d.cubiertaProteccion;
-    const invertida = d.cubiertaAislante === "sobre";
+  if (plana && s.proteccion) {
+    // Las protecciones de la tabla 2.9, aunque el Catálogo solo tenga tres.
+    const p = s.proteccion as ProteccionPlana;
+    const invertida = s.soloInvertida || d.cubiertaAislante === "sobre";
     const autoprotegida = p === "lamina_autoprotegida";
     const t = PENDIENTES_CUBIERTA_PLANA_TABLA_2_9.datos[p];
     add("a", "Sistema de formación de pendientes", "siempre en cubierta plana", true);
@@ -93,6 +99,7 @@ export function cubiertaDe(tipo: TipoCubierta, d: DecisionesEfectivasHs1): Cubie
     if (!autoprotegida) add("i", `Capa de protección de ${NOMBRE_PROTECCION[p].toLowerCase()}`, "cubierta plana", true);
     add("k", "Sistema de evacuación de aguas (sumideros y rebosaderos)", "siempre; se dimensiona por HS 5", true);
     return {
+      sol,
       tipo,
       plana,
       proteccion: p,
@@ -121,6 +128,7 @@ export function cubiertaDe(tipo: TipoCubierta, d: DecisionesEfectivasHs1): Cubie
   add("j", `Tejado: ${fila.pieza.toLowerCase()}`, "cubierta inclinada", true);
   add("k", "Sistema de evacuación de aguas (canalones y bajantes)", "siempre; se dimensiona por HS 5", true);
   return {
+    sol,
     tipo,
     plana,
     proteccion: null,

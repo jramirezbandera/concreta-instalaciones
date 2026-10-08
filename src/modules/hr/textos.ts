@@ -7,6 +7,7 @@
 import type { FilaQueEntra } from "../../components/justificacion/QueEntra";
 import type { DetalleElemento, EstadoPresentacion } from "../../lib/cte/presentacion";
 import type { Aviso } from "../../lib/cte/resultado";
+import { citaCec, enFrase } from "../../lib/constructivo/textos";
 import type { TextoSi } from "../si/definicion";
 import type { ElementoSi } from "../si/tipos";
 import type { Condicion } from "./comprobar";
@@ -51,15 +52,14 @@ const RECINTO: Record<"dormitorios" | "estancias" | "administrativo" | "cubierta
   cubierta: "recintos bajo cubierta",
 };
 
-/** «LP ½ pie + yeso por ambas caras (CEC P1.4)», o con «valores propios». */
+/** «LP ½ pie + yeso por ambas caras (CEC P1.4, p. 101)», o con «valores propios». */
 export function textoSolucion(s: SolucionUsada): string {
-  return `${s.nombre} (${s.propios ? "valores propios" : `CEC ${s.codigo}`})`;
+  return `${s.nombre} (${s.propios ? "valores propios" : citaCec(s)})`;
 }
 
 /** Lo mismo en mitad de una frase: «mortero 5 cm…», pero «LP ½ pie…» y «PYL 15…». */
 export function solucionEnFrase(s: SolucionUsada): string {
-  const t = textoSolucion(s);
-  return /^\p{Lu}\p{Ll}/u.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t;
+  return enFrase(textoSolucion(s));
 }
 
 function det(el: ElementoSi<unknown>): DetalleHr {

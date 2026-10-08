@@ -11,14 +11,13 @@
 //   - la fachada es la de El edificio (feature-26): sus rasgos dan la columna,
 //     las hojas y la combinación (`fachada.ts`); aquí solo se declara lo que el
 //     catálogo no sabe (la R del revestimiento, J, N y H);
-//   - cubierta plana invertida (aislante sobre la impermeabilización), con grava
-//     si no es transitable y solado fijo si lo es; inclinada de teja mixta, sin
-//     impermeabilización bajo el tejado.
+//   - la cubierta es la de El edificio (feature-26), con su protección; aquí
+//     solo se decide la posición del aislante en la plana (invertida, salvo que
+//     se diga) y, en la inclinada, la teja (mixta) y si lleva impermeabilización
+//     bajo el tejado (no).
 // =============================================================================
 
-import type { TipoCubierta } from "../../lib/edificio/tipos";
 import type { DeclaraFachadas } from "./fachada";
-import type { ProteccionPlana } from "./tablas";
 
 /** Tipo de muro (tabla 2.2 y bloques de la tabla 2.4). */
 export type TipoMuro = "flexorresistente" | "gravedad" | "pantalla";
@@ -40,14 +39,6 @@ export const IMPERMEABILIZACIONES_MURO: readonly ImpermeabilizacionMuro[] = ["ex
 export const TIPOS_SUELO: readonly TipoSuelo[] = ["solera", "placa", "elevado"];
 export const INTERVENCIONES_TERRENO: readonly IntervencionTerreno[] = ["sin_intervencion", "sub_base", "inyecciones"];
 
-/** Las protecciones de la tabla 2.9 que admite cada tipo de cubierta plana de El edificio. */
-export function proteccionesDe(tipo: TipoCubierta): ProteccionPlana[] {
-  if (tipo === "plana_transitable") return ["solado_fijo", "solado_flotante", "capa_rodadura"];
-  // La ajardinada es un uso aparte en la tabla 2.9; El edificio no lo distingue y
-  // se ofrece con las no transitables (criterio).
-  return ["grava", "lamina_autoprotegida", "tierra_vegetal"];
-}
-
 export interface DecisionesHs1 {
   muroTipo: Opcion<TipoMuro>;
   muroImper: Opcion<ImpermeabilizacionMuro>;
@@ -55,7 +46,6 @@ export interface DecisionesHs1 {
   sueloIntervencion: Opcion<IntervencionTerreno>;
   /** Lo declarado de cada fachada de El edificio; sin dar, lo habitual (feature-26). */
   fachadaDeclara?: DeclaraFachadas;
-  cubiertaProteccion: Opcion<ProteccionPlana>;
   cubiertaAislante: Opcion<AislantePlana>;
   /** Fila de la tabla 2.10. */
   cubiertaTejado: Opcion<number>;
@@ -67,7 +57,6 @@ export interface DecisionesEfectivasHs1 {
   muroImper: ImpermeabilizacionMuro;
   sueloTipo: TipoSuelo;
   sueloIntervencion: IntervencionTerreno;
-  cubiertaProteccion: ProteccionPlana;
   cubiertaAislante: AislantePlana;
   cubiertaTejado: number;
   cubiertaImpermeabilizacion: ImpermeabilizacionInclinada;
@@ -78,7 +67,6 @@ export const DECISIONES_HS1_POR_DEFECTO: DecisionesHs1 = {
   muroImper: "habitual",
   sueloTipo: "habitual",
   sueloIntervencion: "habitual",
-  cubiertaProteccion: "habitual",
   cubiertaAislante: "habitual",
   cubiertaTejado: "habitual",
   cubiertaImpermeabilizacion: "habitual",
@@ -100,31 +88,27 @@ export const SUELO_HABITUAL: SueloHabitual = { tipo: "solera", intervencion: "si
  * solera sin intervención no se admite con grado 5, y lo habitual nunca es una
  * solución que la tabla 2.4 rechaza.
  */
-export function decisionesHabitualesHs1(cubierta: TipoCubierta, suelo: SueloHabitual = SUELO_HABITUAL): DecisionesEfectivasHs1 {
+export function decisionesHabitualesHs1(suelo: SueloHabitual = SUELO_HABITUAL): DecisionesEfectivasHs1 {
   return {
     muroTipo: "flexorresistente",
     muroImper: "exterior",
     sueloTipo: suelo.tipo,
     sueloIntervencion: suelo.intervencion,
-    cubiertaProteccion: cubierta === "plana_transitable" ? "solado_fijo" : "grava",
     cubiertaAislante: "sobre",
     cubiertaTejado: TEJADO_HABITUAL,
     cubiertaImpermeabilizacion: "sin",
   };
 }
 
-export function resolverDecisionesHs1(d: DecisionesHs1, cubierta: TipoCubierta, suelo: SueloHabitual = SUELO_HABITUAL): DecisionesEfectivasHs1 {
-  const h = decisionesHabitualesHs1(cubierta, suelo);
+export function resolverDecisionesHs1(d: DecisionesHs1, suelo: SueloHabitual = SUELO_HABITUAL): DecisionesEfectivasHs1 {
+  const h = decisionesHabitualesHs1(suelo);
   const v = <K extends keyof DecisionesEfectivasHs1>(k: K): DecisionesEfectivasHs1[K] =>
     (d[k] === "habitual" || d[k] === undefined ? h[k] : d[k]) as DecisionesEfectivasHs1[K];
-  const proteccion = v("cubiertaProteccion");
   return {
     muroTipo: v("muroTipo"),
     muroImper: v("muroImper"),
     sueloTipo: v("sueloTipo"),
     sueloIntervencion: v("sueloIntervencion"),
-    // Una protección de otro tipo de cubierta (la cubierta cambió) vuelve a lo habitual.
-    cubiertaProteccion: proteccionesDe(cubierta).includes(proteccion) ? proteccion : h.cubiertaProteccion,
     cubiertaAislante: v("cubiertaAislante"),
     cubiertaTejado: v("cubiertaTejado"),
     cubiertaImpermeabilizacion: v("cubiertaImpermeabilizacion"),

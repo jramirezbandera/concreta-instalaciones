@@ -13,6 +13,7 @@
 // =============================================================================
 
 import { cerramientosDe } from "../../lib/constructivo/cerramientos";
+import { NOMBRE_CERRAMIENTO } from "../../lib/constructivo/textos";
 import type { Aviso, ElementoResultado } from "../../lib/cte/resultado";
 import type { Edificio } from "../../lib/edificio/tipos";
 import type { DatosGenerales } from "../../lib/proyecto/tipos";
@@ -353,15 +354,15 @@ export function justificarHs1(estado: Hs1Estado, edificio: Edificio, obra: ObraH
 
   // Las decisiones: el muro primero (decide el bloque de la tabla 2.4) y, con
   // los grados de los suelos, lo habitual del suelo.
-  const tipoMuro = resolverDecisionesHs1(estado, partes.cubierta.tipo).muroTipo;
+  const tipoMuro = resolverDecisionesHs1(estado).muroTipo;
   const sueloHabitual = sueloHabitualPara(
     partes.suelos.map((s) => ({
       grado: gradoSuelo(presenciaDe(s.caraInferior_m, freatico).valor, ks.valor),
       bloque: bloqueSuelo(s.id === "suelo-pb" ? null : tipoMuro),
     })),
   );
-  const d = resolverDecisionesHs1(estado, partes.cubierta.tipo, sueloHabitual);
-  const habituales = decisionesHabitualesHs1(partes.cubierta.tipo, sueloHabitual);
+  const d = resolverDecisionesHs1(estado, sueloHabitual);
+  const habituales = decisionesHabitualesHs1(sueloHabitual);
   const caraMasBaja = Math.min(...partes.suelos.map((s) => s.caraInferior_m));
   const presenciaBaja = presenciaDe(caraMasBaja, freatico);
   const delta = deltaFreatico(caraMasBaja, freatico ?? undefined);
@@ -650,62 +651,62 @@ export function justificarHs1(estado: Hs1Estado, edificio: Edificio, obra: ObraH
   const fachadas = [
     { rol: "fachada" as const, nombre: conPB ? "Fachadas de las demás plantas" : "Fachadas", sol: cer.fachada.sol, declara: estado.fachadaDeclara?.general },
     ...(conPB && cer.fachadaPB
-      ? [{ rol: "fachada-pb" as const, nombre: "Fachada de la planta baja", sol: cer.fachadaPB.sol, declara: estado.fachadaDeclara?.pb }]
+      ? [{ rol: "fachada-pb" as const, nombre: NOMBRE_CERRAMIENTO.fachadaPB, sol: cer.fachadaPB.sol, declara: estado.fachadaDeclara?.pb }]
       : []),
   ];
   for (const fa of fachadas) {
-  const ev = evaluarFachada(fa.sol, grado, fa.declara);
-  elementos.push({
-    id: fa.rol,
-    nombre: fa.nombre,
-    tipo: "fachada",
-    veredicto: ev.cumple ? "ok" : "fail",
-    valor: { valor: grado, unidad: "grado" },
-    manda: {
-      tipo: "grado_tabla",
-      tabla: "Tabla 2.5",
-      entradas: [
-        { k: "Zona pluviométrica", v: clima.zona.valor },
-        { k: "Exposición al viento", v: exposicion },
-      ],
-    },
-    cita: ["HS 1 · tablas 2.5, 2.6 y 2.7", "ap. 2.3"],
-    detalle: {
-      clase: "fachada",
-      rol: fa.rol,
-      sol: { codigo: fa.sol.codigo, nombre: fa.sol.nombre, pagina: fa.sol.pagina },
-      grado,
-      zona: clima.zona,
-      eolica: clima.eolica,
-      entorno: clima.entorno,
-      terrenoTipo: obra.terrenoTipo ?? null,
-      altura_m,
-      filaAltura: (fila ?? { rotulo: "más de 100 m" }).rotulo,
-      exposicion,
-      columna: ev.columna,
-      unaHoja: ev.unaHoja,
-      hidrofilo: ev.hidrofilo,
-      niveles: ev.niveles,
-      habituales: ev.habituales,
-      declarado: ev.declarado,
-      opciones: ev.opciones,
-      gradoOpcion: ev.gradoOpcion,
-      opcion: ev.opcion,
-      condiciones: ev.condiciones,
-      hojaUnicaAplicada: ev.opciones[ev.opcion].nota1,
-      cumple: ev.cumple,
-      faltan: ev.faltan,
-      gradoMax: ev.gradoMax,
-      cec: ev.cec,
-      arreglo: ev.cumple ? null : evaluarFachada(fa.sol, grado).cumple ? "habitual" : "edificio",
-      fueraDeTabla: fila === null,
-      influyen,
-    },
-  });
-  // El CEC solo es contraste: se avisa si, con lo declarado, daría que no llega cuando la tabla 2.7 dice que sí.
-  if (ev.cumple && ev.cec && ev.cec.grado < grado) {
-    avisos.push({ id: `cec-${fa.rol}`, tipo: "caso_especial", elementoId: fa.rol, datos: { codigo: fa.sol.codigo, clave: ev.cec.clave, cec: ev.cec.grado, grado, gradoMax: ev.gradoMax } });
-  }
+    const ev = evaluarFachada(fa.sol, grado, fa.declara);
+    elementos.push({
+      id: fa.rol,
+      nombre: fa.nombre,
+      tipo: "fachada",
+      veredicto: ev.cumple ? "ok" : "fail",
+      valor: { valor: grado, unidad: "grado" },
+      manda: {
+        tipo: "grado_tabla",
+        tabla: "Tabla 2.5",
+        entradas: [
+          { k: "Zona pluviométrica", v: clima.zona.valor },
+          { k: "Exposición al viento", v: exposicion },
+        ],
+      },
+      cita: ["HS 1 · tablas 2.5, 2.6 y 2.7", "ap. 2.3"],
+      detalle: {
+        clase: "fachada",
+        rol: fa.rol,
+        sol: { codigo: fa.sol.codigo, nombre: fa.sol.nombre, pagina: fa.sol.pagina },
+        grado,
+        zona: clima.zona,
+        eolica: clima.eolica,
+        entorno: clima.entorno,
+        terrenoTipo: obra.terrenoTipo ?? null,
+        altura_m,
+        filaAltura: (fila ?? { rotulo: "más de 100 m" }).rotulo,
+        exposicion,
+        columna: ev.columna,
+        unaHoja: ev.unaHoja,
+        hidrofilo: ev.hidrofilo,
+        niveles: ev.niveles,
+        habituales: ev.habituales,
+        declarado: ev.declarado,
+        opciones: ev.opciones,
+        gradoOpcion: ev.gradoOpcion,
+        opcion: ev.opcion,
+        condiciones: ev.condiciones,
+        hojaUnicaAplicada: ev.opciones[ev.opcion].nota1,
+        cumple: ev.cumple,
+        faltan: ev.faltan,
+        gradoMax: ev.gradoMax,
+        cec: ev.cec,
+        arreglo: ev.cumple ? null : evaluarFachada(fa.sol, grado).cumple ? "habitual" : "edificio",
+        fueraDeTabla: fila === null,
+        influyen,
+      },
+    });
+    // El CEC solo es contraste: se avisa si, con lo declarado, daría que no llega cuando la tabla 2.7 dice que sí.
+    if (ev.cumple && ev.cec && ev.cec.grado < grado) {
+      avisos.push({ id: `cec-${fa.rol}`, tipo: "caso_especial", elementoId: fa.rol, datos: { codigo: fa.sol.codigo, clave: ev.cec.clave, cec: ev.cec.grado, grado, gradoMax: ev.gradoMax } });
+    }
   }
   if (influyen.length > 0) {
     avisos.push({ id: "clima-supuesto", tipo: "supuesto", elementoId: "fachada", datos: { faltan: influyen } });
@@ -719,8 +720,8 @@ export function justificarHs1(estado: Hs1Estado, edificio: Edificio, obra: ObraH
     avisos.push({ id: "coronacion-peto", tipo: "caso_especial", elementoId: "fachada", datos: { altura_m, limite_m: fila.hasta_m } });
   }
 
-  // ── La cubierta ───────────────────────────────────────────────────────────
-  const cubierta = cubiertaDe(partes.cubierta.tipo, d);
+  // ── La cubierta: la de El edificio (feature-26) ───────────────────────────
+  const cubierta = cubiertaDe(cer.cubierta.sol, d);
   const p = cubierta.pendiente;
   elementos.push({
     id: "cubierta",

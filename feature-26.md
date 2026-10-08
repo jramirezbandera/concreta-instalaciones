@@ -268,6 +268,59 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
      enfoscado intermedio.
 6. **Fichas y memoria**: cada ficha cita el tipo con su código y su página del CEC, por ejemplo
    «F1 · SATE sobre LP ½ pie (CEC F 4.1, p. 64)». El mismo nombre en HE1, HR y HS1.
+
+   **Hecho (2026-10-08), paso 6:**
+   - `src/lib/constructivo/textos.ts`: `citaCec` («CEC F 3.2, p. 59»), `designacion` (el nombre
+     con esa cita), `enFrase`/`designacionEnFrase` (en minúscula salvo las siglas: «enfoscado +
+     LP…», «SATE…») y `NOMBRE_CERRAMIENTO` («Fachada», «Fachada de la planta baja», «Ventanas»,
+     «Ventanas de la planta baja», «Cubierta», «Forjados»).
+   - **HE1**: en la ficha, la fachada, la cubierta, los forjados y las ventanas llevan su
+     designación (la fila «Marco» pasa a ser «Ventanas», con el tipo y el marco); en la memoria,
+     también la cubierta y las ventanas. El vidrio se nombra por su tipo («doble bajo emisivo»)
+     y no por sus lunas, que son las del tipo de ventana; una observación lo explica.
+   - **HR**: la ficha añade a los datos de partida la fachada, las ventanas, la cubierta y los
+     forjados que comprueba (los de la planta baja, si van aparte), y la tabiquería con su
+     cita. `textoSolucion` cita la página de todas las soluciones.
+   - **HS1**: ficha y memoria con la misma designación.
+   - Tests: `lib/constructivo/test/fichas.test.ts` (las tres fichas y memorias con la planta
+     baja distinta dicen lo mismo); 1312 en verde.
+
+   **Decisiones a validar:**
+   - Sin etiquetas «F1», «F2»: los cerramientos se llaman por su papel («Fachada de la planta
+     baja»). «C1» chocaría con las condiciones C1 y C2 de HS1, y «F1» con los códigos F 1.1 del
+     CEC.
+   - En HR, la página del CEC sale en todas las soluciones (tabiquería, separaciones, suelos),
+     no solo en los cerramientos de El edificio.
+   - ~~La cubierta de HS1 la decidía HS1~~: arreglado justo después (abajo).
+
+   **Hecho (2026-10-08), la cubierta de HS1:** HS1 decidía la protección (grava en la no
+   transitable) mientras El edificio solo tenía C 1.3 (transitable, solado fijo) para toda
+   plana. Ahora:
+   - El catálogo añade **C 2.3** (transitable, solado flotante, solo invertida; p. 38) y
+     **C 5.3** (no transitable, grava; p. 41), con R0_paquete 0,25 y + 2 dBA por las
+     pendientes (verificación C.1.3, C.1.4 y C.2). Cada cubierta lleva su `tipo` de El edificio,
+     su `proteccion` de la tabla 2.9 y `soloInvertida`.
+   - La cubierta casa con el **tipo** de cubierta de El edificio, no solo con la forma. La
+     habitual: C 1.3 si es transitable, **C 5.3 si no lo es**, C 9.3 si es inclinada (las que
+     suponía HS1).
+   - **HS1** lee la cubierta de El edificio (`cubiertaDe(sol, d)`): su protección sale de
+     allí y `cubiertaProteccion` desaparece de las decisiones. Solo decide la posición del
+     aislante (invertida por defecto; C 2.3, siempre invertida) y, en la inclinada, la teja
+     y la lámina. En pantalla se ve con «Cambiar en El edificio».
+   - Fichas y memoria de HS1 nombran la cubierta como HE1 y HR.
+   - Ningún veredicto cambia: en HR, C 5.3 da el mismo RA,tr que C 1.3 (52 con el forjado de
+     30 cm); HE1 calcula la cubierta por capas según su tipo, como antes; en HS1, lo habitual
+     era ya la grava. Cambia el nombre: el Demo y el Plurifamiliar pasan a C 5.3.
+   - Tests: 1314 en verde.
+
+   **Decisiones a validar:**
+   - HS1 pierde tres protecciones de la tabla 2.9 que el catálogo no tiene: capa de rodadura,
+     lámina autoprotegida y tierra vegetal. Volverán cuando se lean en imagen las tablas del
+     CEC que faltan (4.1.3, 4.1.4, 4.1.6…). Lo guardado en `cubiertaProteccion` se ignora.
+   - Una cubierta elegida de otro tipo (solado fijo en una no transitable) se descarta con
+     aviso, y con ella sus valores propios de HR.
+   - Sigue pendiente: HE1 calcula siempre la plana invertida; si en HS1 se dice
+     «Convencional», las dos fichas no coinciden en la posición del aislante.
 7. **Tests**:
    - un proyecto sin `cerramientos` da el mismo veredicto que hoy en HE1, HR y HS1;
    - en HE1, la U por capas de cada fachada frente a la del CEC;

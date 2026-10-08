@@ -70,6 +70,7 @@ function tipoTabiqueria(s: SolTabiqueria, apoyo: "directo" | "bandas"): TipoTabi
 export interface SolucionUsada {
   nombre: string;
   codigo: string;
+  pagina: number;
   propios: boolean;
   industrial: boolean;
 }
@@ -139,8 +140,8 @@ export interface JustificacionHr extends JustificacionSiBase {
 
 // ── Resolver las soluciones ─────────────────────────────────────────────────
 
-function usada(s: { nombre: string; codigo: string; industrial?: boolean }, e: Eleccion | null | undefined): SolucionUsada {
-  return { nombre: s.nombre, codigo: s.codigo, propios: conValoresPropios(e), industrial: s.industrial === true };
+function usada(s: { nombre: string; codigo: string; pagina: number; industrial?: boolean }, e: Eleccion | null | undefined): SolucionUsada {
+  return { nombre: s.nombre, codigo: s.codigo, pagina: s.pagina, propios: conValoresPropios(e), industrial: s.industrial === true };
 }
 
 function base(e: Eleccion, medios: boolean) {

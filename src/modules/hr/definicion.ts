@@ -9,9 +9,12 @@ import type { FichaData, FilaDato } from "../../lib/pdf/renderFicha";
 import type { DefinicionSi } from "../si/definicion";
 import { fichaSi, ORIGEN_CRITERIO, ORIGEN_DECISION, ORIGEN_EDIFICIO, ORIGEN_SUPUESTO } from "../si/ficha";
 import { solucionDe } from "../../lib/constructivo/catalogo";
+import { cerramientosDe } from "../../lib/constructivo/cerramientos";
+import { designacion, NOMBRE_CERRAMIENTO } from "../../lib/constructivo/textos";
+import type { Edificio } from "../../lib/edificio/tipos";
 import { dibujoHr } from "./dibujo";
 import { hrEstadoDefaults, type HrEstado } from "./estado";
-import { justificarHr, type ElementoHr, type JustificacionHr } from "./justificacion";
+import { justificarHr, type ElementoHr, type JustificacionHr, type SolucionUsada } from "./justificacion";
 import { memoriaHr } from "./memoria";
 import { EDICION_HR, EXTERIOR_HR, FACHADAS_HR, HORIZONTALES_HR, TABIQUERIA_HR, VERTICALES_HR } from "./tablas";
 import {
@@ -30,6 +33,39 @@ import {
 } from "./textos";
 
 export const HR_PDF_SVG_ID = "hr-svg-pdf";
+
+/**
+ * Los cerramientos de El edificio que comprueba HR, con el mismo nombre que en
+ * HE1 y HS1 (feature-26). La planta baja, solo si se comprueba aparte.
+ */
+function filasCerramientos(j: JustificacionHr, edificio: Edificio): FilaDato[] {
+  const fila = (concepto: string, s: Pick<SolucionUsada, "nombre" | "codigo" | "pagina"> & { propios?: boolean }): FilaDato => ({
+    concepto,
+    valor: designacion(s),
+    origen: s.propios ? `${ORIGEN_EDIFICIO} · valores propios` : ORIGEN_EDIFICIO,
+  });
+  const filas: FilaDato[] = [];
+  const vistas = new Set<boolean>();
+  let forjado: SolucionUsada | null = null;
+  for (const el of j.elementos) {
+    const d = el.detalle;
+    if ((d.clase === "horizontal" || d.clase === "forjado-adosada") && !forjado) forjado = d.forjado;
+    if (d.clase !== "exterior") continue;
+    if (d.recinto === "cubierta") {
+      filas.push(fila(NOMBRE_CERRAMIENTO.cubierta, d.ciega));
+      continue;
+    }
+    const pb = el.id.endsWith("-pb");
+    if (vistas.has(pb)) continue;
+    vistas.add(pb);
+    filas.push(fila(pb ? NOMBRE_CERRAMIENTO.fachadaPB : NOMBRE_CERRAMIENTO.fachada, d.ciega));
+    if (d.hueco) filas.push(fila(pb ? NOMBRE_CERRAMIENTO.ventanaPB : NOMBRE_CERRAMIENTO.ventana, d.hueco));
+  }
+  // Sin separaciones horizontales, el forjado solo cuenta para la cubierta (K-CER.10).
+  if (forjado) filas.push(fila(NOMBRE_CERRAMIENTO.forjado, forjado));
+  else if (j.elementos.some((e) => e.id === "cubierta")) filas.push(fila(NOMBRE_CERRAMIENTO.forjado, cerramientosDe(edificio).forjado.sol));
+  return filas;
+}
 
 function limite(el: ElementoHr): string {
   const d = el.detalle;
@@ -92,8 +128,9 @@ export const hr: DefinicionSi<HrEstado, JustificacionHr> = {
         valor: { plurifamiliar: "Edificio de viviendas", aislada: "Vivienda unifamiliar aislada", adosada: "Vivienda unifamiliar adosada (Anejo I)", otros: "Edificio sin viviendas" }[j.tipologia],
         origen: ORIGEN_EDIFICIO,
       },
-      { concepto: "Tabiquería", valor: `${solucionDe("tabiqueria", o.estado.tabiqueria.id).nombre} · ${TABIQUERIA[j.tabiqueria]}`, origen: ORIGEN_DECISION },
+      { concepto: "Tabiquería", valor: `${designacion(solucionDe("tabiqueria", o.estado.tabiqueria.id))} · ${TABIQUERIA[j.tabiqueria]}`, origen: ORIGEN_DECISION },
       { concepto: "Valores del Catálogo", valor: j.medios ? "Medios" : "Mínimos", origen: ORIGEN_CRITERIO },
+      ...filasCerramientos(j, o.edificio),
     ];
     if (j.separaciones.medianeras) datosPartida.push({ concepto: "Medianeras", valor: "Sí", origen: "SI 2" });
     const observaciones = [

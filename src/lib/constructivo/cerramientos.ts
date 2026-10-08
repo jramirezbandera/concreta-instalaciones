@@ -5,13 +5,16 @@
 // `edificio.cerramientos` es opcional y sin migración (REDISENO-V4 §7.4): si
 // falta, valen los habituales de hoy, con los que ningún proyecto cambia de
 // veredicto: F 3.2 (K-CER.15; en HR vale lo mismo que F 3.1), la ventana
-// batiente de PVC, la cubierta habitual de su tipo y el forjado de 30 cm.
+// batiente de PVC, la cubierta habitual de su tipo (la que HS1 suponía: solado
+// fijo si es transitable, grava si no, tejas si es inclinada) y el forjado de
+// 30 cm.
 //
 // Criterios:
 //   - K-CER.1: la «planta baja» es la planta 0; las demás plantas sobre
 //     rasante llevan la general;
-//   - una cubierta que no casa con el tipo de El edificio (plana o inclinada)
-//     no vale: se usa la habitual del tipo y se avisa.
+//   - una cubierta que no casa con el tipo de El edificio (plana transitable,
+//     plana no transitable o inclinada) no vale: se usa la habitual del tipo y
+//     se avisa.
 // =============================================================================
 
 import { renumerar } from "../edificio/derivar";
@@ -36,14 +39,22 @@ export const CERRAMIENTOS_HABITUALES: Cerramientos = {
   forjado: { id: "fu-bovhorm-300" },
 };
 
-/** La cubierta habitual de cada tipo de cubierta (la que usaba HR). */
+const CUBIERTA_HABITUAL: Record<TipoCubierta, string> = {
+  plana_transitable: "cu-plana-fu-bovhorm-300",
+  plana_no_transitable: "cu-plana-grava",
+  inclinada: "cu-incl-fu-bovhorm-250",
+};
+
+/** La cubierta habitual de cada tipo de cubierta. */
 export function cubiertaHabitual(tipo: TipoCubierta): string {
-  return tipo === "inclinada" ? "cu-incl-fu-bovhorm-250" : "cu-plana-fu-bovhorm-300";
+  return CUBIERTA_HABITUAL[tipo];
 }
 
-export function formaDe(tipo: TipoCubierta): SolCubierta["forma"] {
-  return tipo === "inclinada" ? "inclinada" : "plana";
-}
+const NOMBRE_TIPO_CUBIERTA: Record<TipoCubierta, string> = {
+  plana_transitable: "plana transitable",
+  plana_no_transitable: "plana no transitable",
+  inclinada: "inclinada",
+};
 
 /** Una elección con su solución del Catálogo. */
 export interface Cerramiento<S> {
@@ -82,10 +93,9 @@ function ventanaDe(el: EleccionVentana): CerramientoVentana {
 /** Los cerramientos del edificio con sus soluciones del Catálogo. */
 export function cerramientosDe(e: Edificio): CerramientosDelEdificio {
   const c = eleccionesDe(e);
-  const forma = formaDe(e.cubierta.tipo);
   const habitual = cubiertaHabitual(e.cubierta.tipo);
   const elegida = c.cubierta ? solucion(c.cubierta.id) : undefined;
-  const vale = elegida?.categoria === "cubierta" && elegida.forma === forma;
+  const vale = elegida?.categoria === "cubierta" && elegida.tipo === e.cubierta.tipo;
   const cubierta = vale && c.cubierta ? c.cubierta : { id: habitual };
   return {
     fachada: fachadaDe(c.fachada),
@@ -175,7 +185,7 @@ export function avisosCerramientos(e: Edificio): string[] {
   }
   if (r.cubierta.descartada) {
     avisos.push(
-      `Cerramientos: la cubierta elegida no es ${formaDe(e.cubierta.tipo)}, como el tipo de cubierta. Se usa la habitual (CEC ${r.cubierta.sol.codigo}).`,
+      `Cerramientos: la cubierta elegida no es ${NOMBRE_TIPO_CUBIERTA[e.cubierta.tipo]}, como el tipo de cubierta. Se usa la habitual (CEC ${r.cubierta.sol.codigo}).`,
     );
   }
   return avisos;

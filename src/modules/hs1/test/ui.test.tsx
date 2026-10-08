@@ -44,7 +44,9 @@ describe("HS1 · desde El edificio (feature-17)", () => {
     const muro = within(decisiones).getByRole("group", { name: "El muro del sótano" });
     expect(within(muro).getByRole("button", { name: "Por fuera" })).toHaveAttribute("aria-pressed", "true");
     expect(within(decisiones).getByRole("combobox", { name: "Tipo de muro" })).toHaveValue("flexorresistente");
-    expect(within(decisiones).getByRole("button", { name: "Grava" })).toHaveAttribute("aria-pressed", "true");
+    // La cubierta es la de El edificio; aquí solo la posición del aislante.
+    expect(decisiones).toHaveTextContent("Plana no transitable, con grava");
+    expect(within(decisiones).getByRole("button", { name: "Invertida" })).toHaveAttribute("aria-pressed", "true");
 
     // Lo seleccionado por defecto: la fachada.
     const aside = await findByRole("complementary", { name: DIBUJO });
@@ -60,7 +62,10 @@ describe("HS1 · desde El edificio (feature-17)", () => {
     const user = userEvent.setup();
     const { getByRole, findByRole } = await renderHs1();
     const decisiones = getByRole("region", { name: "Decisiones" });
-    expect(within(decisiones).getByRole("link", { name: "Cambiar en El edificio" })).toHaveAttribute("href", `#/p/${DEMO_ID}/edificio`);
+    // La fachada y la cubierta se cambian en El edificio.
+    const enlaces = within(decisiones).getAllByRole("link", { name: "Cambiar en El edificio" });
+    expect(enlaces).toHaveLength(2);
+    for (const a of enlaces) expect(a).toHaveAttribute("href", `#/p/${DEMO_ID}/edificio`);
     const rev = within(decisiones).getByRole("group", { name: "Revestimiento exterior" });
     expect(within(rev).getByRole("button", { name: "R3 · muy alta" })).toHaveAttribute("aria-pressed", "true");
     await user.click(within(rev).getByRole("button", { name: "R1 · media" }));

@@ -171,12 +171,12 @@ describe("HE1 · la planta baja distinta (K-CER.1, K-CER.2)", () => {
     expect(v.tipo === "ventana" && v.rol).toBe("ventanas-pb");
 
     const t = textoPlanoMemoria(memoriaHe1(j));
-    expect(t).toContain("– Fachada de la planta baja: SATE sobre LP ½ pie (CEC F 4.1), con EPS de");
-    expect(t).toContain("– Ventanas de la planta baja de metálico con RPT de más de 12 mm con");
+    expect(t).toContain("– Fachada de la planta baja: SATE sobre LP ½ pie (CEC F 4.1, p. 64), con EPS de");
+    expect(t).toContain("– Ventanas de la planta baja: batiente, vidrio 4-cámara-6, clase 3 (CEC 4.3.2, p. 97), con marco metálico con RPT de más de 12 mm y vidrio");
 
     const f = toFichaData(j, { estado: he1EstadoDefaults, edificio: conPB, revisados: [], svg: tamanoDibujoHe1() });
     expect(f.datosPartida.map((d) => d.concepto)).toEqual(
-      expect.arrayContaining(["Fachada", "Fachada de la planta baja", "Forjado", "Marco", "Marco de la planta baja"]),
+      expect.arrayContaining(["Fachada", "Fachada de la planta baja", "Forjados", "Ventanas", "Ventanas de la planta baja"]),
     );
     expect(f.verificaciones).toHaveLength(9);
   });

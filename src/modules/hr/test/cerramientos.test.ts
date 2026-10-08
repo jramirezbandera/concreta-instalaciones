@@ -28,7 +28,8 @@ describe("HR · los cerramientos de El edificio (feature-26)", () => {
     const f = detalle<"exterior">(j, "fachada-dormitorios")!;
     expect(f.ciega).toMatchObject({ codigo: "F 3.2", RAtr: 45 });
     expect(f.hueco).toMatchObject({ codigo: "4.3.2", ventanaRAtr: 30 });
-    expect(detalle<"exterior">(j, "cubierta")?.ciega).toMatchObject({ codigo: "C 1.3", RAtr: 52 });
+    // La no transitable es C 5.3: el mismo RA,tr que C 1.3, el forjado + 2 dBA por las pendientes.
+    expect(detalle<"exterior">(j, "cubierta")?.ciega).toMatchObject({ codigo: "C 5.3", RAtr: 52 });
   });
 
   it("la fachada elegida en El edificio es la parte ciega y el flanco de las separaciones", () => {

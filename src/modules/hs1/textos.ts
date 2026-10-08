@@ -7,10 +7,11 @@
 import type { DetalleElemento, EstadoPresentacion } from "../../lib/cte/presentacion";
 import { listaY, mayuscula } from "../../lib/cte/redaccion";
 import type { Aviso } from "../../lib/cte/resultado";
+import { designacionEnFrase, enFrase } from "../../lib/constructivo/textos";
 import { formatoCota } from "../../lib/edificio/derivar";
 import { fmt } from "../../lib/units/format";
 import { CONDICIONES, codigos, type ElementoCondiciones } from "./condiciones";
-import { NOMBRE_PROTECCION, type CubiertaHs1 } from "./cubierta";
+import type { CubiertaHs1 } from "./cubierta";
 import type { ImpermeabilizacionMuro, IntervencionTerreno, TipoMuro, TipoSuelo } from "./decisiones";
 import { ESPESOR_SUELO_CRITERIO_m } from "./partes";
 import { MARGEN_UMBRAL_m, PETO_CRITERIO_m, type DetalleHs1, type ElementoHs1, type JustificacionHs1 } from "./justificacion";
@@ -51,12 +52,6 @@ export const NOMBRE_KS: Record<ClaseKs, string> = {
   bajo: "Ks ≤ 10⁻⁵ cm/s",
 };
 
-const NOMBRE_TIPO_CUBIERTA: Record<CubiertaHs1["tipo"], string> = {
-  plana_transitable: "plana transitable",
-  plana_no_transitable: "plana no transitable",
-  inclinada: "inclinada",
-};
-
 function n1(v: number): string {
   return fmt(v, undefined, 1);
 }
@@ -94,11 +89,16 @@ export function unaSolucionSuelo(tipo: TipoSuelo, intervencion: IntervencionTerr
   return `${tipo === "elevado" ? "un" : "una"} ${solucionSuelo(tipo, intervencion)}`;
 }
 
-export function solucionCubierta(c: CubiertaHs1): string {
+/**
+ * La cubierta de El edificio con lo que decide HS1: «plana no transitable, con
+ * grava (CEC C 5.3, p. 41), invertida». Sin `cita`, para un título.
+ */
+export function solucionCubierta(c: CubiertaHs1, cita = true): string {
+  const s = cita ? designacionEnFrase(c.sol) : enFrase(c.sol.nombre);
   if (c.plana) {
-    return `${NOMBRE_TIPO_CUBIERTA[c.tipo]}${c.proteccion === "lamina_autoprotegida" ? "" : c.invertida ? ", invertida" : ", convencional"}, con ${NOMBRE_PROTECCION[c.proteccion!].toLowerCase()}`;
+    return `${s}${c.proteccion === "lamina_autoprotegida" || c.sol.soloInvertida ? "" : c.invertida ? ", invertida" : ", convencional"}`;
   }
-  return `inclinada de ${c.tejado!.pieza.toLowerCase()}${c.impermeabilizacion ? ", con impermeabilización bajo el tejado" : ""}`;
+  return `${s}, de ${c.tejado!.pieza.toLowerCase()}${c.impermeabilizacion ? ", con impermeabilización bajo el tejado" : ""}`;
 }
 
 /** La pendiente de la cubierta: «del 1 al 5 %», «mayor que el 30 %». */
@@ -339,7 +339,7 @@ export function franjaDe(el: ElementoHs1, j: JustificacionHs1, estado: EstadoPre
       return {
         ...base,
         clase: "Cubierta",
-        titulo: `Cubierta ${solucionCubierta(c)}`,
+        titulo: `Cubierta ${solucionCubierta(c, false)}`,
         valor: c.pendiente ? (c.pendiente.estricta ? `> ${n0(c.pendiente.min_pct)} %` : `${n0(c.pendiente.min_pct)}–${n0(c.pendiente.max_pct ?? 0)} %`) : "Grado único",
         unidad: c.pendiente ? "de pendiente" : undefined,
         manda: c.pendiente

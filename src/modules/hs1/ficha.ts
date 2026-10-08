@@ -10,7 +10,9 @@
 
 import { VEREDICTO_FICHA } from "../../lib/cte/estados";
 import { textoParrafo } from "../../lib/cte/memoria";
+import { mayuscula } from "../../lib/cte/redaccion";
 import { citaDe } from "../../lib/cte/tabla";
+import { designacion, NOMBRE_CERRAMIENTO } from "../../lib/constructivo/textos";
 import { procedenciaEdificio } from "../../lib/edificio/derivar";
 import type { Edificio } from "../../lib/edificio/tipos";
 import type { CitaNormativa, FichaData, FilaDato, FilaVerificacion } from "../../lib/pdf/renderFicha";
@@ -129,14 +131,18 @@ export function toFichaData(j: JustificacionHs1, o: OpcionesFichaHs1): FichaData
       el.detalle.clase === "fachada"
         ? [
             {
-              concepto: el.detalle.rol === "fachada-pb" ? "Fachada de la planta baja" : "Fachada",
-              valor: `${el.detalle.sol.nombre} (CEC ${el.detalle.sol.codigo}, p. ${el.detalle.sol.pagina}) · ${el.detalle.columna === "con_revestimiento" ? `revestimiento R${el.detalle.niveles.R}` : "sin revestimiento"} · ${el.detalle.unaHoja ? "una hoja" : "dos hojas"}`,
+              concepto: el.detalle.rol === "fachada-pb" ? NOMBRE_CERRAMIENTO.fachadaPB : NOMBRE_CERRAMIENTO.fachada,
+              valor: `${designacion(el.detalle.sol)} · ${el.detalle.columna === "con_revestimiento" ? `revestimiento R${el.detalle.niveles.R}` : "sin revestimiento"} · ${el.detalle.unaHoja ? "una hoja" : "dos hojas"}`,
               origen: el.detalle.declarado ? `El edificio · ${ORIGEN_DECISION}` : "El edificio · lo declarado, lo habitual",
             },
           ]
         : [],
     ),
-    { concepto: "Cubierta", valor: solucionCubierta(j.cubierta), origen: ORIGEN_DECISION },
+    {
+      concepto: NOMBRE_CERRAMIENTO.cubierta,
+      valor: mayuscula(solucionCubierta(j.cubierta)),
+      origen: j.cubierta.plana ? "El edificio · aislante: decisión" : `El edificio · tejado: ${ORIGEN_DECISION.toLowerCase()}`,
+    },
   );
 
   const verificaciones: FilaVerificacion[] = j.elementos.map((el) => ({

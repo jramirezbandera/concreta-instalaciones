@@ -4,7 +4,6 @@ import {
   elegir,
   elegirVentana,
   eleccionesDe,
-  formaDe,
   plantaBajaDistinta,
   plantaBajaEnHe1,
   setCerramientos,
@@ -111,7 +110,7 @@ export function EditorCerramientos(props: { edificio: Edificio; onCambiar: (e: E
   const c = eleccionesDe(e);
   const r = cerramientosDe(e);
   const pb = plantaBajaDistinta(c);
-  const cubiertas = deCategoria("cubierta").filter((s) => s.forma === formaDe(e.cubierta.tipo));
+  const cubiertas = deCategoria("cubierta").filter((s) => s.tipo === e.cubierta.tipo);
 
   return (
     <Tarjeta k="Cerramientos" titulo="Fachada, ventana, cubierta y forjado">
@@ -237,7 +236,7 @@ export function EditorCerramientos(props: { edificio: Edificio; onCambiar: (e: E
         filas={[
           { codigo: "HE1", texto: "U de cada fachada, de la cubierta, del suelo y de las ventanas; el aislante y el vidrio se deciden allí", trato: "si" },
           { codigo: "HR", texto: "parte ciega y huecos frente al ruido exterior, flancos y forjados; los valores propios se dan allí", trato: "si" },
-          { codigo: "HS1", texto: "grado de impermeabilidad de cada fachada por sus rasgos (tabla 2.7); la resistencia del revestimiento se declara allí", trato: "si" },
+          { codigo: "HS1", texto: "grado de impermeabilidad de cada fachada por sus rasgos (tabla 2.7) y la protección de la cubierta (tabla 2.9); el revestimiento y el aislante de la cubierta se declaran allí", trato: "si" },
         ]}
       />
     </Tarjeta>

@@ -33,7 +33,7 @@ describe("cerramientos de El edificio (feature-26)", () => {
     expect(r.ventana.sol.id).toBe("ve-4-c-6-batiente");
     expect(r.ventana.marco).toBe("pvc_tres_camaras");
     expect(r.ventanaPB).toBeNull();
-    expect(r.cubierta.sol.codigo).toBe(e.cubierta.tipo === "inclinada" ? "C 9.3" : "C 1.3");
+    expect(r.cubierta.sol.codigo).toBe({ inclinada: "C 9.3", plana_transitable: "C 1.3", plana_no_transitable: "C 5.3" }[e.cubierta.tipo]);
     expect(r.cubierta.habitual).toBe(true);
     expect(r.forjado.sol.id).toBe("fu-bovhorm-300");
     expect(avisosCerramientos(e)).toEqual([]);
@@ -55,7 +55,7 @@ describe("cerramientos de El edificio (feature-26)", () => {
   });
 
   it("la cubierta habitual se guarda como «la habitual» y sigue al tipo de cubierta", () => {
-    let e = setCerramientos(edificioDeCaso("plurifamiliar"), { cubierta: { id: "cu-plana-fu-bovhorm-300" } });
+    let e = setCerramientos(setCubierta(edificioDeCaso("plurifamiliar"), { tipo: "plana_no_transitable" }), { cubierta: { id: "cu-plana-grava" } });
     expect(e.cerramientos?.cubierta).toBeNull();
     e = setCubierta(e, { tipo: "inclinada" });
     const r = cerramientosDe(e);
@@ -68,9 +68,17 @@ describe("cerramientos de El edificio (feature-26)", () => {
       cubierta: { id: "cu-incl-fu-bovhorm-250" },
     });
     const r = cerramientosDe(e);
-    expect(r.cubierta.sol.codigo).toBe("C 1.3");
+    expect(r.cubierta.sol.codigo).toBe("C 5.3");
     expect(r.cubierta.descartada).toBe(true);
-    expect(avisosCerramientos(e).some((a) => a.includes("no es plana"))).toBe(true);
+    expect(avisosCerramientos(e).some((a) => a.includes("no es plana no transitable"))).toBe(true);
+  });
+
+  it("la cubierta casa con el tipo, no solo con la forma: el solado fijo no vale en una no transitable", () => {
+    const base = setCubierta(edificioDeCaso("plurifamiliar"), { tipo: "plana_no_transitable" });
+    const e = setCerramientos(base, { cubierta: { id: "cu-plana-fu-bovhorm-300" } });
+    expect(cerramientosDe(e).cubierta).toMatchObject({ descartada: true, sol: { codigo: "C 5.3" } });
+    const t = setCerramientos(setCubierta(base, { tipo: "plana_transitable" }), { cubierta: { id: "cu-plana-solado-flotante" } });
+    expect(cerramientosDe(t).cubierta).toMatchObject({ descartada: false, habitual: false, sol: { codigo: "C 2.3" } });
   });
 
   it("elegir otra solución quita los valores propios; cambiar la ventana conserva el marco", () => {

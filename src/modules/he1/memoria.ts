@@ -9,6 +9,7 @@ import { listaY } from "../../lib/cte/redaccion";
 import { fmt } from "../../lib/units/format";
 import { ENGINE_VERSION } from "../../lib/version";
 import { MATERIALES_CEC } from "../../lib/constructivo/materiales";
+import { citaCec, designacionEnFrase } from "../../lib/constructivo/textos";
 import { MARCOS } from "../../lib/constructivo/tipos";
 import { aislanteDe, claseDe, nombresProtegidos, rangoNiveles, VIDRIOS, type RolCerramiento } from "./envolvente";
 import { cerramientoDe, fachadaHe1De, rolesDe, ventanaHe1De, type JustificacionHe1 } from "./justificacion";
@@ -28,9 +29,10 @@ function cumple(u: number, lim: number | null): string {
   return lim === null ? "" : ` ${u <= lim ? "≤" : ">"} ${n2(lim)}`;
 }
 
-/** «PVC de tres cámaras», «madera de 500 kg/m³». */
-function minuscula(nombre: string): string {
-  return nombre.startsWith("PVC") ? nombre : nombre[0].toLowerCase() + nombre.slice(1);
+/** «marco de PVC de tres cámaras», «marco de madera de 500 kg/m³», «marco metálico sin RPT». */
+function marcoEnTexto(nombre: string): string {
+  const m = nombre.startsWith("PVC") ? nombre : nombre[0].toLowerCase() + nombre.slice(1);
+  return m.startsWith("metálico") ? `marco ${m}` : `marco de ${m}`;
 }
 
 /** «forjado unidireccional, bovedilla de hormigón, 30 cm», «losa maciza de hormigón armado 20 cm». */
@@ -54,21 +56,23 @@ function linea(j: JustificacionHe1, rol: RolCerramiento): Trozo[] {
       const f = fachadaHe1De(j, rol);
       const donde = rol === "fachada-pb" ? " de la planta baja" : "";
       return [
-        `– Fachada${donde}: ${f.sol.nombre} (CEC ${f.sol.codigo}), con ${MATERIALES_CEC[f.sol.aislante].nombre} de `,
+        `– Fachada${donde}: ${designacionEnFrase(f.sol)}, con ${MATERIALES_CEC[f.sol.aislante].nombre} de `,
         { v: `${aislanteDe(d, rol as "fachada" | "fachada-pb")} mm` },
         ": U = ",
         u,
         `${cumple(r.u_W_m2K, r.ulim_W_m2K)}.`,
       ];
     }
-    case "cubierta":
+    case "cubierta": {
+      const t = j.propuesta.tipos;
       return [
-        `– Cubierta ${j.propuesta.envolvente.cubierta === "inclinada" ? "inclinada" : "plana invertida"} sobre ${forjadoEnTexto(j.propuesta.tipos.forjado.nombre)} (CEC ${j.propuesta.tipos.forjado.codigo}), con XPS de `,
+        `– Cubierta: ${designacionEnFrase(t.cubierta)}${j.propuesta.envolvente.cubierta === "inclinada" ? "" : ", invertida"}, con ${forjadoEnTexto(t.forjado.nombre)} (${citaCec(t.forjado)}) y XPS de `,
         { v: `${d.aislanteCubierta_mm} mm` },
         ": U = ",
         u,
         `${cumple(r.u_W_m2K, r.ulim_W_m2K)}.`,
       ];
+    }
     case "suelo": {
       const s = el.detalle.suelo!;
       const que =
@@ -87,9 +91,10 @@ function linea(j: JustificacionHe1, rol: RolCerramiento): Trozo[] {
     }
     case "ventanas": {
       const h = r.hueco!;
+      const v = ventanaHe1De(j, rol);
       const donde = rol === "ventanas-pb" ? " de la planta baja" : "";
       return [
-        `– Ventanas${donde} de ${minuscula(MARCOS[ventanaHe1De(j, rol).marco].nombre)} con ${VIDRIOS[d.vidrio].nombre} (Ug ${n1(h.ug_W_m2K)}, Uf ${n1(h.uf_W_m2K)}, Ψ ${n2(h.psi_W_mK)}, fracción de marco ${n0(h.fraccionMarco * 100)} %): UH = `,
+        `– Ventanas${donde}: ${designacionEnFrase(v.sol)}, con ${marcoEnTexto(MARCOS[v.marco].nombre)} y vidrio ${VIDRIOS[d.vidrio].tipo} (Ug ${n1(h.ug_W_m2K)}, Uf ${n1(h.uf_W_m2K)}, Ψ ${n2(h.psi_W_mK)}, fracción de marco ${n0(h.fraccionMarco * 100)} %): UH = `,
         { v: `${n2(r.u_W_m2K)} W/m²K` },
         `${cumple(r.u_W_m2K, r.ulim_W_m2K)}.`,
       ];
