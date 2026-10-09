@@ -57,7 +57,8 @@ export interface Cerramientos {
   cubierta: Eleccion | null;
   /**
    * La posición del aislante en la cubierta plana: el CEC da sus cubiertas
-   * convencionales o invertidas (C 2.3, solo invertida). Sin dar, invertida.
+   * convencionales o invertidas (C 2.3, solo invertida; C 6.3, solo
+   * convencional). Sin dar, invertida.
    */
   aislanteCubierta?: "invertida" | "convencional";
   /** El forjado de todas las plantas (y el soporte de la cubierta, K-CER.10). */

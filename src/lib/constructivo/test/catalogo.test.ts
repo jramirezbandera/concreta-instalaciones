@@ -56,17 +56,23 @@ describe("catálogo común (feature-26)", () => {
       ["C 1.3", "plana_transitable", "solado_fijo", 0.27, true],
       ["C 2.3", "plana_transitable", "solado_flotante", 0.25, true],
       ["C 5.3", "plana_no_transitable", "grava", 0.25, true],
+      ["C 6.3", "plana_no_transitable", "lamina_autoprotegida", 0.23, true],
+      ["C 7.3", "plana_no_transitable", "tierra_vegetal", 0.82, true],
       ["C 9.3", "inclinada", null, 0.19, false],
     ]);
-    // C 2.3 solo la da el CEC invertida (verificacion-cerramientos-cec.md, C.2.3).
-    expect(deCategoria("cubierta").filter((c) => c.soloInvertida).map((c) => c.codigo)).toEqual(["C 2.3"]);
+    // C 2.3 solo la da el CEC invertida (C.2.3) y C 6.3, solo convencional, con un aislante soldable (Bloque H, K-CER.18).
+    const cs = deCategoria("cubierta");
+    expect(cs.filter((c) => c.posicion !== "ambas").map((c) => [c.codigo, c.posicion, c.aislante])).toEqual([
+      ["C 2.3", "invertida", "xps"],
+      ["C 6.3", "convencional", "lana_mineral"],
+    ]);
   });
 
   it("el RA,tr de una cubierta sale de su forjado y reproduce el del CEC con el de referencia (K-CER.10)", () => {
     const plana = solucionDe("cubierta", "cu-plana-fu-bovhorm-300");
     const incl = solucionDe("cubierta", "cu-incl-fu-bovhorm-250");
     expect(RAtrCubierta(plana, solucionDe("forjado", "fu-bovhorm-300"))).toBe(plana.RAtr);
-    for (const id of ["cu-plana-solado-flotante", "cu-plana-grava"]) {
+    for (const id of ["cu-plana-solado-flotante", "cu-plana-grava", "cu-plana-autoprotegida", "cu-plana-ajardinada"]) {
       const c = solucionDe("cubierta", id);
       expect(RAtrCubierta(c, solucionDe("forjado", "fu-bovhorm-300"))).toBe(c.RAtr);
     }

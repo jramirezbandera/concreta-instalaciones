@@ -13,7 +13,7 @@ import { citaCec, designacionEnFrase } from "../../lib/constructivo/textos";
 import { MARCOS } from "../../lib/constructivo/tipos";
 import { aislanteDe, claseDe, nombresProtegidos, rangoNiveles, VIDRIOS, type RolCerramiento } from "./envolvente";
 import { cerramientoDe, fachadaHe1De, rolesDe, ventanaHe1De, type JustificacionHe1 } from "./justificacion";
-import { lugar, montajeEnTexto } from "./textos";
+import { aislanteCubiertaDe, lugar, montajeEnTexto } from "./textos";
 
 function n0(v: number): string {
   return fmt(v, undefined, 0);
@@ -66,7 +66,7 @@ function linea(j: JustificacionHe1, rol: RolCerramiento): Trozo[] {
     case "cubierta": {
       const t = j.propuesta.tipos;
       return [
-        `– Cubierta: ${designacionEnFrase(t.cubierta)}${montajeEnTexto(j) ? `, ${montajeEnTexto(j)}` : ""}, con ${forjadoEnTexto(t.forjado.nombre)} (${citaCec(t.forjado)}) y XPS de `,
+        `– Cubierta: ${designacionEnFrase(t.cubierta)}${montajeEnTexto(j) ? `, ${montajeEnTexto(j)}` : ""}, con ${forjadoEnTexto(t.forjado.nombre)} (${citaCec(t.forjado)}) y ${aislanteEnTexto(aislanteCubiertaDe(j))} de `,
         { v: `${d.aislanteCubierta_mm} mm` },
         ": U = ",
         u,

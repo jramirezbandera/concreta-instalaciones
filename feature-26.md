@@ -344,7 +344,29 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
      marcando condensación en enero: el Sd orientativo de la lámina es bajo frente al de la
      impermeabilización de encima. Se queda en aviso (el DB admite condensación que se evapore
      en el año), sin inventar un Sd mayor.
-   - El aislante de la cubierta sigue siendo XPS también en la convencional.
+   - El aislante de la cubierta sigue siendo XPS también en la convencional (salvo C 6.3).
+
+   **Hecho (2026-10-09), las protecciones de HS1 que faltaban:** el agente de normativa leyó
+   las 14 tablas de cubiertas del CEC (Bloque H de la verificación).
+   - **C 6.3** (p. 42, 4.1.6), «Plana no transitable, con lámina autoprotegida»: **solo
+     convencional**, R0_paquete 0,23, RA,tr 52. Aislante soldable: **lana mineral** por defecto
+     (K-CER.18).
+   - **C 7.3** (p. 43, 4.1.7), «Plana no transitable, ajardinada»: convencional o invertida,
+     R0_paquete 0,82 (supone unos 30 cm de tierra; solo contraste, HE1 no cuenta la protección:
+     lado seguro), RA,tr 52. El CEC también la llama no transitable.
+   - **La capa de rodadura no está en el CEC**: sus cuatro planas transitables son de peatones.
+   - Modelo: `soloInvertida` pasa a `posicion` («ambas», «invertida», «convencional») y cada
+     cubierta lleva su `aislante`. HE1 usa ese aislante en la capa y en los textos. En El
+     edificio, la no transitable ofrece C 5.3 (la habitual), C 6.3 y C 7.3.
+   - Tests: 1323 en verde.
+
+   **Decidido con el usuario (2026-10-09):**
+   - **Capa de rodadura: no se ofrece** (no está en el CEC; K-CER.17 opción a). Se añadiría
+     si un proyecto la necesita, rotulada como criterio.
+   - **Pendiente de C 6.3**: el CEC la da del 1 al 5 % (nota 2) y la tabla 2.9, hasta el 15 %.
+     Cada cubierta lleva `pendienteMax_pct` donde se ha leído (C 1.3, C 6.3 y C 7.3: 5 %), y
+     HS1 avisa (`cubierta-pendiente-cec`) si la tabla 2.9 admite más: por encima, la cubierta
+     ya no es la del Catálogo.
 7. **Tests**:
    - un proyecto sin `cerramientos` da el mismo veredicto que hoy en HE1, HR y HS1;
    - en HE1, la U por capas de cada fachada frente a la del CEC;

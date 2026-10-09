@@ -89,6 +89,17 @@ describe("HE1 · la cubierta convencional (El edificio)", () => {
     expect(burgos.propuesta.minimos.cubierta).toBe(justificar(edificioDeCaso("plurifamiliar"), {}, BURGOS).propuesta.minimos.cubierta);
   });
 
+  it("con lámina autoprotegida (C 6.3): convencional y con lana mineral, que es soldable (K-CER.18)", () => {
+    const e = setCerramientos(edificioDeCaso("plurifamiliar"), { cubierta: { id: "cu-plana-autoprotegida" } });
+    const j = justificar(e);
+    expect(j.propuesta.montajeCubierta.invertida).toBe(false);
+    expect(capas(j)).toContain("Lana mineral");
+    expect(capas(j).at(-1)).toBe("Impermeabilización");
+    const f = toFichaData(j, { estado: he1EstadoDefaults, edificio: e, revisados: [], svg: tamanoDibujoHe1() });
+    expect(f.datosPartida.find((d) => d.concepto === "Cubierta")?.valor).toMatch(/\(CEC C 6\.3, p\. 42\) · convencional.* · Lana mineral \d+ mm$/);
+    expect(textoPlanoMemoria(memoriaHe1(j))).toMatch(/\(CEC C 6\.3, p\. 42\), convencional.*y lana mineral de/);
+  });
+
   it("la ficha y la memoria lo dicen; si aun con barrera condensa, el aviso no pide ponerla", () => {
     const j = justificar(conv, {}, BURGOS);
     const f = toFichaData(j, { estado: he1EstadoDefaults, edificio: conv, revisados: [], svg: tamanoDibujoHe1() });

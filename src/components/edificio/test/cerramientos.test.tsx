@@ -84,6 +84,15 @@ describe("Cerramientos en El edificio", () => {
     expect(getByText(/el Catálogo solo la da así/)).toBeInTheDocument();
   });
 
+  it("la no transitable se elige entre grava, lámina autoprotegida y ajardinada", async () => {
+    const user = userEvent.setup();
+    const { getByLabelText, onCambiar } = montar(edificioDeCaso("plurifamiliar"));
+    const sel = getByLabelText("Cubierta");
+    expect([...(sel as HTMLSelectElement).options].map((o) => o.value)).toEqual(["cu-plana-grava", "cu-plana-autoprotegida", "cu-plana-ajardinada"]);
+    await user.selectOptions(sel, "cu-plana-autoprotegida");
+    expect(onCambiar.mock.lastCall![0].cerramientos?.cubierta).toEqual({ id: "cu-plana-autoprotegida" });
+  });
+
   it("la cubierta lleva a Cerramientos", async () => {
     const user = userEvent.setup();
     const onSeleccionar = vi.fn();

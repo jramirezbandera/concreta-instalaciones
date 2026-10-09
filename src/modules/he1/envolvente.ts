@@ -37,7 +37,7 @@
 
 import { indiceFuera, type SolCubierta, type SolFachada, type SolForjado, type SolVentana } from "../../lib/constructivo/catalogo";
 import { cerramientosDe } from "../../lib/constructivo/cerramientos";
-import { MATERIALES_CEC, type ClaveMaterial } from "../../lib/constructivo/materiales";
+import { MATERIALES_CEC, type ClaveAislante, type ClaveMaterial } from "../../lib/constructivo/materiales";
 import { NOMBRE_CERRAMIENTO } from "../../lib/constructivo/textos";
 import { MARCOS, type Marco } from "../../lib/constructivo/tipos";
 import { etiquetaNivel, plantasDe } from "../../lib/edificio/derivar";
@@ -334,10 +334,16 @@ export interface MontajeCubierta {
 
 const INVERTIDA: MontajeCubierta = { invertida: true, barrera: false };
 
-export function cubiertaDe(tipo: TipoCubierta, e_mm: number, forjado: SolForjado, m: MontajeCubierta = INVERTIDA): CerramientoInput {
+export function cubiertaDe(
+  tipo: TipoCubierta,
+  e_mm: number,
+  forjado: SolForjado,
+  m: MontajeCubierta = INVERTIDA,
+  clave: ClaveAislante = "xps",
+): CerramientoInput {
   // Lámina bituminosa: Sd del producto (orientativo, criterio); la barrera de vapor, la misma lámina.
   const lamina = (id: string, nombre: string): CapaInput => ({ id, nombre, material: "betun_lamina_asfaltica", espesor_m: 0.004, sd_m: 50 });
-  const aislante: CapaInput = { id: capaAislante("cubierta"), nombre: "XPS", material: "xps", espesor_m: e_mm / 1000 };
+  const aislante: CapaInput = { id: capaAislante("cubierta"), nombre: MATERIALES_CEC[clave].nombre, material: MATERIAL_HE1[clave]!, espesor_m: e_mm / 1000 };
   const plana: CapaInput[] = [
     { id: "cubierta-enlucido", nombre: "Enlucido de yeso", material: "enlucido_yeso", espesor_m: 0.015 },
     capaForjado("cubierta-forjado", "Forjado", forjado),
@@ -529,7 +535,7 @@ export function propuestaHe1(e: Edificio, zona: ZonaClimatica, d: DecisionesHe1,
   }
   // El mínimo, sin barrera de vapor (apenas suma R: lado seguro).
   const sinBarrera: MontajeCubierta = { invertida: tipos.cubiertaInvertida || env.cubierta === "inclinada", barrera: false };
-  minimos.cubierta = minimoAislante_mm(cubiertaDe(env.cubierta, ESPESOR_TIPO_mm.cubierta, tipos.forjado, sinBarrera), zona, higrometria, clima);
+  minimos.cubierta = minimoAislante_mm(cubiertaDe(env.cubierta, ESPESOR_TIPO_mm.cubierta, tipos.forjado, sinBarrera, tipos.cubierta.aislante), zona, higrometria, clima);
   minimos.suelo = minimoAislante_mm(suelo(env.suelo, local, ESPESOR_TIPO_mm.suelo, tipos.forjado), zona, higrometria, clima);
   const propio = (rol: RolOpaco) => {
     const clase = claseDe(rol) as keyof typeof ESPESOR_TIPO_mm;
@@ -557,13 +563,13 @@ export function propuestaHe1(e: Edificio, zona: ZonaClimatica, d: DecisionesHe1,
   };
   // La convencional lleva barrera de vapor si, sin ella, Glaser prevé condensaciones.
   const condensaSin = () => {
-    const r = calcHE1(inputsDe([cubiertaDe(env.cubierta, decisiones.aislanteCubierta_mm, tipos.forjado, sinBarrera)], zona, higrometria, clima)).porCerramiento[0];
+    const r = calcHE1(inputsDe([cubiertaDe(env.cubierta, decisiones.aislanteCubierta_mm, tipos.forjado, sinBarrera, tipos.cubierta.aislante)], zona, higrometria, clima)).porCerramiento[0];
     return r.glaserAplica && r.glaser.condensaIntersticial;
   };
   const montajeCubierta: MontajeCubierta = { invertida: sinBarrera.invertida, barrera: !sinBarrera.invertida && condensaSin() };
   const cers = [
     ...tipos.fachadas.map((f) => fachadaDe(f.sol, aislanteDe(decisiones, f.rol), f.rol, f.nombre)),
-    cubiertaDe(env.cubierta, decisiones.aislanteCubierta_mm, tipos.forjado, montajeCubierta),
+    cubiertaDe(env.cubierta, decisiones.aislanteCubierta_mm, tipos.forjado, montajeCubierta, tipos.cubierta.aislante),
     suelo(env.suelo, decisiones.local, decisiones.aislanteSuelo_mm, tipos.forjado),
     ...tipos.ventanas.map((w) => ventanasDe(decisiones.vidrio, w)),
   ];

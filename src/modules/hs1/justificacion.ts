@@ -735,6 +735,11 @@ export function justificarHs1(estado: Hs1Estado, edificio: Edificio, obra: ObraH
     cita: ["HS 1 · ap. 2.4", p ? p.tabla.toLowerCase() : "ap. 2.4.2"],
     detalle: { clase: "cubierta", cubierta },
   });
+  // La tabla 2.9 puede admitir más pendiente que la solución del CEC (C 6.3: del 1 al 5 %, la tabla hasta el 15 %).
+  const maxCec = cer.cubierta.sol.pendienteMax_pct;
+  if (p?.max_pct != null && maxCec !== undefined && p.max_pct > maxCec) {
+    avisos.push({ id: "cubierta-pendiente-cec", tipo: "caso_especial", elementoId: "cubierta", datos: { codigo: cer.cubierta.sol.codigo, maxCec, maxDb: p.max_pct } });
+  }
 
   const veredicto: Veredicto = elementos.some((e) => e.veredicto === "fail") ? "fail" : "ok";
   return { partes, decisiones: d, habituales, cubierta, elementos, avisos, veredicto };

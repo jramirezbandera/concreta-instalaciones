@@ -83,6 +83,8 @@ describe("cerramientos de El edificio (feature-26)", () => {
     });
     expect(cerramientosDe(flotante).cubierta.invertida).toBe(true);
     expect(cerramientosDe(setCubierta(base, { tipo: "inclinada" })).cubierta.invertida).toBe(false);
+    // C 6.3 (lámina autoprotegida): solo convencional, aunque no se diga.
+    expect(cerramientosDe(setCerramientos(base, { cubierta: { id: "cu-plana-autoprotegida" } })).cubierta.invertida).toBe(false);
   });
 
   it("la cubierta casa con el tipo, no solo con la forma: el solado fijo no vale en una no transitable", () => {

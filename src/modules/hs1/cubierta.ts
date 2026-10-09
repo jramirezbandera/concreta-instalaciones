@@ -34,7 +34,7 @@ export interface PendienteCubierta {
 
 export interface CubiertaHs1 {
   /** La de El edificio, para nombrarla como en HE1 y HR. */
-  sol: Pick<SolCubierta, "nombre" | "codigo" | "pagina" | "soloInvertida">;
+  sol: Pick<SolCubierta, "nombre" | "codigo" | "pagina" | "posicion">;
   tipo: TipoCubierta;
   plana: boolean;
   proteccion: ProteccionPlana | null;
@@ -63,7 +63,7 @@ export const NOMBRE_PROTECCION: Record<ProteccionPlana, string> = {
 /** `invertida`: la posición del aislante que da El edificio (`cerramientosDe`). */
 export function cubiertaDe(s: SolCubierta, invertida: boolean, d: DecisionesEfectivasHs1): CubiertaHs1 {
   const tipo = s.tipo;
-  const sol = { nombre: s.nombre, codigo: s.codigo, pagina: s.pagina, soloInvertida: s.soloInvertida };
+  const sol = { nombre: s.nombre, codigo: s.codigo, pagina: s.pagina, posicion: s.posicion };
   const plana = tipo !== "inclinada";
   const capas: CapaCubierta[] = [];
   const add = (letra: CapaCubierta["letra"], elemento: string, porque: string, exigida: boolean) =>

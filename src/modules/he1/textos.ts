@@ -86,6 +86,11 @@ export function textoEtiqueta(el: ElementoHe1): string {
   }
 }
 
+/** «XPS», «Lana mineral»: el aislante de la cubierta de El edificio. */
+export function aislanteCubiertaDe(j: JustificacionHe1): string {
+  return MATERIALES_CEC[j.propuesta.tipos.cubierta.aislante].nombre;
+}
+
 /** «invertida», «convencional», «convencional con barrera de vapor»; la inclinada, «». */
 export function montajeEnTexto(j: JustificacionHe1): string {
   if (j.propuesta.envolvente.cubierta === "inclinada") return "";
@@ -102,7 +107,7 @@ export function composicionCorta(j: JustificacionHe1, rol: RolCerramiento): stri
       return `${f.codigo} · ${MATERIALES_CEC[f.aislante].nombre} ${aislanteDe(d, rol as "fachada" | "fachada-pb")}`;
     }
     case "cubierta":
-      return `${j.propuesta.envolvente.cubierta === "inclinada" ? "inclinada" : `plana ${montajeEnTexto(j)}`} · XPS ${d.aislanteCubierta_mm}`;
+      return `${j.propuesta.envolvente.cubierta === "inclinada" ? "inclinada" : `plana ${montajeEnTexto(j)}`} · ${aislanteCubiertaDe(j)} ${d.aislanteCubierta_mm}`;
     case "suelo":
       return `${cerramientoDe(j, "suelo").detalle.aislante?.nombre ?? "aislante"} ${d.aislanteSuelo_mm} bajo el forjado`;
     case "ventanas":
@@ -186,7 +191,7 @@ export function franjaDe(el: ElementoHe1, j: JustificacionHe1, estado: EstadoPre
           clase: "Cubierta",
           titulo: inclinada ? "Cubierta inclinada" : `Cubierta plana ${montajeEnTexto(j)}`,
           unidad,
-          manda: `El aislante: XPS de ${a?.espesor_mm ?? 0} mm ${inclinada ? "sobre el forjado, bajo la teja" : j.propuesta.montajeCubierta.invertida ? "sobre la impermeabilización" : j.propuesta.montajeCubierta.barrera ? "bajo la impermeabilización, sobre una barrera de vapor: sin ella, Glaser prevé condensaciones" : "bajo la impermeabilización"}.${desde}${porFRsi}`,
+          manda: `El aislante: ${aislanteCubiertaDe(j)} de ${a?.espesor_mm ?? 0} mm ${inclinada ? "sobre el forjado, bajo la teja" : j.propuesta.montajeCubierta.invertida ? "sobre la impermeabilización" : j.propuesta.montajeCubierta.barrera ? "bajo la impermeabilización, sobre una barrera de vapor: sin ella, Glaser prevé condensaciones" : "bajo la impermeabilización"}.${desde}${porFRsi}`,
           filas: [
             limite,
             { k: "Forjado", v: `${j.propuesta.tipos.forjado.nombre} · R ${n2(j.propuesta.tipos.forjado.R)}` },

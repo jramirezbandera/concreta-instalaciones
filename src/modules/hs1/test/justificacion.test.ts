@@ -6,6 +6,7 @@ import { crearProyectoDemo } from "../../../lib/proyecto/demo";
 import { hs1EstadoDefaults, type Hs1Estado } from "../estado";
 import { justificarHs1, obraHs1De, type ElementoHs1, type JustificacionHs1, type ObraHs1 } from "../justificacion";
 import { partesDe, presenciaAguaDe } from "../partes";
+import { textoAviso } from "../textos";
 
 // =============================================================================
 // HS1 (feature-17) — Lo que entra desde El edificio, la presencia de agua y la
@@ -200,6 +201,20 @@ describe("justificación", () => {
     const g = justificarHs1(est(), setCerramientos(E("plurifamiliar_locales"), { aislanteCubierta: "convencional" }), OBRA);
     expect(g.cubierta).toMatchObject({ proteccion: "grava", invertida: false, sol: { codigo: "C 5.3" } });
     expect(g.cubierta.capas.find((c) => c.letra === "g")).toMatchObject({ exigida: true });
+  });
+
+  it("con lámina autoprotegida (C 6.3), sin capa de protección; ajardinada (C 7.3), con tierra vegetal", () => {
+    const auto = justificarHs1(est(), setCerramientos(E("plurifamiliar_locales"), { cubierta: { id: "cu-plana-autoprotegida" } }), OBRA);
+    expect(auto.cubierta).toMatchObject({ proteccion: "lamina_autoprotegida", invertida: false, sol: { codigo: "C 6.3" } });
+    expect(auto.cubierta.pendiente).toMatchObject({ min_pct: 1, max_pct: 15 });
+    expect(auto.cubierta.capas.some((c) => c.letra === "i")).toBe(false);
+    // El CEC la da hasta el 5 %; la tabla 2.9, hasta el 15 %: se avisa.
+    expect(auto.avisos.find((a) => a.id === "cubierta-pendiente-cec")?.datos).toEqual({ codigo: "C 6.3", maxCec: 5, maxDb: 15 });
+    expect(textoAviso(auto.avisos.find((a) => a.id === "cubierta-pendiente-cec")!).titulo).toBe("La C 6.3 del Catálogo vale hasta el 5 % de pendiente.");
+    const jardin = justificarHs1(est(), setCerramientos(E("plurifamiliar_locales"), { cubierta: { id: "cu-plana-ajardinada" } }), OBRA);
+    expect(jardin.cubierta).toMatchObject({ proteccion: "tierra_vegetal", invertida: true, ajardinadaCriterio: true });
+    // La tierra vegetal, del 1 al 5 % en la tabla 2.9 y en el CEC: sin aviso.
+    expect(jardin.avisos.some((a) => a.id === "cubierta-pendiente-cec")).toBe(false);
   });
 
   it("con solado flotante (C 2.3) va invertida aunque se diga convencional", () => {

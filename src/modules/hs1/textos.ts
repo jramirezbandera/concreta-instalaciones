@@ -96,7 +96,8 @@ export function unaSolucionSuelo(tipo: TipoSuelo, intervencion: IntervencionTerr
 export function solucionCubierta(c: CubiertaHs1, cita = true): string {
   const s = cita ? designacionEnFrase(c.sol) : enFrase(c.sol.nombre);
   if (c.plana) {
-    return `${s}${c.proteccion === "lamina_autoprotegida" || c.sol.soloInvertida ? "" : c.invertida ? ", invertida" : ", convencional"}`;
+    // C 2.3 lo dice en su nombre.
+    return `${s}${c.sol.posicion === "invertida" ? "" : c.invertida ? ", invertida" : ", convencional"}`;
   }
   return `${s}, de ${c.tejado!.pieza.toLowerCase()}${c.impermeabilizacion ? ", con impermeabilización bajo el tejado" : ""}`;
 }
@@ -561,6 +562,11 @@ export function textoAviso(a: Aviso): TextoAviso {
 
 function textoAvisoResto(a: Aviso): TextoAviso {
   switch (a.id) {
+    case "cubierta-pendiente-cec":
+      return {
+        titulo: `La ${a.datos.codigo} del Catálogo vale hasta el ${a.datos.maxCec} % de pendiente.`,
+        detalle: `La tabla 2.9 admite hasta el ${a.datos.maxDb} %, pero por encima del ${a.datos.maxCec} % la cubierta ya no es la del Catálogo (su nota 2): sus valores de HE1 y HR dejan de servir y hay que justificarla con los del producto.`,
+      };
     case "coronacion-peto":
       return {
         titulo: "Un peto podría cambiar la exposición al viento.",

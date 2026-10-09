@@ -111,7 +111,9 @@ export function cerramientosDe(e: Edificio): CerramientosDelEdificio {
       sol: cubiertaSol,
       habitual: cubierta.id === habitual && !cubierta.valores,
       descartada: c.cubierta !== null && !vale,
-      invertida: cubiertaSol.tipo !== "inclinada" && (cubiertaSol.soloInvertida || c.aislanteCubierta !== "convencional"),
+      invertida:
+        cubiertaSol.tipo !== "inclinada" &&
+        (cubiertaSol.posicion === "invertida" || (cubiertaSol.posicion === "ambas" && c.aislanteCubierta !== "convencional")),
     },
     forjado: { eleccion: c.forjado, sol: solucionDe("forjado", c.forjado.id) },
     supuestos: e.cerramientos === undefined,

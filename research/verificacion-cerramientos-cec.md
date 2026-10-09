@@ -1,6 +1,6 @@
 # Verificación normativa: catálogo común de cerramientos del CEC para HE1, HR y HS1 (feature-26, paso 0)
 
-**Fecha:** 2026-10-05 · Agente: cte-normativa · **No se ha editado código.**
+**Fecha:** 2026-10-05 · Agente: cte-normativa · **No se ha editado código.** Bloque H añadido el 2026-10-09.
 **Ámbito:** fijar, para cada fachada, cubierta, forjado y ventana del catálogo común, la composición por capas, la R0 de la fórmula del CEC, el grado de impermeabilidad que da el CEC y los rasgos que HS1 necesita, y comprobar si el cálculo por capas de HE1 reproduce el CEC. Bloques A a G del encargo, en ese orden. Los valores acústicos ya verificados (`research/verificacion-hr-cec.md`) solo se cotejan.
 
 **Regla de veredictos** (la misma que en `verificacion-hr-cec.md`):
@@ -17,7 +17,7 @@
 
 | Clave | Documento | Edición | Lectura en esta sesión |
 |---|---|---|---|
-| [CEC] | Catálogo de Elementos Constructivos del CTE (IETcc, CEPCO, AICIA) | «Versión preliminar: Marzo 10. Borrador», archivo CAT-EC-v06.3 (marzo 2010). Sin carácter reglamentario (avisos 1 a 5 de `verificacion-hr-cec.md` §0) | Imagen: pp. 17, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31, 32 (materiales); 37, 38, 41, 45, 46, 49 (cubiertas); 53 a 61, 63 a 69, 73, 75, 76 (fachadas); 90, 92, 93, 95 (ventanas); 114, 115 (particiones horizontales). Texto: cabeceras de pp. 39 a 51, 91, 94 |
+| [CEC] | Catálogo de Elementos Constructivos del CTE (IETcc, CEPCO, AICIA) | «Versión preliminar: Marzo 10. Borrador», archivo CAT-EC-v06.3 (marzo 2010). Sin carácter reglamentario (avisos 1 a 5 de `verificacion-hr-cec.md` §0) | Imagen: pp. 17, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31, 32 (materiales); 37, 38, 41, 45, 46, 49 (cubiertas); 53 a 61, 63 a 69, 73, 75, 76 (fachadas); 90, 92, 93, 95 (ventanas); 114, 115 (particiones horizontales). Texto: cabeceras de pp. 39 a 51, 91, 94. **Bloque H (2026-10-09), imagen:** pp. 14, 37, 38, 39, 40, 42, 43, 44, 47, 48, 50, 51, 52 |
 | [DA/1] | DA DB-HE/1 «Cálculo de parámetros característicos de la envolvente» | enero 2020 | No releído aquí; se usa lo ya codificado en `he1/tablas.ts` (Rsi/Rse Tabla 1, cámaras Tabla 2, ec. (10), Tabla 10) |
 | [HS1] | DB-HS1, tabla 2.7 y condiciones de fachada | La edición que usa el repo (`hs1/tablas.ts`, `hs1/condiciones.ts`, `research/verificacion-hs1.md`) | No releído aquí; se coteja con el repo |
 
@@ -266,7 +266,7 @@ Referencia leída también: metálico sin RPT (p. 90), UVA 4-15: 3,3 / 3,9 / 2,6
 
 ### F.2 El CEC define las mismas condiciones que el DB-HS1
 
-VERIFICADO, p. 53 («4.2 Fachadas. Consideraciones previas»): B3 (revestimiento continuo intermedio estanco, o cámara ventilada de 3 a 10 cm por el lado exterior de un aislante no hidrófilo, con recogida del agua y aberturas ≥ 120 cm² por 10 m² de paño), B3′, R1, R2, R3, R3′ (paneles prefabricados con juntas estancas), C1 («½ pie de ladrillo cerámico, que debe ser perforado o macizo cuando no exista revestimiento exterior o cuando exista un revestimiento exterior discontinuo o un aislante exterior fijados mecánicamente; 12 cm de bloque cerámico, bloque de hormigón o piedra natural»), C1′ (paneles prefabricados de hormigón, muro de hormigón in situ, o elemento ligero estanco), N1, N2, J1, J1′, J2. Las definiciones de B1, B2, C2 y H1 estarán en la p. 52 (**PENDIENTE**, no renderizada).
+VERIFICADO, p. 53 («4.2 Fachadas. Consideraciones previas»): B3 (revestimiento continuo intermedio estanco, o cámara ventilada de 3 a 10 cm por el lado exterior de un aislante no hidrófilo, con recogida del agua y aberturas ≥ 120 cm² por 10 m² de paño), B3′, R1, R2, R3, R3′ (paneles prefabricados con juntas estancas), C1 («½ pie de ladrillo cerámico, que debe ser perforado o macizo cuando no exista revestimiento exterior o cuando exista un revestimiento exterior discontinuo o un aislante exterior fijados mecánicamente; 12 cm de bloque cerámico, bloque de hormigón o piedra natural»), C1′ (paneles prefabricados de hormigón, muro de hormigón in situ, o elemento ligero estanco), N1, N2, J1, J1′, J2. Las definiciones de B1, B2, C2 y H1 estarán en la p. 52 (**PENDIENTE**, no renderizada). **Corrección 2026-10-09:** la p. 52 es «Cubiertas 16» (C 14.5 y C 14.6, final de 4.1.14), VERIFICADO en imagen; B1, B2, C2 y H1 no están ahí (ver PENDIENTES).
 
 ### F.3 Cotejo fachada a fachada
 
@@ -332,6 +332,96 @@ VERIFICADO, p. 53 («4.2 Fachadas. Consideraciones previas»): B3 (revestimiento
 | K-CER.14 | Proyecto sin `cerramientos` | HE1 conserva sus composiciones de hoy, con sus λ, para que no cambie ningún veredicto; la corrección de B.3.3 se aplica solo a los proyectos con `cerramientos` (o se acepta el cambio y se dice en la ficha). Decisión del usuario | B.3.3, B.3.4 |
 | K-CER.15 | Fachada habitual | **F 3.2**, no F 3.1: es la composición que hoy calcula HE1 (con cámara) y tiene los mismos RA/RAtr/m que F 3.1 en HR | A.3.1 |
 
+Criterios propuestos en el bloque H (a validar): **K-CER.16** (tierra de la ajardinada), **K-CER.17** (capa de rodadura sin solución del CEC), **K-CER.18** (aislante de la lámina autoprotegida adherida). Ver H.6.
+
+---
+
+## Bloque H. Cubiertas para las tres protecciones de HS1 que faltan (2026-10-09)
+
+**Encargo:** ¿tabula el CEC una cubierta con **capa de rodadura** (transitable para vehículos), con **lámina autoprotegida** (no transitable) y **ajardinada** (tierra vegetal), para añadirlas al catálogo común como C 1.3, C 2.3 y C 5.3? Fila sobre forjado unidireccional con bovedilla de hormigón (FU BH).
+
+**Lectura.** Imagen PNG de 1 653 × 2 339 px (200 ppp sobre A4) de las pp. 14, 37, 38, 39, 40, 42, 43, 44, 47, 48, 50, 51 y 52 del CEC CAT-EC-v06.3 («Versión preliminar: Marzo 10. Borrador»). Son los renders del mismo archivo hechos en una sesión anterior (scratchpad de la sesión 3ecb9da7, `cec/pNNN.png`); en esta sesión no había shell para volver a descargar el PDF, así que no se ha re-renderizado: se han leído esas imágenes. Para localizar términos en todo el catálogo se ha usado el texto extraído completo de la sesión b82be346 (`hr/cec_texto.txt`); lo que solo sale de ahí va como LEÍDO (texto).
+
+### H.1 Las catorce tablas de 4.1 (pp. 37 a 52)
+
+Constante del paquete = R0 de la fila − R del forjado de 3.18 de 250 mm (BP 0,80; BC 0,28; BH 0,19; CP 0,20; CC 0,15; CH 0,13; SC 0,06; L 0,08 con losa de 200), como en C.1.4.
+
+| Apartado, página | Cabecera del CEC (título y recuadro) | Posición del aislante | Fila FU BH: código y R0 | Constante del paquete (ARITMÉTICA, todas las filas) | Nota HR | Veredicto |
+|---|---|---|---|---|---|---|
+| 4.1.1, p. 37 | «Plana transitable. No ventilada. Solado fijo»; «CUBIERTA PLANA Transitable peatón · SIN CÁMARA» | Convencional e invertida | C 1.3: 0,46 | 0,27 (C.1.4) | (4): 3.18 + 2 dBA | VERIFICADO |
+| 4.1.2, p. 38 | «Plana transitable. No ventilada. Solado flotante»; «Transitable peatón · SIN CÁMARA» | Invertida | C 2.3: 0,44 | 0,25 (C.1.4) | (4): 3.18 + 2 dBA | VERIFICADO |
+| 4.1.3, p. 39 | «Plana transitable. Ventilada. Solado fijo»; «Transitable peatón · CON CÁMARA VENTILADA» | Convencional | C 3.3: 0,66 ligeramente / 0,42 muy ventilada | **0,47 / 0,23** en las ocho (1,27/0,75/0,66/0,67/0,62/0,60/0,53/0,55 y 1,03/0,51/0,42/0,43/0,38/0,36/0,29/0,31) | (6): 3.18 + 2 dBA «cuando la cubierta tenga una capa de formación de pendientes de hormigón con áridos ligeros»; aquí FP es «con tablero cerámico o de hormigón» | VERIFICADO; ARITMÉTICA |
+| 4.1.4, p. 40 | «Plana transitable. Con cámara. Solado flotante»; «Transitable peatón · CON CÁMARA» (C: «cámara de aire, ventilada o no ventilada», bajo el solado sobre soportes S) | Convencional e invertida | C 4.3: 0,48 | **0,29** en las ocho (1,09/0,57/0,48/0,49/0,44/0,42/0,35/0,37) | (4): 3.18 + 2 dBA; FP de hormigón con áridos ligeros | VERIFICADO; ARITMÉTICA |
+| 4.1.5, p. 41 | No transitable, grava | Conv. e inv. | C 5.3: 0,44 | 0,25 (C.1.4) | (4) + 2 dBA | VERIFICADO (sesión anterior) |
+| **4.1.6, p. 42** | «**Plana no transitable. No ventilada. Autoprotegida**»; «CUBIERTA PLANA No Transitable · SIN CÁMARA · Convencional · Autoprotegida o con lámina vista» | **Solo convencional** | **C 6.3: 0,42** | **0,23** en las ocho (1,03/0,51/0,42/0,43/0,38/0,36/0,29/0,31) | (4): 3.18 + 2 dBA; FP de hormigón con áridos ligeros | VERIFICADO; ARITMÉTICA |
+| **4.1.7, p. 43** | «**Plana no transitable. No ventilada. Ajardinada**»; «CUBIERTA PLANA No Transitable · SIN CÁMARA · Convencional e Invertida · Ajardinada» | Convencional e invertida | **C 7.3: 1,01** | **0,82** en las ocho (1,62/1,10/1,01/1,02/0,97/0,95/0,88/0,90) | (4): 3.18 + 2 dBA; FP de hormigón con áridos ligeros | VERIFICADO; ARITMÉTICA |
+| 4.1.8, p. 44 | «Plana no transitable. Ventilada. Autoprotegida»; «No transitable · CON CÁMARA VENTILADA (con aislante) · Convencional · Autoprotegida o con lámina vista» | Convencional | C 8.3: 0,62 ligeramente / 0,42 muy ventilada | **0,43 / 0,23** en las ocho (1,23/0,71/0,62/0,63/0,58/0,56/0,49/0,51 y 1,03/0,51/0,42/0,43/0,38/0,36/0,29/0,31) | (6): 3.18 + 2 dBA con FP de hormigón ligero; aquí FP es «de tablero cerámico o de hormigón» | VERIFICADO; ARITMÉTICA |
+| 4.1.9, pp. 45–46 | Inclinada, forjado inclinado, tejas | Conv. e inv. | C 9.3: 0,38 | 0,19 (C.1.4) | (5): 3.18 sin +2 | VERIFICADO (sesión anterior) |
+| 4.1.10, p. 47 | «Inclinada. Forjado/tablero inclinado. No ventilada. Autoprotegida» | Convencional | C 10.3: 0,36 | **0,17** (BP 0,97; BC 0,45; BH 0,36; L 0,25) | (4): 3.18 **sin** +2 (SR hace la pendiente). C 10.5 y C 10.6 (tablero cerámico TS) con HR propio: 152/41/39 y 149/44/40 | VERIFICADO; ARITMÉTICA |
+| 4.1.11, p. 48 | «Inclinada. Forjado inclinado. Ventilada. Con capa de protección» (tejas, pizarra, placas y perfiles metálicos; tablero de madera) | Convencional | C 11.3: 0,59 / 0,42 | **0,40 / 0,23** (BP 1,20/1,03; BC 0,68/0,51; BH 0,59/0,42; L 0,48/0,31) | (6): 3.18 **sin** +2 | VERIFICADO; ARITMÉTICA |
+| 4.1.12, p. 49 | Inclinada ventilada sobre forjado horizontal | Conv. | C 12.3 | 0,23 / 0,45 (C.1.4) | (6) + 2 dBA | VERIFICADO (sesión anterior) |
+| 4.1.13, p. 50 | «Inclinada. Ligera. No ventilada»: panel sándwich | — (no hay forjado) | — | U = 1/(0,14 + R_AA) a 1/(0,38 + R_AA + R_AB); HR propio (C 13.4: 63/51/48) | — | VERIFICADO |
+| 4.1.14, pp. 51–52 | «Inclinada. Entramado estructural de madera. Ventilada» | — (no hay forjado) | — | 1,38/(1,07 + R_AT), 1,24/(1,24 + R_AT), 1,3/(1,34 + R_AT); nota (4) «para λ = 0,035» | HR propio (5): solo con lana mineral | VERIFICADO |
+
+| # | Afirmación | Veredicto | Detalle |
+|---|---|---|---|
+| H.1.1 | **El CEC no tiene ninguna cubierta para tráfico de vehículos (capa de rodadura).** Las cuatro planas transitables (4.1.1 a 4.1.4) dicen «**Transitable peatón**» en el recuadro y sus protecciones son solado fijo o flotante | VERIFICADO | pp. 37, 38, 39, 40. El resto de 4.1 (4.1.5 a 4.1.14, pp. 41 a 52) son no transitables o inclinadas. 4.1 termina en la p. 52 (C 14.6); la p. 53 ya es «4.2 Fachadas» |
+| H.1.2 | La única mención a vehículos en todo el CEC está en 3.20 (impermeabilizaciones), no en una solución: «(9) En el caso de cubiertas planas transitables para vehículos, la capa de impermeabilización bituminosa ha de ser bicapa y cumplirá con las siguientes propiedades: …» | LEÍDO (texto), p. 34 | Búsqueda en el texto completo de «vehículo», «rodadura», «aglomerado» y «asfalto»: solo esa nota y «Asfalto» como material (tablas de materiales, p. 23). La p. 34 no está renderizada |
+| H.1.3 | Ni 4.1.10 ni 4.1.11 sirven para la tabla 2.9 del DB-HS1: son inclinadas (autoprotegida sobre forjado inclinado y tejado ventilado) | VERIFICADO | pp. 47, 48. La lámina autoprotegida inclinada (C 10.3) queda fuera de este encargo |
+
+### H.2 Soluciones utilizables (fila FU BH)
+
+Capas de **interior a exterior** (leyenda del CEC: SR soporte resistente; FP formación de pendientes; B barrera contra el vapor; AT aislante; Cs capa separadora; I impermeabilización; Csa capa separadora bajo protección; D capa drenante; Fi capa filtrante; P protección; C cámara de aire ventilada). R0_paquete = R0 de la fila − 0,19 (FU BH 250). RAtr con el forjado FU BH 300 de El edificio: RA 55, RAtr 50, m 372 (`verificacion-hr-cec.md` D.8, CEC p. 29).
+
+| # | Código, página | Descripción (CEC) | Capas (int → ext) | R0 CEC → R0_paquete | RA / RAtr (FU BH 300) | Veredicto |
+|---|---|---|---|---|---|---|
+| H.2.1 | **C 6.3**, p. 42 (4.1.6) | Plana **no transitable**, no ventilada (sin cámara), **autoprotegida o con lámina vista**. **Solo convencional**: la cabecera dice «Convencional» y hay una sola sección; no hay versión invertida | SR · FP (hormigón con áridos ligeros) · B (solo si hay riesgo de condensación según el DB HE-1) · AT («soldable en el caso de que la capa de impermeabilización fuera adherida») · I («adherida o fijada mecanicamente. Autoprotegida en el caso de que sea de un material bituminoso»). No lleva Cs, Csa ni P | **0,42 − 0,19 = 0,23** (constante en las ocho filas) | 55 + 2 = **57** / 50 + 2 = **52** | VERIFICADO (capas, R0, nota); ARITMÉTICA (constante y RAtr) |
+| H.2.2 | **C 7.3**, p. 43 (4.1.7) | Plana **no transitable**, no ventilada (sin cámara), **ajardinada**. Convencional e invertida | Convencional: SR · FP (hormigón con áridos ligeros) · B (solo si hay riesgo) · AT · Cs · I · Csa · D · Fi · P («capa de protección de tierra»). Invertida: SR · FP · Cs · I · Csa · AT · Csa · D · Fi · P | **1,01 − 0,19 = 0,82** (constante en las ocho filas). Ver H.4 | **57** / **52** | VERIFICADO (capas, R0, nota); ARITMÉTICA; INTERPRETACIÓN (qué espesor de tierra hay dentro del 0,82) |
+| H.2.3 | C 8.3, p. 44 (4.1.8). **Alternativa**, no se propone por defecto | Plana no transitable, **ventilada** (cámara con aislante), autoprotegida o con lámina vista. Solo convencional | SR · AT · C (ventilada, 30 > Ss/Ac > 3) · FP («de tablero cerámico o de hormigón») · I (adherida; autoprotegida si es bituminosa) | 0,62 − 0,19 = **0,43** ligeramente ventilada (500 < S ≤ 1 500 mm²/m²); 0,42 − 0,19 = **0,23** muy ventilada (S > 1 500) | 55 / **50** (sin +2: el FP es de tablero, no de hormigón ligero) | VERIFICADO (capas, R0); ARITMÉTICA; INTERPRETACIÓN (el +2 no aplica) |
+
+### H.3 Acústica: la nota de 4.1.6 y 4.1.7
+
+| # | Afirmación | Veredicto | Detalle |
+|---|---|---|---|
+| H.3.1 | m, RA y RAtr remiten a 3.18 y **se suman 2 dBA por la formación de pendientes de hormigón con áridos ligeros**. Texto de la nota (4), igual en las dos páginas: «Para obtener los valores de m, RA y RAtr de cubiertas, se utilizarán los valores de m, RA y RAtr de forjados y losas del apartado 3.18. Cuando la cubierta tenga una capa de formación de pendientes de hormigón con áridos ligeros, el valor de los índices RA y RAtr del forjado se incrementará 2 dBA.» Sigue el párrafo del techo suspendido (suma de ΔRA y ΔRAtr, 4.5.2.1) | VERIFICADO | 4.1.6 nota (4), p. 42; 4.1.7 nota (4), p. 43. La leyenda FP de las dos es «formación de pendientes de hormigón con áridos ligeros» → **pendientesLigero: sí** en C 6.3 y C 7.3 |
+| H.3.2 | RAtr con FU BH 300: **50 + 2 = 52 dBA** (RA 57) en las dos | ARITMÉTICA (regla H.3.1 con D.8 de la verificación HR) | Igual que C 1.3, C 2.3 y C 5.3 del catálogo. La masa de la tierra de la ajardinada no se cuenta (el CEC no la da): queda del lado seguro |
+| H.3.3 | C 6.9 (chapa grecada, p. 42) lleva HR propio: m 15, RA 38, RAtr 31, nota (5) «Valor para cubiertas con lana mineral con espesor de 80 mm». No es una fila sobre forjado | VERIFICADO | No se propone (como C 5.9, K-CER.7) |
+| H.3.4 | En 4.1.3 y 4.1.8 (ventiladas) la nota (6) es la misma, pero el FP de su leyenda es de **tablero** («con tablero cerámico o de hormigón», «de tablero cerámico o de hormigón»), no de hormigón ligero; por la letra de la nota, no se suman los 2 dBA | VERIFICADO (texto de la leyenda y la nota); INTERPRETACIÓN (que no aplique) | pp. 39, 44 |
+
+### H.4 Notas relevantes
+
+| # | Afirmación | Veredicto | Detalle |
+|---|---|---|---|
+| H.4.1 | **Pendiente de C 6.3: entre el 1 y el 5 %** (nota (2), p. 42: «La pendiente de la cubierta estará comprendida entre el 1 y el 5%»). La tabla 2.9 del DB-HS1 admite para la lámina autoprotegida del 1 al **15 %** (`hs1/tablas.ts`) | VERIFICADO (CEC); cotejo con el repo, DB no releído aquí | No hay contradicción: el CEC tabula una solución más estrecha. Si el usuario declara más del 5 % con lámina autoprotegida, HS1 puede cumplir, pero la cubierta **ya no es la C 6.3 del CEC** (aviso, no fallo) |
+| H.4.2 | **Pendiente de C 7.3: entre el 1 y el 5 %** (nota (2), p. 43). Coincide con la tabla 2.9 para tierra vegetal (1–5 %, `hs1/tablas.ts`) | VERIFICADO | |
+| H.4.3 | Barrera de vapor: «Sólo si hay riesgo de condensación según lo dispuesto en el Documento Básico DB HE-1» (4.1.6, leyenda B); en 4.1.7, «barrera contra el vapor en cubierta convencional. Sólo si hay riesgo …» | VERIFICADO | pp. 42, 43. Igual que 4.1.1: la decide Glaser de HE1 |
+| H.4.4 | Ajardinada: P «capa de protección de tierra», Fi «capa filtrante», D «capa drenante», Csa «capa separadora bajo protección». Es lo que HS1 ya pide para la tierra vegetal (`hs1/cubierta.ts`: «con capa drenante y capa filtrante») | VERIFICADO | p. 43. 3.20 trae además la propiedad «resistencia a la penetración de raíces» de la lámina (nota (5)), LEÍDO (texto), p. 34 |
+| H.4.5 | **El CEC clasifica la ajardinada como no transitable**: recuadro «CUBIERTA PLANA No Transitable … Ajardinada» y título «Plana no transitable. No ventilada. Ajardinada» | VERIFICADO | p. 43. Respalda el criterio del repo de tratarla con las no transitables (`ajardinadaCriterio`). En la tabla 2.9 del DB-HS1 la ajardinada sigue siendo un uso aparte (con sus pendientes propias), así que el rótulo «criterio» puede quedarse, ahora citando el CEC |
+| H.4.6 | Lámina autoprotegida: el CEC llama «autoprotegida» a la lámina **bituminosa** con autoprotección; el recuadro dice «Autoprotegida **o con lámina vista**» (sintéticas sin protección) | VERIFICADO | p. 42. La tabla 2.9 del DB-HS1 solo nombra la «lámina autoprotegida» |
+| H.4.7 | Con la lámina **adherida**, el aislante tiene que ser **soldable** (leyenda AT de 4.1.6). El XPS por defecto de las otras cubiertas no admite soldeo a llama: lo normal es lana mineral de alta densidad o PIR revestido | VERIFICADO (leyenda); INTERPRETACIÓN (qué aislantes lo son) | Propuesta K-CER.18 en H.6 |
+| H.4.8 | Solo convencional: el catálogo de hoy solo distingue `soloInvertida`. Para C 6.3 (y C 8.3) haría falta lo contrario (solo convencional) para que El edificio no ofrezca la invertida. `hs1/textos.ts` ya omite «convencional/invertida» cuando la protección es la lámina autoprotegida | VERIFICADO (CEC); INTERPRETACIÓN (modelo) | Delegar en motor-calculo: p. ej. `posiciones: ["convencional"]` o `soloConvencional: true` |
+
+### H.5 Tierra de la ajardinada: qué hay dentro del 0,82
+
+| # | Afirmación | Veredicto | Detalle |
+|---|---|---|---|
+| H.5.1 | La constante de C 7.3 (0,82) es **0,59 mayor** que la de la lámina autoprotegida (0,23) y 0,57 mayor que la de la grava (0,25). El CEC no acota el espesor de tierra ni de las capas D y Fi | ARITMÉTICA; VERIFICADO (la sección no tiene cotas) | p. 43 |
+| H.5.2 | Con la tierra vegetal del CEC, **λ = 0,52** (ρ ≤ 2 050; cp 1 840; 3.1.1, p. 14), esos 0,59 equivalen a unos **0,31 m de tierra** (0,59 × 0,52), algo menos si D y Fi aportan R | VERIFICADO (λ); INTERPRETACIÓN (el espesor implícito) | Es una ajardinada intensiva. Con una extensiva de 10 cm de sustrato la constante sería del orden de 0,23 + 0,10/0,52 ≈ **0,42**, no 0,82: tomar el 0,82 del CEC **no va del lado seguro** si la tierra es fina |
+
+### H.6 Propuesta para el catálogo y criterios nuevos
+
+| Protección HS1 (tabla 2.9) | Solución | Tipo de El edificio | Nombre propuesto | soloInvertida | R0_paquete | pendientesLigero | RAtr (FU BH 300) | Veredicto |
+|---|---|---|---|---|---|---|---|---|
+| `lamina_autoprotegida` | **C 6.3**, p. 42, 4.1.6 | `plana_no_transitable` | «Plana no transitable, con lámina autoprotegida» | **No** (y además **solo convencional**: H.4.8) | **0,23** | Sí | **52** | VERIFICADO; ARITMÉTICA |
+| `tierra_vegetal` | **C 7.3**, p. 43, 4.1.7 | `plana_no_transitable` (el CEC también la llama no transitable, H.4.5) | «Plana ajardinada, no transitable» | No (convencional e invertida) | **0,82** del CEC; ver K-CER.16 | Sí | **52** | VERIFICADO; ARITMÉTICA; INTERPRETACIÓN (H.5) |
+| `capa_rodadura` | **Ninguna**: el CEC no la tabula (H.1.1) | `plana_transitable` | — | — | — | — | — | **NO TABULADA** en el CEC (pp. 37 a 52 leídas en imagen) |
+
+| # | Caso | Propuesta | Por qué |
+|---|---|---|---|
+| K-CER.16 | Tierra de la ajardinada | Usar el 0,82 del CEC solo si el proyecto declara **≥ 30 cm de tierra**; si no, R0_paquete = **0,23 + e_tierra/0,52** (base de la lámina de 4.1.6 más la tierra con el λ del CEC, 3.1.1), con e_tierra declarado y 0 por defecto. En la ficha: «C 7.3 del CEC; R de la tierra por espesor declarado (criterio)». Decisión del usuario | H.5 |
+| K-CER.17 | Capa de rodadura | No hay solución del CEC. Opciones: (a) no ofrecerla en el catálogo de El edificio y que HS1 la admita solo como declaración del proyectista, sin cubierta del CEC; (b) una entrada **marcada como criterio, sin código CEC**, por analogía con C 1.3 (P = capa de rodadura de hormigón o aglomerado sobre MA), con R0_paquete 0,27 (lado seguro: la rodadura de hormigón tiene más R que el solado, y no se cuenta), RAtr 52 y lámina bituminosa **bicapa** (3.20 nota (9), texto). Decisión del usuario | H.1.1, H.1.2 |
+| K-CER.18 | Aislante de C 6.3 | Por defecto, **lana mineral de alta densidad** (o PIR revestido), con λ orientativo del CEC y el aviso «soldable si la lámina va adherida»; no XPS | H.4.7 |
+
 ---
 
 ## Correcciones o matices al plan de feature-26.md
@@ -348,15 +438,19 @@ VERIFICADO, p. 53 («4.2 Fachadas. Consideraciones previas»): B3 (revestimiento
 10. **Ventanas**: las tablas 4.3.1 no llevan Ψ y redondean al alza; la ec. (10) de HE1 es más exigente y debe seguir. Dos erratas en cabeceras (RPT > 12: 3,3 por 3,2; madera: «500 kg/m³» con Uf 2,2). Ug y Uf del repo coinciden con 3.15.2 y 3.16. (E)
 11. **µ del repo que no coinciden con el CEC**: PYL 4 (repo 8), enlucido 6 (repo usa 8), HA 80 (repo 95), XPS 100–220 (repo muMax 2 200); EPS λ recomendado 0,039 (repo 0,037). Corregir con cuidado: cambian Glaser. (B.3.5)
 12. **4.1.9 (cubierta inclinada)**: la remisión a 3.18 está ahora VERIFICADA en imagen (nota (5), p. 46), sin el +2 dBA. El RAtr 48 del catálogo HR sigue valiendo. (C.1.3)
+13. **Capa de rodadura: el CEC no tiene solución** (todas sus transitables son «Transitable peatón»). Si se quiere conservar en HS1, decidir K-CER.17. (H.1.1)
+14. **Ajardinada (C 7.3)**: el CEC la llama no transitable, como el criterio del repo; su R0_paquete de 0,82 supone unos 30 cm de tierra y no es lado seguro con sustratos finos. Decidir K-CER.16. (H.4.5, H.5)
+15. **Lámina autoprotegida (C 6.3)**: solo convencional y con pendiente del 1 al 5 % (el DB admite hasta el 15 %); con lámina adherida, aislante soldable. (H.4.1, H.4.7, H.4.8)
 
 ## PENDIENTES
 
-- **p. 52** (consideraciones previas de fachadas: definiciones de B1, B2, C2, H1 en el CEC): no renderizada.
+- **Definiciones de B1, B2, C2 y H1 del CEC**: no están en la p. 52, que es «Cubiertas 16» (C 14.5 y C 14.6), VERIFICADO en imagen el 2026-10-09. Las consideraciones previas de fachadas empiezan en la p. 53 (F.2); falta localizar dónde define el CEC esas cuatro (o confirmar que no las define).
 - **DB-HS1, texto de B2** («cámara por el lado exterior del aislante»): no releído aquí (F.4.4).
 - **DA DB-HE/1, regla de cámaras muy ventiladas** (Rse = Rsi, se excluyen las capas exteriores): aquí solo por aritmética sobre el CEC; leerla en el DA antes de citarla en la ficha.
-- **Cubiertas no leídas en imagen**: 4.1.3, 4.1.4, 4.1.6, 4.1.7, 4.1.8, 4.1.10, 4.1.11, 4.1.13, 4.1.14 (pp. 39, 40, 42, 43, 44, 47, 48, 50, 51). Solo cabeceras en texto.
+- **Cubiertas**: todas las tablas de 4.1 (4.1.1 a 4.1.14, pp. 37 a 52) leídas ya en imagen (bloques C y H). Solo queda en texto la p. 34 (3.20: nota (9) de la impermeabilización bicapa para cubiertas transitables para vehículos y nota (5) de resistencia a raíces).
 - **Fachadas no leídas en imagen**: F 3.28 a F 3.37 (p. 62), 4.2.6 resto y notas (pp. 70–72), 4.2.7 F 7.7 a F 7.15 (p. 74), 4.2.9 (p. 77).
 - **Ventanas**: RPT 4–12 (p. 91), PVC dos cámaras (p. 94) y ventanas dobles (p. 96) solo en texto.
 - **3.20 impermeabilizaciones** (λ, µ o Sd de láminas): pp. 33–36 no renderizadas.
 - **4.5.1 resto y nota (8) HE** (R_AR de los materiales de impactos, S02, S03): pp. 116–117 no leídas en esta sesión.
 - **Preámbulo (p. 3)**: sigue leído solo en texto.
+- **Bloque H**: las imágenes son renders de una sesión anterior del mismo PDF; no se ha vuelto a descargar ni a renderizar en esta sesión (sin shell). Si se quiere trazabilidad completa, re-renderizar pp. 14, 39, 40, 42, 43, 44, 47, 48, 50, 51, 52 y comprobar que coinciden.

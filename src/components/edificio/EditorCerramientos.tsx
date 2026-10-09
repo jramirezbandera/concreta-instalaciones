@@ -187,8 +187,10 @@ export function EditorCerramientos(props: { edificio: Edificio; onCambiar: (e: E
       </Fila>
       {r.cubierta.sol.tipo !== "inclinada" && (
         <Fila etiqueta="Aislante de la cubierta">
-          {r.cubierta.sol.soloInvertida ? (
-            <span className="text-text-secondary text-[12px]">Invertida: el Catálogo solo la da así</span>
+          {r.cubierta.sol.posicion !== "ambas" ? (
+            <span className="text-text-secondary text-[12px]">
+              {r.cubierta.invertida ? "Invertida" : "Convencional"}: el Catálogo solo la da así
+            </span>
           ) : (
             <Segmentado<"invertida" | "convencional">
               etiqueta="Aislante de la cubierta"

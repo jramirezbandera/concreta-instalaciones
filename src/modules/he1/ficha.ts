@@ -37,7 +37,7 @@ import {
   ULIM_PARTICIONES_TABLA_3_2,
   ULIM_TABLA_3_1_1_a,
 } from "./tablas";
-import { composicionCorta, descripcionEnvolvente, lugar, montajeEnTexto, textoAviso } from "./textos";
+import { aislanteCubiertaDe, composicionCorta, descripcionEnvolvente, lugar, montajeEnTexto, textoAviso } from "./textos";
 
 const ORIGEN_EDIFICIO = "El edificio";
 const ORIGEN_DECISION = "Decisión del proyectista";
@@ -135,7 +135,7 @@ export function toFichaData(j: JustificacionHe1, o: OpcionesFichaHe1): FichaData
     })),
     {
       concepto: NOMBRE_CERRAMIENTO.cubierta,
-      valor: `${designacion(t.cubierta)} · ${montajeEnTexto(j) ? `${montajeEnTexto(j)} · ` : ""}XPS ${d.aislanteCubierta_mm} mm`,
+      valor: `${designacion(t.cubierta)} · ${montajeEnTexto(j) ? `${montajeEnTexto(j)} · ` : ""}${aislanteCubiertaDe(j)} ${d.aislanteCubierta_mm} mm`,
       origen: `${ORIGEN_EDIFICIO} · composición tipo · λ orientativas`,
     },
     { concepto: cerramientoDe(j, "suelo").nombre, valor: composicionCorta(j, "suelo"), origen: ORIGEN_TIPO },

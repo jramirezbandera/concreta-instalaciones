@@ -179,9 +179,14 @@ export interface SolCubierta extends Base {
   /** El tipo de cubierta de El edificio con el que casa. */
   tipo: TipoCubierta;
   /** La protección de la tabla 2.9 de HS1 (la plana); null en la inclinada. */
-  proteccion: "solado_fijo" | "solado_flotante" | "grava" | null;
-  /** El CEC solo la da invertida (el aislante sobre la impermeabilización). */
-  soloInvertida: boolean;
+  proteccion: "solado_fijo" | "solado_flotante" | "grava" | "lamina_autoprotegida" | "tierra_vegetal" | null;
+  /**
+   * Dónde puede ir el aislante según el CEC: sobre la impermeabilización
+   * (invertida), bajo ella (convencional) o las dos. La inclinada, «ambas».
+   */
+  posicion: "ambas" | "invertida" | "convencional";
+  /** El aislante por defecto (K-CER.6; K-CER.18 en la autoprotegida: soldable). */
+  aislante: ClaveAislante;
   /**
    * La parte constante de R0 sin el forjado: U = 1/(R0_paquete + R_forjado + e_AT/λ_AT).
    * El CEC la tabula con forjados de 250 mm; la diferencia de R0 es la misma en
@@ -190,6 +195,8 @@ export interface SolCubierta extends Base {
   R0_paquete: number;
   /** Formación de pendientes de hormigón ligero: + 2 dBA sobre el forjado (4.1.1 nota 4). */
   pendientesLigero: boolean;
+  /** La pendiente máxima [%] con la que el CEC da la solución (su nota 2), si se ha leído. */
+  pendienteMax_pct?: number;
 }
 
 export interface SolVentana extends Base {
@@ -382,22 +389,36 @@ export const CATALOGO: readonly Solucion[] = [
   {
     categoria: "cubierta", id: "cu-plana-fu-bovhorm-300", codigo: "C 1.3", pagina: 37, apartado: "4.1.1", tipo: "plana_transitable",
     nombre: "Plana transitable, no ventilada, con solado fijo", RAtr: 52, R0_paquete: 0.27, pendientesLigero: true,
-    proteccion: "solado_fijo", soloInvertida: false,
+    proteccion: "solado_fijo", posicion: "ambas", aislante: "xps", pendienteMax_pct: 5,
   },
   {
     categoria: "cubierta", id: "cu-plana-solado-flotante", codigo: "C 2.3", pagina: 38, apartado: "4.1.2", tipo: "plana_transitable",
     nombre: "Plana transitable, invertida, con solado flotante", RAtr: 52, R0_paquete: 0.25, pendientesLigero: true,
-    proteccion: "solado_flotante", soloInvertida: true,
+    proteccion: "solado_flotante", posicion: "invertida", aislante: "xps",
   },
   {
     categoria: "cubierta", id: "cu-plana-grava", codigo: "C 5.3", pagina: 41, apartado: "4.1.5", tipo: "plana_no_transitable",
     nombre: "Plana no transitable, con grava", RAtr: 52, R0_paquete: 0.25, pendientesLigero: true,
-    proteccion: "grava", soloInvertida: false,
+    proteccion: "grava", posicion: "ambas", aislante: "xps",
+  },
+  // La lámina va adherida o fijada; adherida, sobre un aislante soldable: lana
+  // mineral de alta densidad por defecto (K-CER.18). Bloque H.
+  {
+    categoria: "cubierta", id: "cu-plana-autoprotegida", codigo: "C 6.3", pagina: 42, apartado: "4.1.6", tipo: "plana_no_transitable",
+    nombre: "Plana no transitable, con lámina autoprotegida", RAtr: 52, R0_paquete: 0.23, pendientesLigero: true,
+    proteccion: "lamina_autoprotegida", posicion: "convencional", aislante: "lana_mineral", pendienteMax_pct: 5,
+  },
+  // R0_paquete 0,82 supone unos 30 cm de tierra (Bloque H, K-CER.16): solo
+  // contraste; HE1 no cuenta la protección, del lado seguro.
+  {
+    categoria: "cubierta", id: "cu-plana-ajardinada", codigo: "C 7.3", pagina: 43, apartado: "4.1.7", tipo: "plana_no_transitable",
+    nombre: "Plana no transitable, ajardinada", RAtr: 52, R0_paquete: 0.82, pendientesLigero: true,
+    proteccion: "tierra_vegetal", posicion: "ambas", aislante: "xps", pendienteMax_pct: 5,
   },
   {
     categoria: "cubierta", id: "cu-incl-fu-bovhorm-250", codigo: "C 9.3", pagina: 45, apartado: "4.1.9", tipo: "inclinada",
     nombre: "Inclinada de tejas sobre forjado inclinado, no ventilada", RAtr: 48, R0_paquete: 0.19, pendientesLigero: false,
-    proteccion: null, soloInvertida: false,
+    proteccion: null, posicion: "ambas", aislante: "xps",
   },
 
   // ── Ventanas (4.3.2) ──────────────────────────────────────────────────────
