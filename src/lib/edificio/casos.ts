@@ -10,14 +10,18 @@
 import { renumerar } from "./derivar";
 import type { Edificio, NucleoAseos, ViviendaTipo } from "./tipos";
 
-export type CasoEdificio = "unifamiliar" | "plurifamiliar" | "plurifamiliar_locales" | "oficinas";
+export type CasoEdificio = "unifamiliar" | "plurifamiliar" | "plurifamiliar_locales" | "oficinas" | "reforma_local_vivienda";
 
 export const CASOS_EDIFICIO: readonly { key: CasoEdificio; etiqueta: string }[] = [
   { key: "unifamiliar", etiqueta: "Vivienda unifamiliar" },
   { key: "plurifamiliar", etiqueta: "Plurifamiliar" },
   { key: "plurifamiliar_locales", etiqueta: "Plurifamiliar con locales" },
   { key: "oficinas", etiqueta: "Oficinas" },
+  { key: "reforma_local_vivienda", etiqueta: "Reforma: local a vivienda" },
 ];
+
+/** Los casos de obra nueva (los de las maquetas v4), sin el ejemplo de reforma. */
+export const CASOS_OBRA_NUEVA: readonly CasoEdificio[] = ["unifamiliar", "plurifamiliar", "plurifamiliar_locales", "oficinas"];
 
 const TIPO_A: ViviendaTipo = {
   clase: "vivienda",
@@ -153,6 +157,33 @@ function plurifamiliarLocales(): Edificio {
   };
 }
 
+/**
+ * Ejemplo de reforma (feature-27): la plurifamiliar con locales, en la que parte
+ * del local de la PB pasa a ser una vivienda. Lo demás existe y no se toca,
+ * salvo el portal, que se reforma para dar acceso a la nueva vivienda. Los datos
+ * de la obra (cambio de uso con el asistente respondido) están en
+ * `lib/proyecto/alcance.ts`, `obraDeCaso`.
+ */
+function reformaLocalVivienda(): Edificio {
+  const e = plurifamiliarLocales();
+  const marcas: Record<string, "existente" | "reformada"> = { z1: "existente", z3: "reformada", z4: "existente", z5: "existente", z6: "existente" };
+  for (const g of e.grupos) for (const z of g.zonas) if (marcas[z.id]) z.obra = marcas[z.id];
+  const pb = e.grupos.find((g) => g.id === "g2")!;
+  pb.zonas = [
+    {
+      id: "z2",
+      uso: "viviendas",
+      superficieUtil_m2: 90,
+      unidades: [{ tipoId: "A", cantidad: 1 }],
+      obra: "cambia_uso",
+      usoAnterior: "local_sin_uso",
+    },
+    { id: "z7", uso: "local_sin_uso", superficieUtil_m2: 70, obra: "existente" },
+    ...pb.zonas.filter((z) => z.id === "z3"),
+  ];
+  return e;
+}
+
 function oficinas(): Edificio {
   const N: NucleoAseos = {
     clase: "nucleo_aseos",
@@ -199,6 +230,7 @@ const CONSTRUCTORES: Record<CasoEdificio, () => Edificio> = {
   plurifamiliar,
   plurifamiliar_locales: plurifamiliarLocales,
   oficinas,
+  reforma_local_vivienda: reformaLocalVivienda,
 };
 
 /** Un edificio nuevo a partir de un caso (renumerado, objetos frescos). */

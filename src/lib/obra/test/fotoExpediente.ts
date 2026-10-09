@@ -1,5 +1,5 @@
 import { justificacionRegistry } from "../../../data/justificacionRegistry";
-import { CASOS_EDIFICIO, edificioDeCaso } from "../../edificio/casos";
+import { CASOS_OBRA_NUEVA, edificioDeCaso } from "../../edificio/casos";
 import { crearProyectoDemo } from "../../proyecto/demo";
 import type { Intervencion, JustificacionKey, Proyecto } from "../../proyecto/tipos";
 import { evaluarExpediente } from "../evaluar";
@@ -30,7 +30,10 @@ function proyectos(): [string, Proyecto][] {
   const base = crearProyectoDemo("2026-10-09T10:00:00.000Z");
   const edificios: [string, () => Proyecto["edificio"]][] = [
     ["demo", () => structuredClone(base.edificio)],
-    ...CASOS_EDIFICIO.map((c): [string, () => Proyecto["edificio"]] => [c.key, () => edificioDeCaso(c.key)]),
+    // Los cuatro casos de partida de antes de feature-27 (sin el ejemplo de reforma).
+    ...CASOS_OBRA_NUEVA.map(
+      (c): [string, () => Proyecto["edificio"]] => [c, () => edificioDeCaso(c)],
+    ),
   ];
   for (const [nombre, edificio] of edificios) {
     for (const intervencion of INTERVENCIONES) {

@@ -298,7 +298,26 @@ Detalle al final de la verificación.
 2. Lo no respondido se queda en lo prudente: HE 4 y HE 5 aplican mientras no se diga si la reforma es
    íntegra; DB-SE externo mientras no se diga que no se toca la estructura.
 3. Qué lee cada módulo (paso 6): SI 5 y SUA 6, el edificio entero; SUA 7, lo intervenido.
-4. El proyecto de demostración de reforma (paso 7): ¿segundo Demo con migración o caso de partida?
+4. El proyecto de demostración de reforma (paso 7): decidido, caso de partida (ver «Validación»).
 5. Lo que queda fuera: los umbrales con cifra que el asistente no pregunta (el 7 % del PEM de HE 6, la
    demanda inicial de 5.000 l/d de HE 4 se deduce de El edificio); el DA DB-SUA/2 y la Guía DB-HE sin
    leer; un elemento «modificado sustancialmente» lo decide el proyectista.
+
+## Validación (2026-10-09)
+
+El usuario valida las decisiones del motor tal como están:
+
+1. Lo no respondido se queda en lo prudente (a lo intervenido; HE 4 y HE 5 aplican mientras no se
+   diga si la reforma es íntegra; DB-SE externo mientras no se diga que no se toca la estructura).
+2. Cambiar ventanas cuenta como tocar la fachada (HS 1, SI 5, SUA 1 y SUA 2, además de HE 1).
+3. SI 5 y SUA 6 calculan el edificio entero; SUA 7, lo intervenido.
+4. **Ejemplo de reforma como caso de partida**: «Reforma: local a vivienda»
+   ([casos.ts](src/lib/edificio/casos.ts)). Es la plurifamiliar con locales con 90 m² del local de
+   la PB convertidos en una vivienda A (cambia de uso desde local sin uso), el resto del local y
+   las viviendas, garaje, trasteros e instalaciones sin tocar, y el portal reformado. Trae también
+   los datos de la obra (`obraDeCaso` en [alcance.ts](src/lib/proyecto/alcance.ts)): cambio de uso
+   parcial y reforma, con el asistente respondido (ventanas y particiones, pasa a acondicionado,
+   distribución, vidrios y aseos, más aparatos, generación solo en parte, eléctrica modificada,
+   sin estructura ni aparcamiento). Al crear un proyecto rellena la intervención y el alcance; en
+   El edificio, «Partir de un caso» lo avisa y cambia también los datos de la obra.
+   `CASOS_OBRA_NUEVA` deja fuera el ejemplo en las fotos congeladas de feature-26 y feature-27.

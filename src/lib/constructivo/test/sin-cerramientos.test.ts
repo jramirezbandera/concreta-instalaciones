@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CASOS_EDIFICIO, edificioDeCaso } from "../../edificio/casos";
+import { CASOS_OBRA_NUEVA, edificioDeCaso } from "../../edificio/casos";
 import { setCubierta } from "../../edificio/editar";
 import type { Edificio, TipoCubierta } from "../../edificio/tipos";
 import { crearProyectoDemo } from "../../proyecto/demo";
@@ -53,7 +53,7 @@ function texto(j: { veredicto: string; elementos: { id: string; veredicto: strin
 
 function veredictosDeHoy(): Record<string, string> {
   const out: Record<string, string> = {};
-  const casos: { k: string; e: Edificio }[] = [...CASOS_EDIFICIO.map((c) => ({ k: c.key, e: edificioDeCaso(c.key) })), { k: "demo", e: demo.edificio }];
+  const casos: { k: string; e: Edificio }[] = [...CASOS_OBRA_NUEVA.map((c) => ({ k: c, e: edificioDeCaso(c) })), { k: "demo", e: demo.edificio }];
   for (const { k, e: e0 } of casos) {
     expect(e0.cerramientos).toBeUndefined();
     for (const cub of ["asi", "plana_transitable", "plana_no_transitable", "inclinada"] as const) {

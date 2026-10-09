@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { evaluarExpediente } from "../evaluar";
-import { ALCANCE_MODULO, edificioParaModulo, proyectoParaModulo } from "../../proyecto/alcance";
+import { ALCANCE_MODULO, edificioParaModulo, obraDeCaso, proyectoParaModulo } from "../../proyecto/alcance";
+import { edificioDeCaso } from "../../edificio/casos";
 import { crearProyectoDemo } from "../../proyecto/demo";
 import type { ObraZona } from "../../edificio/tipos";
 import type { JustificacionKey, Proyecto } from "../../proyecto/tipos";
@@ -73,5 +74,36 @@ describe("ningún módulo se rompe al calcular lo intervenido", () => {
     expect(ev.porClave.hs4?.estado).toBe("sin_datos");
     // HS 3 ni siquiera aplica: no se interviene en locales de su ámbito.
     expect(ev.porClave.hs3?.estado).toBe("no_aplica");
+  });
+});
+
+describe("el ejemplo de reforma «local a vivienda»", () => {
+  function ejemplo(): Proyecto {
+    const p = demo();
+    p.edificio = edificioDeCaso("reforma_local_vivienda");
+    p.justificaciones = {};
+    p.datosGenerales = { ...p.datosGenerales, ...obraDeCaso("reforma_local_vivienda") };
+    return p;
+  }
+
+  it("solo el ejemplo trae datos de la obra", () => {
+    expect(obraDeCaso("plurifamiliar_locales")).toBeNull();
+    expect(obraDeCaso("reforma_local_vivienda")?.intervencion).toBe("cambio_uso");
+  });
+
+  it("propone lo esperable y ningún módulo falla", () => {
+    const ev = evaluarExpediente(ejemplo());
+    for (const [k, e] of Object.entries(ev.porClave)) expect(e?.estado, k).not.toBe("error");
+    const ap = (k: JustificacionKey) => ev.porClave[k]?.aplicabilidad;
+    expect(ap("hr")).toBe("aplica_reformado");
+    expect(ap("hs4")).toBe("aplica_reformado");
+    expect(ap("he4")).toBe("no_aplica");
+    expect(ap("dbse")).toBe("no_aplica");
+    expect(ap("sua8")).toBe("aplica");
+  });
+
+  it("HS 4 calcula solo la vivienda nueva", () => {
+    const p = proyectoParaModulo(ejemplo(), "hs4");
+    expect(ids(p)).toEqual(["z2", "z3"]);
   });
 });

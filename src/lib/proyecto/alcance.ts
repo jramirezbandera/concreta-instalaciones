@@ -1,5 +1,6 @@
 import type { DatosGenerales, Intervencion, JustificacionKey, Proyecto, TipoObraExistente } from "./tipos";
 import type { Edificio, ObraZona, UsoZona, Zona } from "../edificio/tipos";
+import type { CasoEdificio } from "../edificio/casos";
 import type { He4Estado } from "../../modules/he4/estado";
 import { demandaReferencia } from "../../modules/he4/justificacion";
 import { edificioSi, superficies } from "../../modules/si/edificio";
@@ -181,4 +182,34 @@ export function edificioParaModulo(dg: DatosGenerales, edificio: Edificio, key: 
 export function proyectoParaModulo(p: Proyecto, key: JustificacionKey): Proyecto {
   const edificio = edificioParaModulo(p.datosGenerales, p.edificio, key);
   return edificio === p.edificio ? p : { ...p, edificio };
+}
+
+// ─── El ejemplo de reforma (feature-27) ──────────────────────────────────────
+
+/**
+ * Los datos de la obra que acompañan a un caso de partida: solo el ejemplo de
+ * reforma los tiene (cambio de uso de parte del local a vivienda, con la
+ * reforma del portal y el asistente de alcance respondido).
+ */
+export function obraDeCaso(caso: CasoEdificio): Pick<DatosGenerales, "intervencion" | "alcance"> | null {
+  if (caso !== "reforma_local_vivienda") return null;
+  return {
+    intervencion: "cambio_uso",
+    alcance: {
+      tipos: ["cambio_uso", "reforma"],
+      integral: false,
+      cambioUsoCaracteristico: false,
+      envolvente: ["huecos", "particiones"],
+      envolventeMas25: false,
+      pasaAcondicionado: true,
+      interior: ["distribucion", "aseos", "vidrios_puertas"],
+      generacionTermica: "parcial",
+      aparatos: "aumentan",
+      pluviales: false,
+      electrica: "modifica",
+      estructura: false,
+      aparcamiento: false,
+      electrica50: false,
+    },
+  };
 }

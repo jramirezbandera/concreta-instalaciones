@@ -11,6 +11,7 @@ import type { Seleccion } from "../components/edificio/presentacion";
 import { TiposRepetidos } from "../components/edificio/TiposRepetidos";
 import { avisosCerramientos } from "../lib/constructivo/cerramientos";
 import { CASOS_EDIFICIO, edificioDeCaso, type CasoEdificio } from "../lib/edificio/casos";
+import { obraDeCaso } from "../lib/proyecto/alcance";
 import { fraseEdificio, renumerar, validarEdificio } from "../lib/edificio/derivar";
 import { anadirPlantaArriba, anadirSotano, anadirZona, buscarZona } from "../lib/edificio/editar";
 import type { Edificio } from "../lib/edificio/tipos";
@@ -68,7 +69,7 @@ function casoActual(e: Edificio): CasoEdificio | null {
 
 export function EdificioPage(): JSX.Element {
   const { openDrawer } = useDrawer();
-  const { proyecto, derivados, actualizarEdificio } = useProyecto();
+  const { proyecto, derivados, actualizarEdificio, actualizarDatosGenerales } = useProyecto();
   const edificio = proyecto.edificio;
   const dg = proyecto.datosGenerales;
 
@@ -114,6 +115,9 @@ export function EdificioPage(): JSX.Element {
   const partirDe = (c: CasoEdificio) => {
     const nuevo = conCerramientos(edificioDeCaso(c));
     cambiar(nuevo);
+    // El ejemplo de reforma trae también los datos de la obra (feature-27).
+    const obra = obraDeCaso(c);
+    if (obra) actualizarDatosGenerales({ ...dg, ...obra }, new Date().toISOString());
     setSeleccion(seleccionInicial(nuevo));
     setCasoPendiente(null);
   };
@@ -181,6 +185,7 @@ export function EdificioPage(): JSX.Element {
                   <span className="text-text-secondary">
                     Se sustituye el edificio entero por «
                     {CASOS_EDIFICIO.find((c) => c.key === casoPendiente)?.etiqueta}».
+                    {obraDeCaso(casoPendiente) && " La obra pasa a ser un cambio de uso, con el alcance respondido."}
                   </span>
                   <button
                     type="button"

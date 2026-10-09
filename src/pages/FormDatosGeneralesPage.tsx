@@ -26,6 +26,7 @@ import { useNavigate } from "react-router";
 import { CollapsibleSection } from "../components/ui/CollapsibleSection";
 import { Field, InputLabel, NumberInput, SelectInput } from "../components/ui/InputLabel";
 import { AsistenteAlcance } from "../components/proyecto/AsistenteAlcance";
+import { obraDeCaso } from "../lib/proyecto/alcance";
 import { SelectorMunicipio } from "../components/proyecto/SelectorMunicipio";
 import { PROVINCIAS, altitudCapitalDe, limiteTramoCercano } from "../data/zonasClimaticasHE";
 import { derivarContexto } from "../lib/proyecto/derivar";
@@ -307,6 +308,16 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
     return () => window.removeEventListener("keydown", alPulsar);
   }, []);
 
+  // El ejemplo de reforma trae también los datos de la obra (feature-27); al
+  // volver a un caso de obra nueva, se deshacen.
+  function elegirCaso(c: CasoEdificio): void {
+    const antes = obraDeCaso(caso);
+    const obra = obraDeCaso(c);
+    setCaso(c);
+    if (obra) setDg((prev) => ({ ...prev, ...obra }));
+    else if (antes) setDg((prev) => ({ ...prev, intervencion: "obra_nueva", alcance: undefined }));
+  }
+
   function set<K extends keyof DatosGenerales>(k: K, v: DatosGenerales[K]): void {
     setDg((prev) => ({ ...prev, [k]: v }));
   }
@@ -576,7 +587,7 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
                         name="dg-caso"
                         value={c.key}
                         checked={caso === c.key}
-                        onChange={() => setCaso(c.key)}
+                        onChange={() => elegirCaso(c.key)}
                         className="accent-accent"
                       />
                       {c.etiqueta}
