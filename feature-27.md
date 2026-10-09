@@ -277,3 +277,28 @@ Detalle al final de la verificación.
 - **Pendiente de decidir**: el proyecto de demostración de reforma. El Demo se siembra solo en el
   primer arranque; un segundo Demo no llegaría a quien ya usa la app sin una migración. Alternativa:
   un caso «Reforma: local a vivienda» en «Partir de un caso».
+
+### Paso 8 (hecho) · cierre
+
+- [fotoExpediente.ts](src/lib/obra/test/fotoExpediente.ts): 40 proyectos (el Demo y los cuatro casos
+  de El edificio × las cuatro intervenciones × con y sin piscina); por justificación,
+  aplicabilidad, estado, veredicto, nota y cita, y la huella del texto entero de la memoria. La foto
+  se generó con el código de partida (7e576d8, worktree en el scratchpad) y
+  [sin-alcance.test.ts](src/lib/obra/test/sin-alcance.test.ts) la compara con la de ahora:
+  **idénticos los 40**. Obra nueva y las reformas sin asistente no cambian en nada.
+- Capturas con el navegador de gstack del asistente, el editor de flexibilidad, El edificio con las
+  zonas marcadas, HS4 calculando solo lo intervenido y la memoria con el párrafo de alcance: sin
+  errores de consola.
+- 1449 tests en verde.
+
+## Para validar con el usuario
+
+1. Los criterios propios del paso 2 (huecos como fachada; puertas para SUA 3; SUA 6 con piscina
+   colectiva; REBT con instalación nueva → aplica).
+2. Lo no respondido se queda en lo prudente: HE 4 y HE 5 aplican mientras no se diga si la reforma es
+   íntegra; DB-SE externo mientras no se diga que no se toca la estructura.
+3. Qué lee cada módulo (paso 6): SI 5 y SUA 6, el edificio entero; SUA 7, lo intervenido.
+4. El proyecto de demostración de reforma (paso 7): ¿segundo Demo con migración o caso de partida?
+5. Lo que queda fuera: los umbrales con cifra que el asistente no pregunta (el 7 % del PEM de HE 6, la
+   demanda inicial de 5.000 l/d de HE 4 se deduce de El edificio); el DA DB-SUA/2 y la Guía DB-HE sin
+   leer; un elemento «modificado sustancialmente» lo decide el proyectista.
