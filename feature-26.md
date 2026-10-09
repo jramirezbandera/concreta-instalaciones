@@ -373,6 +373,22 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
    - casos con la planta baja distinta;
    - capturas de El edificio y de HE1 con dos fachadas.
 
+   **Hecho (2026-10-09), paso 7:**
+   - `lib/constructivo/test/sin-cerramientos.test.ts`: 420 combinaciones (los cuatro casos de
+     El edificio y el Demo, con cada tipo de cubierta; HE1 con tres obras y aislantes habituales,
+     finos, justos y medios; HR con cuatro niveles de ruido; HS1 con cinco obras) frente a los
+     veredictos de **antes de feature-26**, sacados del código de 3f5b662 en un worktree
+     (`veredictos-antes.ts`). HR y HS1, idénticos elemento a elemento, también lo que no cumple.
+     En HE1 solo cambian la cubierta y el suelo con los espesores en el límite (70 y 30 mm), y
+     solo de no cumplir a cumplir: es el forjado del CEC del paso 3.
+   - La U por capas de las catorce fachadas frente a la R0 del CEC: `he1/test/catalogo.test.ts`
+     (paso 1). La planta baja distinta: los tests de cerramientos de HE1, HR, HS1 y las fichas.
+   - Capturas (navegador de gstack, `.gstack/browse-reports/2026-10-09-1039/`): El edificio con
+     la planta baja distinta (F 4.1 y marco metálico con RPT) y HE1 con las dos fachadas y las
+     dos ventanas; la de la planta baja no cumple (UH 2,19 > 2,10) y pide otro marco en El
+     edificio. Sin errores de consola.
+   - 1326 tests en verde. **feature-26 cerrada.**
+
 ## Criterios nuevos (a validar)
 
 - K-CER.1: la «planta baja» es la planta 0. Las demás plantas sobre rasante llevan la general.
