@@ -18,7 +18,7 @@
 // La fachada, la ventana, la cubierta y el forjado son los de El edificio
 // (feature-26). Con la planta baja distinta, su fachada y su ventana se
 // comprueban con los recintos de la planta 0 y la general con los demás
-// (K-CER.1); los flancos de las separaciones, con la fachada general.
+// (K-CER.1); los flancos de las separaciones, con cada fachada (vale la peor).
 // =============================================================================
 
 import type { Aviso } from "../../lib/cte/resultado";
@@ -251,8 +251,15 @@ export function justificarHr(estado: HrEstado, p: ProyectoSi, comparar = true): 
   const tab = tipoTabiqueria(tabS, st.apoyo);
   const cer = cerramientosDe(p.edificio);
   const grupos = gruposExterior(p, tipologia);
-  // Los flancos de las separaciones, con la fachada general (criterio).
-  const fa = fachada(grupos[0].fachada, medios);
+  // Los flancos de las separaciones (condiciones de fachada de las tablas 3.2 y
+  // 3.3): cada separación es una para todo el edificio; con la fachada de la
+  // planta baja aparte, se comprueba con las dos y vale la peor (criterio, lado
+  // seguro).
+  const flancosFachada = grupos.map((g) => fachada(g.fachada, medios).flanco);
+  const peor = <R extends { cumple: boolean }>(f: (fl: FachadaFlanco) => R): R => {
+    const rs = flancosFachada.map(f);
+    return rs.find((x) => !x.cumple) ?? rs[0];
+  };
   const fj = forjado(cer.forjado.eleccion);
   const sf = suelo(st.suelo, fj.m);
   const ts = techo(st.techo, fj.m);
@@ -261,8 +268,6 @@ export function justificarHr(estado: HrEstado, p: ProyectoSi, comparar = true): 
   const svTr = sv.s.tipo === 1 ? trasdosado(st.trasdosado, sv.m, st.unaCara) : null;
   const sa = base(st.separacionActividad, medios);
   const saTr = sa.s.tipo === 1 ? trasdosado(st.trasdosadoActividad, sa.m, st.unaCaraActividad) : null;
-  const colV = columnaVertical(tab, fa.flanco);
-  const colH = columnaHorizontal(tab, fa.flanco);
 
   const RA_conjunto = (b: { RA: number }, tr: { dRA: number } | null) => b.RA + (tr ? tr.dRA : 0);
 
@@ -287,21 +292,25 @@ export function justificarHr(estado: HrEstado, p: ProyectoSi, comparar = true): 
   });
 
   const vertical = (id: string, nombre: string, caso: "unidades" | "actividad", separa: string[], b: ReturnType<typeof base>, tr: ReturnType<typeof trasdosado>, instalaciones: boolean, tsVal: number) => {
-    const r = comprobarVertical({
-      tipo: b.s.tipo,
-      m: b.m,
-      RA: b.RA,
-      dRA: tr ? tr.dRA : null,
-      unaCara: tr?.unaCara ?? false,
-      columna: colV,
-      tabiqueria: tab,
-      paren: caso === "actividad",
-      instalaciones,
-      forjadoM: fj.m,
-      sueloDRA: sf.dRA,
-      techoDRA: tsVal,
-      fachada: fa.flanco,
-      bandas: (b.s as SolBase).bandas,
+    const { r, colV } = peor((fl) => {
+      const colV = columnaVertical(tab, fl);
+      const r = comprobarVertical({
+        tipo: b.s.tipo,
+        m: b.m,
+        RA: b.RA,
+        dRA: tr ? tr.dRA : null,
+        unaCara: tr?.unaCara ?? false,
+        columna: colV,
+        tabiqueria: tab,
+        paren: caso === "actividad",
+        instalaciones,
+        forjadoM: fj.m,
+        sueloDRA: sf.dRA,
+        techoDRA: tsVal,
+        fachada: fl,
+        bandas: (b.s as SolBase).bandas,
+      });
+      return { r, colV, cumple: r.cumple };
     });
     elementos.push({
       id,
@@ -326,20 +335,23 @@ export function justificarHr(estado: HrEstado, p: ProyectoSi, comparar = true): 
   };
 
   const horizontal = (id: string, nombre: string, caso: CasoHorizontal, separa: string[], garaje: boolean, t: ReturnType<typeof techo>) => {
-    const r = comprobarHorizontal({
-      forjado: fj,
-      columna: colH,
-      caso: caso === "actividad" || caso === "encima" ? "paren" : "normal",
-      // Bajo la vivienda: el suelo flotante de la vivienda, con el ΔLw sin paréntesis (Guía R.2).
-      // Encima de la vivienda, un recinto de actividad: el ΔLw entre paréntesis (2.1.2 a.ii).
-      dLw: caso === "encima" ? "paren" : "normal",
-      garaje,
-      sueloDLw: sf.dLw,
-      sueloDRA: sf.dRA,
-      techoDRA: t?.dRA ?? 0,
+    const { r, colH, flancos, cumple: ok } = peor((fl) => {
+      const colH = columnaHorizontal(tab, fl);
+      const r = comprobarHorizontal({
+        forjado: fj,
+        columna: colH,
+        caso: caso === "actividad" || caso === "encima" ? "paren" : "normal",
+        // Bajo la vivienda: el suelo flotante de la vivienda, con el ΔLw sin paréntesis (Guía R.2).
+        // Encima de la vivienda, un recinto de actividad: el ΔLw entre paréntesis (2.1.2 a.ii).
+        dLw: caso === "encima" ? "paren" : "normal",
+        garaje,
+        sueloDLw: sf.dLw,
+        sueloDRA: sf.dRA,
+        techoDRA: t?.dRA ?? 0,
+      });
+      const flancos = flancosHorizontal(colH, tab, fl);
+      return { r, colH, flancos, cumple: r.cumple && flancos.every((c) => c.cumple !== false) };
     });
-    const flancos = flancosHorizontal(colH, tab, fa.flanco);
-    const ok = r.cumple && flancos.every((c) => c.cumple !== false);
     elementos.push({
       id,
       nombre,
@@ -392,10 +404,12 @@ export function justificarHr(estado: HrEstado, p: ProyectoSi, comparar = true): 
       const modo = st.ascensor ?? sep.ascensorHabitual;
       const r =
         modo === "hueco"
-          ? comprobarVertical({
-              tipo: sa.s.tipo, m: sa.m, RA: sa.RA, dRA: saTr ? saTr.dRA : null, unaCara: saTr?.unaCara ?? false, columna: colV, tabiqueria: tab,
-              paren: true, instalaciones: true, forjadoM: fj.m, sueloDRA: sf.dRA, techoDRA: 0, fachada: fa.flanco, bandas: (sa.s as SolBase).bandas,
-            })
+          ? peor((fl) =>
+              comprobarVertical({
+                tipo: sa.s.tipo, m: sa.m, RA: sa.RA, dRA: saTr ? saTr.dRA : null, unaCara: saTr?.unaCara ?? false, columna: columnaVertical(tab, fl), tabiqueria: tab,
+                paren: true, instalaciones: true, forjadoM: fj.m, sueloDRA: sf.dRA, techoDRA: 0, fachada: fl, bandas: (sa.s as SolBase).bandas,
+              }),
+            )
           : null;
       const RA = modo === "hueco" ? RA_conjunto(sa, saTr) : RA_conjunto(sv, svTr);
       const ok = r ? r.cumple : RA > L.ascensorRA;

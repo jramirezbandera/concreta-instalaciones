@@ -133,7 +133,7 @@ export function toFichaData(j: JustificacionHs1, o: OpcionesFichaHs1): FichaData
             {
               concepto: el.detalle.rol === "fachada-pb" ? NOMBRE_CERRAMIENTO.fachadaPB : NOMBRE_CERRAMIENTO.fachada,
               valor: `${designacion(el.detalle.sol)} · ${el.detalle.columna === "con_revestimiento" ? `revestimiento R${el.detalle.niveles.R}` : "sin revestimiento"} · ${el.detalle.unaHoja ? "una hoja" : "dos hojas"}`,
-              origen: el.detalle.declarado ? `El edificio · ${ORIGEN_DECISION}` : "El edificio · lo declarado, lo habitual",
+              origen: el.detalle.declarado ? `El edificio · ${ORIGEN_DECISION}` : `El edificio · lo mínimo para el grado ${el.detalle.grado} (al pliego)`,
             },
           ]
         : [],

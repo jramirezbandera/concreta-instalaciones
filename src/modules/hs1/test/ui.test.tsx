@@ -69,6 +69,9 @@ describe("HS1 · desde El edificio (feature-17)", () => {
     for (const a of enlaces) expect(a).toHaveAttribute("href", `#/p/${DEMO_ID}/edificio`);
     const rev = within(decisiones).getByRole("group", { name: "Revestimiento exterior" });
     expect(within(rev).getByRole("button", { name: "R3 · muy alta" })).toHaveAttribute("aria-pressed", "true");
+    // Lo propuesto es el mínimo que pide el grado, y el revestimiento va al pliego.
+    expect(decisiones).toHaveTextContent("Lo mínimo para el grado 5.");
+    expect(decisiones).toHaveTextContent("El revestimiento exterior ha de ser R3 (resistencia muy alta a la filtración): se exige en el pliego.");
     await user.click(within(rev).getByRole("button", { name: "R1 · media" }));
     const aside = await findByRole("complementary", { name: DIBUJO });
     await waitFor(() => expect(getByRole("region", { name: "Avisos" })).toHaveTextContent("La fachada no llega al grado 5."));

@@ -115,8 +115,9 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
      «hoja exterior m ≥ 130»); F 3.9 195 / 43 (la de F 4.3 con una cara revestida).
    - Aislante por defecto de F 2.1 y F 7.3: XPS, porque va entre las dos hojas (K-CER.6).
    - El aplacado de las ventiladas se dibuja con 20 mm; no cuenta en la U.
-   - Las cubiertas C 5.3, C 2.3 y C 12.3 se añaden cuando HR y HE1 lean el forjado de El edificio
-     (pasos 2 a 4): sin forjado no tienen RAtr. El código «4.1.9» de HR pasa a «C 9.3».
+   - ~~Las cubiertas C 5.3, C 2.3 y C 12.3 se añaden cuando HR y HE1 lean el forjado de El edificio
+     (pasos 2 a 4)~~: C 5.3 y C 2.3 entraron con la cubierta de HS1; C 12.3 queda para cuando un
+     proyecto la pida. El código «4.1.9» de HR pasa a «C 9.3».
 2. **El edificio**: `Edificio.cerramientos?`:
    ```ts
    interface Cerramientos {
@@ -162,8 +163,8 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
    - Los valores propios no se editan en El edificio: el tipo los guarda, y en el paso 4 HR
      los editará sobre la elección de El edificio (como SUA 9 escribe el ascensor).
    - Una cubierta que no casa con el tipo (inclinada en un edificio de cubierta plana) se
-     descarta: vale la habitual y se avisa. Con una sola cubierta por forma, el editor la
-     enseña sin desplegable; C 5.3, C 2.3 y C 12.3 siguen esperando a los pasos 3 y 4.
+     descarta: vale la habitual y se avisa. ~~Con una sola cubierta por forma, el editor la
+     enseña sin desplegable~~: ya hay desplegable en la transitable y la no transitable.
    - El marco no se pinta con su Uf en El edificio, para no duplicar la tabla de HE1.
 3. **HE1**: los cerramientos salen de los tipos (fachada y, si la hay, fachada PB; cubierta;
    suelo con el forjado elegido; ventana o ventanas). Cada fachada con aislante propone su
@@ -232,12 +233,10 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
    **Decisiones a validar:**
    - Los valores de fachada, ventana, cubierta y forjado que hubiera guardado HR en un
      proyecto se pierden (HR salió el 2026-10-05; no hay migración).
-   - Los flancos (condiciones de fachada de las tablas 3.2 y 3.3) se comprueban solo con la
-     fachada general, también para las separaciones de la planta baja.
+   - ~~Los flancos se comprueban solo con la fachada general~~: cambiado en la validación (abajo).
    - El porcentaje de huecos, la caja de persiana y «fachada no expuesta» son los mismos para
      la planta baja y las demás.
-   - C 5.3, C 2.3 y C 12.3 siguen fuera: HE1 calcula la cubierta por capas según su tipo y
-     aún no distingue grava, solado flotante ni bajo cubierta ventilado.
+   - ~~C 5.3, C 2.3 y C 12.3 siguen fuera~~: C 5.3 y C 2.3 entraron; C 12.3, cuando haga falta.
 5. **HS1**: `fachadaHojas`, `fachadaRevestimiento` y la combinación de la tabla 2.7 se deducen de
    los rasgos de la fachada. El grado del CEC se usa como contraste y avisa si difiere. Con la
    planta baja distinta, se comprueban las dos.
@@ -263,6 +262,7 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
    **Decisiones a validar:**
    - La R habitual es la menor que cumple (con grado 5, R3: «revestimiento estanco»), igual
      que HE1 propone el aislante; así ningún proyecto sin cerramientos cambia de veredicto.
+     El texto cambió en la validación (abajo).
    - Las declaraciones de antes (con o sin revestimiento, hojas, combinación) se ignoran.
    - J, N y H se pueden declarar en las fachadas sin revestimiento; N solo si la sección tiene
      enfoscado intermedio.
@@ -314,9 +314,9 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
    - Tests: 1314 en verde.
 
    **Decisiones a validar:**
-   - HS1 pierde tres protecciones de la tabla 2.9 que el catálogo no tiene: capa de rodadura,
-     lámina autoprotegida y tierra vegetal. Volverán cuando se lean en imagen las tablas del
-     CEC que faltan (4.1.3, 4.1.4, 4.1.6…). Lo guardado en `cubiertaProteccion` se ignora.
+   - ~~HS1 pierde tres protecciones~~: volvieron la lámina autoprotegida (C 6.3) y la
+     ajardinada (C 7.3); la capa de rodadura no está en el CEC y no se ofrece. Lo guardado en
+     `cubiertaProteccion` se ignora.
    - Una cubierta elegida de otro tipo (solado fijo en una no transitable) se descarta con
      aviso, y con ella sus valores propios de HR.
    - ~~HE1 siempre invertida y HS1 podía decir convencional~~: arreglado (abajo).
@@ -388,6 +388,32 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
      dos ventanas; la de la planta baja no cumple (UH 2,19 > 2,10) y pide otro marco en El
      edificio. Sin errores de consola.
    - 1326 tests en verde. **feature-26 cerrada.**
+
+## Validación (2026-10-09)
+
+Revisadas con el usuario todas las «Decisiones a validar» de los pasos 1 a 7.
+
+- **Aceptadas tal cual:** K-CER.1 a K-CER.3; F 3.2 como habitual; la hoja principal, el
+  aislante y el aplacado de las fachadas nuevas; el aislante por fachada; un solo vidrio; los
+  valores propios editados en HR y guardados en El edificio; el interruptor de la planta baja;
+  el Uf solo en HE1; la cubierta por capas con el paquete del CEC como contraste; el forjado
+  elegido para la inclinada; la R0 de C 7.3 como contraste (K-CER.16); la lana mineral en C 6.3
+  (K-CER.18); la pérdida de lo que HR guardaba antes y de los valores propios de una cubierta
+  descartada; huecos y caja de persiana iguales en la planta baja; nombres sin F1/F2 y la
+  página del CEC en todas las soluciones de HR.
+- **Cambiadas:**
+  - **Flancos de HR con la planta baja distinta:** cada separación (es una para todo el
+    edificio) se comprueba con las dos fachadas como flanco y vale la peor (criterio, lado
+    seguro). La ficha lo dice. Test: SATE en la planta baja hace fallar la P3.2, que con la F 3.2
+    sola cumplía.
+  - **HS1, lo propuesto de la fachada:** se rotula «Lo mínimo para el grado N» (no «Lo
+    habitual») y, con revestimiento, «El revestimiento exterior ha de ser R3 (resistencia muy
+    alta a la filtración): se exige en el pliego». La ficha, «lo mínimo para el grado N (al
+    pliego)».
+  - **Sd de las láminas de la cubierta:** el agente de normativa lee el 3.20 del CEC (Bloque I
+    de la verificación) para sustituir el Sd 50 m orientativo.
+- **Para cuando un proyecto lo pida:** C 12.3 (inclinada ventilada sobre forjado horizontal),
+  la capa de rodadura como criterio y el balance anual de Glaser.
 
 ## Criterios nuevos (a validar)
 

@@ -82,6 +82,17 @@ describe("HR · la planta baja distinta (K-CER.1)", () => {
     expect(textoPlanoMemoria(hr.memoria(j))).toContain("Fachada de los dormitorios de la planta baja (recinto más desfavorable");
   });
 
+  it("las separaciones se comprueban con las dos fachadas y vale la peor (flancos, lado seguro)", () => {
+    // Sola, la F 3.2 cumple como flanco de la separación; la SATE de la planta baja (una hoja, m 161) no.
+    expect(detalle<"vertical">(justificar(PLURI), "separacion")?.r.cumple).toBe(true);
+    const sv = detalle<"vertical">(justificar(conPB), "separacion")!;
+    expect(sv.r.cumple).toBe(false);
+    expect(sv.r.flancos).toEqual([{ texto: "Fachada de una hoja: m 161 kg/m², RA 42 dBA; m ≥ 225 kg/m² y RA ≥ 50 dBA", cumple: false }]);
+    // Con la misma fachada en la planta baja (solo otra ventana), como siempre.
+    const misma = setCerramientos(setPlantaBajaDistinta(PLURI, true), { ventanaPB: { id: "ve-4-c-4-batiente", marco: "pvc_tres_camaras" } });
+    expect(detalle<"vertical">(justificar(misma), "separacion")?.r.cumple).toBe(true);
+  });
+
   it("solo con otro marco (mismo tipo acústico) no hay nada aparte", () => {
     const e = setCerramientos(setPlantaBajaDistinta(PLURI, true), { ventanaPB: { id: "ve-4-c-6-batiente", marco: "metalico_sin_rpt" } });
     expect(ids(justificar(e)).some((id) => id.endsWith("-pb"))).toBe(false);

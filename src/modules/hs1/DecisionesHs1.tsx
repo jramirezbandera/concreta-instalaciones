@@ -60,6 +60,9 @@ function enPalabras(c: readonly string[], el: "muro" | "suelo" | "fachada"): str
 
 type DetalleFachada = Extract<DetalleHs1, { clase: "fachada" }>;
 
+/** La resistencia del revestimiento exterior a la filtración (R1 a R3 de la tabla 2.7). */
+const RESISTENCIA_R: Record<number, string> = { 1: "media", 2: "alta", 3: "muy alta" };
+
 /** La cubierta de El edificio (feature-26): se ve aquí y se cambia allí. */
 function CubiertaDelEdificio({ c, enlace }: { c: CubiertaHs1; enlace: string }): JSX.Element {
   return (
@@ -175,7 +178,10 @@ function DecisionFachada({
       }
       texto={
         <>
-          <b className="text-text-primary font-medium">{det.declarado ? "Declarado." : "Lo habitual."}</b> {texto}
+          <b className="text-text-primary font-medium">{det.declarado ? "Declarado." : `Lo mínimo para el grado ${det.grado}.`}</b> {texto}
+          {det.columna === "con_revestimiento" && det.cumple
+            ? ` El revestimiento exterior ha de ser R${det.niveles.R} (resistencia ${RESISTENCIA_R[det.niveles.R] ?? ""} a la filtración): se exige en el pliego.`
+            : ""}
           {det.hidrofilo ? " El aislante es hidrófilo: no cuenta como barrera." : ""}
         </>
       }

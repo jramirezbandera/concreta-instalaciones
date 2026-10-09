@@ -139,6 +139,11 @@ export const hr: DefinicionSi<HrEstado, JustificacionHr> = {
       "El edificio es de uso residencial privado: no se le aplican los valores límite de tiempo de reverberación (ap. 2.2).",
     ];
     if (j.tipologia === "otros") observaciones.pop();
+    if (j.elementos.some((e) => e.id.endsWith("-pb"))) {
+      observaciones.push(
+        "Criterio: la planta baja lleva otra fachada; cada separación se comprueba con las dos como flanco (condiciones de fachada de las tablas 3.2 y 3.3) y vale la peor.",
+      );
+    }
     return fichaSi(j, {
       titulo: "HR — Protección frente al ruido",
       slug: "hr-ruido",
