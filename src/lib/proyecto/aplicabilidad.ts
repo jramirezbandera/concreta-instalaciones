@@ -13,6 +13,16 @@ import { demandaReferencia } from "../../modules/he4/justificacion";
 import { superficiesHe5 } from "../../modules/he5/justificacion";
 import { recargaDeHe6 } from "../../modules/he6/justificacion";
 import { edificioSi } from "../../modules/si/edificio";
+import { alcanceDeEdificio, tiposDeObra } from "./alcance";
+import {
+  CITA_MANTENIMIENTO,
+  NOTA_MANTENIMIENTO,
+  REGLAS_EXISTENTES,
+  casosDeObra,
+  propuestaExistente,
+  type CasoObra,
+  type ContextoExistente,
+} from "./reglasExistentes";
 
 // Motor de aplicabilidad — Fase A, obra nueva (feature-6 §A, UX-RECONCEPT §2.3 y §5).
 // Lib PURA: sin React/DOM/Date.now. Dados los atributos del proyecto propone, por
@@ -47,6 +57,15 @@ export interface AtributosProyecto {
    */
   plazasAparcamiento?: number;
   excluidoHe6?: boolean;
+  /**
+   * Obra en un edificio existente con el asistente de alcance respondido
+   * (feature-27). Sin él, la intervención se queda con la nota «alcance pendiente».
+   */
+  existente?: {
+    casos: CasoObra[];
+    soloMantenimiento: boolean;
+    contexto: ContextoExistente;
+  };
 }
 
 /**
@@ -64,6 +83,8 @@ export function atributosDe(
 ): AtributosProyecto {
   const r = resumenEdificio(edificio);
   const he6 = recargaDeHe6({ edificio, datosGenerales: dg, justificaciones });
+  const superficieConstruida_m2 = superficiesHe5(edificioSi(edificio).zonas, r.tieneViviendas).s_m2;
+  const alcance = dg.intervencion !== "obra_nueva" ? dg.alcance : undefined;
   return {
     intervencion: dg.intervencion,
     tienePiscina: dg.tienePiscina,
@@ -72,9 +93,18 @@ export function atributosDe(
     tieneGaraje: r.tieneGaraje,
     tieneTrasteros: r.tieneTrasteros,
     demandaAcs_l_d: demandaReferencia(edificio, estadoHe4),
-    superficieConstruida_m2: superficiesHe5(edificioSi(edificio).zonas, r.tieneViviendas).s_m2,
+    superficieConstruida_m2,
     plazasAparcamiento: he6.plazas,
     excluidoHe6: he6.plazas > 0 && !he6.aplica,
+    existente: alcance && {
+      casos: casosDeObra(tiposDeObra(dg), alcance),
+      soloMantenimiento: alcance.soloMantenimiento === true,
+      contexto: {
+        alcance,
+        edificio: alcanceDeEdificio(dg, edificio, estadoHe4),
+        superficieConstruida_m2,
+      },
+    },
   };
 }
 
@@ -213,7 +243,7 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
     // Ámbito (research/verificacion-he4-he5.md): edificios nuevos con una demanda
     // de ACS superior a 100 l/d, calculada según el Anejo F.
     key: "he4",
-    cuando: (a) => a.demandaAcs_l_d !== undefined && a.demandaAcs_l_d <= 100,
+    cuando: (a) => !a.existente && a.demandaAcs_l_d !== undefined && a.demandaAcs_l_d <= 100,
     resultado: "no_aplica",
     nota:
       "DB-HE 4 Contribución mínima de energía renovable para cubrir la demanda de " +
@@ -226,7 +256,7 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
     // Ámbito: edificios nuevos que superen los 1.000 m² construidos, con el
     // aparcamiento interior (desde el RD 450/2022, de cualquier uso).
     key: "he5",
-    cuando: (a) => a.superficieConstruida_m2 !== undefined && a.superficieConstruida_m2 <= 1000,
+    cuando: (a) => !a.existente && a.superficieConstruida_m2 !== undefined && a.superficieConstruida_m2 <= 1000,
     resultado: "no_aplica",
     nota:
       "DB-HE 5 Generación mínima de energía eléctrica procedente de fuentes " +
@@ -264,8 +294,10 @@ export const REGLAS_ATRIBUTOS: readonly ReglaAtributo[] = [
     // ruidosos, espectáculos, aulas de más de 350 m³ y las obras en edificios
     // existentes que no sean de rehabilitación integral. La unifamiliar, aislada
     // o adosada, SÍ está dentro (tabiquería, fachada e instalaciones; Anejo I).
+    // Con el asistente de alcance respondido manda la regla de existentes
+    // (feature-27, K-REF.4: el cambio de uso no está en la exclusión).
     key: "hr",
-    cuando: (a) => a.intervencion !== "obra_nueva",
+    cuando: (a) => a.intervencion !== "obra_nueva" && !a.existente,
     resultado: "no_aplica",
     nota:
       "DB-HR Protección frente al ruido: no es de aplicación — la obra es una " +
@@ -288,26 +320,35 @@ const KEYS_EXPEDIENTE: readonly JustificacionKey[] = justificacionRegistry
   .map((j) => j.key as JustificacionKey);
 
 /**
- * Aplicabilidad PROPUESTA para cada justificación del expediente (Fase A):
- *  1. Entradas `formato: "externo"` del registry → `externo` ("Se justifica con <destino>").
+ * Aplicabilidad PROPUESTA para cada justificación del expediente:
+ *  0. Obra de solo mantenimiento (feature-27) → todo `no_aplica`: fuera del CTE.
+ *  1. Entradas `formato: "externo"` del registry → `externo` ("Se justifica con <destino>"),
+ *     salvo que en un edificio existente su regla diga que no aplica (K-REF.10).
  *  2. `REGLAS_ATRIBUTOS` en orden — para cada key gana la primera que casa.
- *  3. Resto → `aplica`; si la intervención no es obra nueva, con el aviso de
- *     alcance pendiente (motor de reformas en Fase E).
+ *  3. Edificio existente con el asistente respondido → `REGLAS_EXISTENTES`.
+ *  4. Resto → `aplica`; en un edificio existente sin asistente, con el aviso de
+ *     alcance pendiente.
  * Función pura y determinista: mismos atributos ⇒ mismo resultado.
  */
 export function aplicabilidadBase(
   a: AtributosProyecto,
 ): Record<JustificacionKey, AplicabilidadCalculada> {
   const resultado = {} as Record<JustificacionKey, AplicabilidadCalculada>;
+  const ex = a.existente;
   for (const key of KEYS_EXPEDIENTE) {
     const entry = justificacionRegistry.find((j) => j.key === key);
+    // 0. Mantenimiento: no es intervención (CTE Parte I, Anejo III).
+    if (ex?.soloMantenimiento) {
+      resultado[key] = { aplicabilidad: "no_aplica", nota: NOTA_MANTENIMIENTO, cita: CITA_MANTENIMIENTO };
+      continue;
+    }
     // 1. Externas: se resuelven fuera de la app (HULC, Concreta estructura).
     if (entry?.formato === "externo") {
-      resultado[key] = {
-        aplicabilidad: "externo",
-        nota: `Se justifica con ${entry.externo?.destino ?? "herramienta externa"}.`,
-        cita: entry.db,
-      };
+      const destino = `Se justifica con ${entry.externo?.destino ?? "herramienta externa"}.`;
+      const p = ex && REGLAS_EXISTENTES[key] ? propuestaExistente(key, ex.casos, ex.contexto) : undefined;
+      resultado[key] = p
+        ? { aplicabilidad: p.aplicabilidad, nota: p.aplicabilidad === "externo" ? `${p.nota} ${destino}` : p.nota, cita: p.cita }
+        : { aplicabilidad: "externo", nota: destino, cita: entry.db };
       continue;
     }
     // 2. Reglas de atributos: primera que casa gana.
@@ -320,9 +361,15 @@ export function aplicabilidadBase(
       };
       continue;
     }
-    // 3. Resto: aplica (obra nueva); intervención existente ⇒ aviso de alcance.
+    // 3. Edificio existente con el alcance respondido.
+    const p = ex ? propuestaExistente(key, ex.casos, ex.contexto) : undefined;
+    if (p) {
+      resultado[key] = p;
+      continue;
+    }
+    // 4. Resto: aplica (obra nueva); intervención existente sin alcance ⇒ aviso.
     resultado[key] =
-      a.intervencion === "obra_nueva"
+      a.intervencion === "obra_nueva" || ex
         ? { aplicabilidad: "aplica" }
         : {
             aplicabilidad: "aplica",

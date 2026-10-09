@@ -52,8 +52,9 @@
 - **DB-HE, DB-SI y DB-SUA** traen criterios propios para existentes (no empeoramiento,
   flexibilidad, «elementos modificados por la reforma», cambio de uso parcial, ampliación).
   **DB-HS y DB-HR no**: rige la Parte I.
-- Cada sección tiene su umbral: HE 1 (Ulim solo en lo sustituido; K y control solar si se renueva
-  más del 25 % de la envolvente final), HE 0 (generación **y** más del 25 %), HE 4 (reforma
+- Cada sección tiene su umbral: HE 1 (en reformas, Ulim solo en lo sustituido y K y control solar
+  si se renueva más del 25 % de la envolvente final; en ampliaciones, control solar siempre y K si
+  crecen más del 10 %), HE 0 (generación **y** más del 25 %), HE 4 (reforma
   íntegra o cambio de uso característico con más de 100 l/d; o más de 5.000 l/d que crecen más
   del 50 %), HE 5 (más de 1.000 m²), HE 6 (cinco supuestos), HS 4/HS 5 (solo si aumentan los
   aparatos), HS 6 (parte nueva, zona afectada o todo), HR (solo rehabilitación integral), REBT (la
@@ -180,3 +181,29 @@ Se rellenan al cerrar cada paso.
   viviendas, como en feature-25.
 - En obra nueva la marca de zona no cuenta. Sin marca, en un edificio existente, la zona cuenta
   como reformada: la propuesta más prudente.
+
+### Paso 0 (hecho)
+
+Cotejo en imagen (PyMuPDF a PNG) de DB-HE pp. 5, 9 y 15–18, DB-SI pp. 4–6, DB-SUA pp. 4–5, DB-HS
+pp. 81, 111 y 138 y REBT p. 9: ningún literal difería. Cambió una regla: **HE 1 global en
+ampliación va siempre** (el control solar del ap. 3.1.2 pto 1 no tiene umbral; el 10 % es solo de
+K). Varios párrafos ganan precisión (permeabilidad sin el caso b; «siempre que ello suponga» del
+criterio 9 del SI; la ampliación del SI es criterio de los comentarios, no del articulado).
+Detalle al final de la verificación.
+
+### Paso 2 (hecho)
+
+- [reglasExistentes.ts](src/lib/proyecto/reglasExistentes.ts): una regla por justificación y caso de
+  obra (reforma, ampliación, cambio de uso parcial o característico), con párrafo y cita; gana el
+  más exigente y se juntan las notas de «a lo intervenido»; no empeoramiento al final de cada una
+  (salvo REBT, que no es CTE) y aviso de protegido.
+- `aplicabilidadBase`: solo mantenimiento → todo `no_aplica`; las externas pasan por su regla
+  (K-REF.10); las reglas de obra nueva de HE 4 y HE 5 (que citan el pto 1 a, de edificios nuevos)
+  y la de HR ya no se evalúan cuando hay asistente.
+- **Lo no respondido es lo prudente**: «a lo intervenido» si depende de qué se toca; HE 4 y HE 5
+  aplican mientras no se diga si la reforma es íntegra; DB-SE externo mientras no se diga que no
+  se toca la estructura.
+- Criterios propios, a validar: los huecos cuentan como fachada para HS 1, SI 5, SUA 1 y SUA 2;
+  la puerta para SUA 3 sale de «vidrios o puertas»; SUA 6 con piscina colectiva queda «a lo
+  intervenido» («solo si son objeto de la intervención»), porque el asistente no pregunta por la
+  piscina; REBT con instalación nueva completa → `aplica`.
