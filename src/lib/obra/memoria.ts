@@ -15,6 +15,7 @@
 import type { MemoriaDoc } from "../cte/presentacion";
 import { textoParrafo } from "../cte/memoria";
 import type { JustificacionKey, Proyecto } from "../proyecto/tipos";
+import { notaAlcance, type NotaAlcance } from "./alcanceTexto";
 import { evaluarExpediente, type EvaluacionJustificacion } from "./evaluar";
 
 export const TITULO_MEMORIA = "Memoria CTE de instalaciones";
@@ -29,8 +30,8 @@ interface ApartadoBase {
 }
 
 export type ApartadoMemoria =
-  | (ApartadoBase & { tipo: "redactado"; doc: MemoriaDoc; porRevisar: number })
-  | (ApartadoBase & { tipo: "no_cumple"; doc: MemoriaDoc; motivos: string[] })
+  | (ApartadoBase & { tipo: "redactado"; doc: MemoriaDoc; porRevisar: number; alcance?: NotaAlcance })
+  | (ApartadoBase & { tipo: "no_cumple"; doc: MemoriaDoc; motivos: string[]; alcance?: NotaAlcance })
   | (ApartadoBase & { tipo: "no_aplica"; parrafo: string; cita?: string })
   | (ApartadoBase & { tipo: "externo"; destino: string; referencia?: string });
 
@@ -45,16 +46,20 @@ export interface MemoriaCte {
 function apartadoDe(ev: EvaluacionJustificacion, p: Proyecto): ApartadoMemoria | null {
   const e = ev.entrada;
   const base = { key: ev.key, codigo: e.codigo, grupo: e.grupo };
+  // En una obra existente, a qué se aplica (feature-27).
+  const n = notaAlcance(p, ev.key);
+  const alcance = n ? { alcance: n } : {};
   switch (ev.estado) {
     case "cumple":
     case "revisar": {
       const doc = ev.calculado!.memoria();
-      return { ...base, encabezado: `${doc.norma} · ${doc.titulo}`, tipo: "redactado", doc, porRevisar: ev.avisos.length };
+      return { ...base, ...alcance, encabezado: `${doc.norma} · ${doc.titulo}`, tipo: "redactado", doc, porRevisar: ev.avisos.length };
     }
     case "no_cumple": {
       const doc = ev.calculado!.memoria();
       return {
         ...base,
+        ...alcance,
         encabezado: `${doc.norma} · ${doc.titulo}`,
         tipo: "no_cumple",
         doc,
@@ -138,6 +143,10 @@ export function bloquesMemoria(m: MemoriaCte, fecha: string): BloqueMemoria[] {
       b.push({ tipo: "titulo", nivel: 2, texto: grupo });
     }
     b.push({ tipo: "titulo", nivel: 3, texto: a.encabezado });
+    if ((a.tipo === "redactado" || a.tipo === "no_cumple") && a.alcance) {
+      b.push({ tipo: "parrafo", texto: a.alcance.parrafo });
+      if (a.alcance.cita) b.push({ tipo: "nota", texto: a.alcance.cita });
+    }
     switch (a.tipo) {
       case "redactado":
         for (const p of a.doc.parrafos) b.push({ tipo: "parrafo", texto: textoParrafo(p) });

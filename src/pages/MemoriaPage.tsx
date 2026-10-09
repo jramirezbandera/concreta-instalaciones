@@ -82,6 +82,12 @@ function Apartado({ a, base }: { a: ApartadoMemoria; base: string }): JSX.Elemen
           </Link>
         )}
       </div>
+      {(a.tipo === "redactado" || a.tipo === "no_cumple") && a.alcance && (
+        <div className="border-accent/40 mb-2 border-l-2 pl-2.5">
+          <p className="text-[12.5px]">{a.alcance.parrafo}</p>
+          {a.alcance.cita && <p className="text-text-disabled mt-0.5 font-mono text-[10.5px]">{a.alcance.cita}</p>}
+        </div>
+      )}
       {a.tipo === "redactado" && (
         <>
           {a.porRevisar > 0 && (

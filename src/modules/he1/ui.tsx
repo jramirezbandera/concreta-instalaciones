@@ -29,6 +29,7 @@ import { zonaClimaticaDe } from "../../data/zonasClimaticasHE";
 import { avisosPendientes, estadosElementos, veredictoConRevision } from "../../lib/cte/estados";
 import { textoPlanoMemoria } from "../../lib/cte/memoria";
 import { renderFicha } from "../../lib/pdf/renderFicha";
+import { fichaConAlcance } from "../../lib/obra/alcanceTexto";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import { edificioParaModulo } from "../../lib/proyecto/alcance";
 import { ajustar } from "../../lib/ui/ajustar";
@@ -149,7 +150,7 @@ export function He1Module() {
   const valid = j.elementos.length > 0;
   const generarFicha = () => {
     const base = toFichaData(j, { estado: deferredState, edificio, revisados, svg: tamano });
-    return renderFicha({ ...base, proyecto: proyecto.nombre, fechaProyecto: formatearFecha(proyecto.modificado) });
+    return renderFicha({ ...fichaConAlcance(base, proyecto, "he1"), proyecto: proyecto.nombre, fechaProyecto: formatearFecha(proyecto.modificado) });
   };
   const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } = usePdfPreview(
     generarFicha,

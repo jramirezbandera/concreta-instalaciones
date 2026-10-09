@@ -32,6 +32,7 @@ import { PdfPreviewModal } from "../../components/ui/PdfPreviewModal";
 import { showToast } from "../../components/ui/Toast";
 import type { EstadoPresentacion } from "../../lib/cte/presentacion";
 import { renderFicha } from "../../lib/pdf/renderFicha";
+import { fichaConAlcance } from "../../lib/obra/alcanceTexto";
 import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import { edificioParaModulo } from "../../lib/proyecto/alcance";
@@ -154,7 +155,7 @@ export function Hs5Module() {
   const tamano = tamanoDibujoHs5(j, edificio);
   const valid = j.elementos.length > 0 && (j.residuales?.arbolValido ?? true);
   const generarFicha = () => {
-    const base = toFichaData(j, { estado: deferredState, edificio, obra, revisados, svg: tamano });
+    const base = fichaConAlcance(toFichaData(j, { estado: deferredState, edificio, obra, revisados, svg: tamano }), proyecto, "hs5");
     return renderFicha({
       ...base,
       proyecto: proyecto.nombre,

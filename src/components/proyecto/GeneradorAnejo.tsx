@@ -4,6 +4,7 @@ import { estadoDe } from "../../lib/proyecto/progreso";
 import { estadoEfectivo, evaluarExpediente } from "../../lib/obra/evaluar";
 import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
 import { proyectoParaModulo } from "../../lib/proyecto/alcance";
+import { fichaConAlcance } from "../../lib/obra/alcanceTexto";
 import { justificacionRegistry } from "../../data/justificacionRegistry";
 import type { FichaData } from "../../lib/pdf/renderFicha";
 import type { PdfResult } from "../../lib/pdf/utils";
@@ -337,7 +338,7 @@ export function GeneradorAnejo({ children }: GeneradorAnejoProps): JSX.Element {
           // En una obra existente, la ficha de lo intervenido (feature-27).
           proyectoParaModulo(proyecto, key),
         );
-        listos.push({ key, data, nodo });
+        listos.push({ key, data: fichaConAlcance(data, proyecto, key), nodo });
       } catch {
         // Módulo que no calcula con los inputs guardados: se omite su ficha y
         // queda como pendiente en el anejo (nunca se aborta el documento).

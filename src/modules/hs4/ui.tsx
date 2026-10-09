@@ -33,6 +33,7 @@ import { showToast } from "../../components/ui/Toast";
 import { avisosPendientes, estadosElementos, veredictoConRevision } from "../../lib/cte/estados";
 import { textoPlanoMemoria } from "../../lib/cte/memoria";
 import { renderFicha } from "../../lib/pdf/renderFicha";
+import { fichaConAlcance } from "../../lib/obra/alcanceTexto";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import { edificioParaModulo } from "../../lib/proyecto/alcance";
 import { ajustar } from "../../lib/ui/ajustar";
@@ -164,7 +165,7 @@ export function Hs4Module() {
   const valid = j.elementos.length > 0 && (j.resultado?.arbolValido ?? true);
   const generarFicha = () => {
     const base = toFichaData(j, { estado: deferredState, edificio, obra, revisados, svg: tamano });
-    return renderFicha({ ...base, proyecto: proyecto.nombre, fechaProyecto: formatearFecha(proyecto.modificado) });
+    return renderFicha({ ...fichaConAlcance(base, proyecto, "hs4"), proyecto: proyecto.nombre, fechaProyecto: formatearFecha(proyecto.modificado) });
   };
   const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } = usePdfPreview(
     generarFicha,

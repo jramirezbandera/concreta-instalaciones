@@ -263,3 +263,17 @@ Detalle al final de la verificación.
   módulo da error.
 - Criterio a validar: SI 5 y SUA 6 leen el edificio entero; SUA 7 lo intervenido (si el garaje no se
   toca, no hay nada que calcular).
+
+### Paso 7 (hecho)
+
+- [alcanceTexto.ts](src/lib/obra/alcanceTexto.ts): `notaAlcance` (el párrafo de «a lo intervenido»,
+  de flexibilidad o del cambio de uso característico) y `fichaConAlcance`.
+- **Memoria del expediente**: el párrafo va justo después del título del apartado, con su cita, en
+  pantalla, Word, PDF y texto copiado. **Ficha** (página del módulo y anejo): primera observación,
+  «Alcance: …».
+- No va: en obra nueva (salvo lo forzado), con el asistente sin responder (la nota «pendiente» no es
+  texto de memoria) ni en lo que no aplica o es externo, que tienen su propio apartado.
+- La pestaña Memoria de cada módulo no lo repite: es el texto del cálculo.
+- **Pendiente de decidir**: el proyecto de demostración de reforma. El Demo se siembra solo en el
+  primer arranque; un segundo Demo no llegaría a quien ya usa la app sin una migración. Alternativa:
+  un caso «Reforma: local a vivienda» en «Partir de un caso».

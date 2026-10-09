@@ -30,6 +30,7 @@ import { avisosPendientes, estadosElementos, veredictoConRevision } from "../../
 import { textoPlanoMemoria } from "../../lib/cte/memoria";
 import type { Edificio } from "../../lib/edificio/tipos";
 import { renderFicha } from "../../lib/pdf/renderFicha";
+import { fichaConAlcance } from "../../lib/obra/alcanceTexto";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import { edificioParaModulo } from "../../lib/proyecto/alcance";
 import { formatearFecha } from "../../lib/ui/fecha";
@@ -152,7 +153,7 @@ export function PantallaSi<E extends Record<string, unknown>, J extends Justific
   const tamano = { nativeW: dibujo.ancho, nativeH: dibujo.alto };
   const generarFicha = () => {
     const base = def.ficha(j, { estado: deferredState, edificio, revisados, svg: tamano });
-    return renderFicha({ ...base, proyecto: proyecto.nombre, fechaProyecto: formatearFecha(proyecto.modificado) });
+    return renderFicha({ ...fichaConAlcance(base, proyecto, def.key), proyecto: proyecto.nombre, fechaProyecto: formatearFecha(proyecto.modificado) });
   };
   const { pdfExporting, pdfPreview, handleExportPdf, handleDownloadPdf, closePdfPreview } = usePdfPreview(generarFicha, true);
 
