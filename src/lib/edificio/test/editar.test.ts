@@ -16,6 +16,7 @@ import {
   setAltura,
   setContador,
   setCubierta,
+  setObra,
   setRepeticiones,
   setSuperficie,
   setUnidades,
@@ -195,4 +196,23 @@ describe("invariantes", () => {
       expect(niveles).toContain(0);
     },
   );
+});
+
+describe("setObra (feature-27)", () => {
+  it("marca la zona y solo guarda el uso anterior si cambia de uso", () => {
+    const e = edificioDeCaso("plurifamiliar_locales");
+    const a = setObra(e, "z2", "cambia_uso", "local_sin_uso");
+    expect(buscarZona(a, "z2")?.zona).toMatchObject({ obra: "cambia_uso", usoAnterior: "local_sin_uso" });
+    const b = setObra(a, "z2", "cambia_uso");
+    expect(buscarZona(b, "z2")?.zona.usoAnterior).toBe("local_sin_uso");
+    const c = setObra(b, "z2", "existente");
+    expect(buscarZona(c, "z2")?.zona.obra).toBe("existente");
+    expect(buscarZona(c, "z2")?.zona.usoAnterior).toBeUndefined();
+    expect(buscarZona(e, "z2")?.zona.obra).toBeUndefined();
+  });
+
+  it("cambiar el uso conserva la marca", () => {
+    const e = setObra(edificioDeCaso("plurifamiliar_locales"), "z2", "cambia_uso", "local_sin_uso");
+    expect(buscarZona(setUso(e, "z2", "viviendas"), "z2")?.zona).toMatchObject({ obra: "cambia_uso", usoAnterior: "local_sin_uso" });
+  });
 });

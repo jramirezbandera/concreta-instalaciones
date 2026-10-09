@@ -1,6 +1,8 @@
 import type { CSSProperties, JSX } from "react";
 import { cotasGrupo, esBajoRasante, formatoCota, nombreGrupo, plantasDe } from "../../lib/edificio/derivar";
-import type { Edificio, GrupoPlantas, TipoCubierta } from "../../lib/edificio/tipos";
+import type { Edificio, GrupoPlantas, ObraZona, TipoCubierta } from "../../lib/edificio/tipos";
+import { obraDeZona } from "../../lib/proyecto/alcance";
+import type { Intervencion } from "../../lib/proyecto/tipos";
 import { detalleZona, ETIQUETA_CUBIERTA, type Seleccion } from "./presentacion";
 import { USOS, type FamiliaUso } from "../../lib/edificio/usos";
 
@@ -56,6 +58,8 @@ export function SeccionEdificio(props: {
   onAnadirZona?: (grupoId: string) => void;
   onAnadirPlanta?: () => void;
   onAnadirSotano?: () => void;
+  /** Fuera de obra nueva, cada zona dice qué se hace con ella (feature-27). */
+  intervencion?: Intervencion;
 }): JSX.Element {
   const { edificio: e, seleccion, onSeleccionar, onAnadirZona, onAnadirPlanta, onAnadirSotano } =
     props;
@@ -113,6 +117,7 @@ export function SeccionEdificio(props: {
             seleccion={seleccion}
             onSeleccionar={onSeleccionar}
             onAnadirZona={onAnadirZona}
+            intervencion={props.intervencion}
           />
         ))}
       </div>
@@ -165,14 +170,24 @@ function Muestra(props: { clase: string; estilo?: CSSProperties; children: strin
   );
 }
 
+/** Rótulo de la zona en la sección según lo que se hace con ella (feature-27). */
+const ROTULO_OBRA: Record<ObraZona, string> = {
+  nueva: "nueva",
+  reformada: "se reforma",
+  cambia_uso: "cambia de uso",
+  existente: "sin tocar",
+};
+
 function Banda(props: {
   e: Edificio;
   g: GrupoPlantas;
   seleccion: Seleccion | null;
   onSeleccionar: (s: Seleccion) => void;
   onAnadirZona?: (grupoId: string) => void;
+  intervencion?: Intervencion;
 }): JSX.Element {
-  const { e, g, seleccion, onSeleccionar, onAnadirZona } = props;
+  const { e, g, seleccion, onSeleccionar, onAnadirZona, intervencion } = props;
+  const existente = intervencion !== undefined && intervencion !== "obra_nueva";
   const n = Math.max(1, g.repeticiones);
   const bajo = esBajoRasante(g);
   const nombre = nombreGrupo(g);
@@ -228,7 +243,9 @@ function Banda(props: {
             }
             if (def.familia === "local") fondos.push(RAYADO);
             const detalle = detalleZona(e, z);
-            const sup = supTexto(z.superficieUtil_m2) + (n > 1 ? " por planta" : "");
+            const obra = existente ? obraDeZona(z, intervencion) : null;
+            const sup =
+              supTexto(z.superficieUtil_m2) + (n > 1 ? " por planta" : "") + (obra ? ` · ${ROTULO_OBRA[obra]}` : "");
             return (
               <button
                 key={z.id}
@@ -244,6 +261,7 @@ function Banda(props: {
                   "flex min-w-[56px] flex-col justify-center gap-px overflow-hidden rounded border px-2.5 py-1 text-left transition-colors max-sm:px-1.5 sm:min-w-[96px]",
                   FONDO[def.familia],
                   bajo ? "border-dashed" : "",
+                  obra === "existente" ? "opacity-55" : "",
                   sel
                     ? "border-accent shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
                     : "border-border-main hover:border-text-disabled",

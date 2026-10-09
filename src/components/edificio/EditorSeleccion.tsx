@@ -24,13 +24,16 @@ import {
   setCubierta,
   setGrifos,
   setRepeticiones,
+  setObra,
   setSuperficie,
   setUnidades,
   setUso,
 } from "../../lib/edificio/editar";
+import { obraDeZona } from "../../lib/proyecto/alcance";
+import type { Intervencion } from "../../lib/proyecto/tipos";
 import { deduccionesTipo, deduccionesZona, dondeEstaTipo, loUsanZona } from "../../lib/edificio/deducciones";
 import { cambiarAscensor } from "../../modules/sua/editar";
-import type { Edificio, OrigenDocumento, TipoCubierta, UnidadTipo, UsoZona } from "../../lib/edificio/tipos";
+import type { Edificio, ObraZona, OrigenDocumento, TipoCubierta, UnidadTipo, UsoZona } from "../../lib/edificio/tipos";
 import { ORDEN_USOS, USOS } from "../../lib/edificio/usos";
 import { cerramientosDe } from "../../lib/constructivo/cerramientos";
 import { EditorCerramientos } from "./EditorCerramientos";
@@ -49,7 +52,17 @@ interface Props {
   seleccion: Seleccion;
   onCambiar: (e: Edificio) => void;
   onSeleccionar: (s: Seleccion) => void;
+  /** La intervención de la obra: fuera de obra nueva, cada zona dice qué se hace con ella (feature-27). */
+  intervencion?: Intervencion;
 }
+
+/** Qué se hace con una zona, en el orden del desplegable. */
+const OBRA_ZONA: { value: ObraZona; label: string }[] = [
+  { value: "reformada", label: "Se reforma" },
+  { value: "nueva", label: "Es nueva (ampliación)" },
+  { value: "cambia_uso", label: "Cambia de uso" },
+  { value: "existente", label: "Existente, no se toca" },
+];
 
 const SELECT =
   "border-border-main bg-bg-primary text-text-primary focus:border-accent h-[34px] rounded border px-2 text-[13px] focus:outline-none";
@@ -240,6 +253,44 @@ function EditorZona(props: Props & { zonaId: string }): JSX.Element | null {
           ))}
         </select>
       </Fila>
+
+      {props.intervencion && props.intervencion !== "obra_nueva" && (
+        <>
+          <Fila etiqueta="En esta obra" htmlFor="ed-obra" columna>
+            <select
+              id="ed-obra"
+              value={obraDeZona(zona, props.intervencion)}
+              onChange={(ev) => onCambiar(setObra(e, zona.id, ev.target.value as ObraZona))}
+              className={SELECT}
+            >
+              {OBRA_ZONA.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Fila>
+          {zona.obra === "cambia_uso" && (
+            <Fila etiqueta="Uso que tenía" htmlFor="ed-uso-anterior" columna>
+              <select
+                id="ed-uso-anterior"
+                value={zona.usoAnterior ?? ""}
+                onChange={(ev) => onCambiar(setObra(e, zona.id, "cambia_uso", ev.target.value as UsoZona))}
+                className={SELECT}
+              >
+                <option value="" disabled>
+                  Elige el uso anterior
+                </option>
+                {ORDEN_USOS.map((u) => (
+                  <option key={u} value={u}>
+                    {USOS[u].etiqueta}
+                  </option>
+                ))}
+              </select>
+            </Fila>
+          )}
+        </>
+      )}
 
       {claseUnidad && (
         <Sub>{claseUnidad === "vivienda" ? "Viviendas" : "Núcleos de aseos"} en {n > 1 ? "cada planta" : "la planta"}</Sub>

@@ -262,6 +262,7 @@ export function EdificioPage(): JSX.Element {
               seleccion={sel}
               onCambiar={cambiar}
               onSeleccionar={seleccionar}
+              intervencion={dg.intervencion}
             />
           </aside>
 
@@ -282,6 +283,7 @@ export function EdificioPage(): JSX.Element {
             <div className="canvas-dot-grid bg-bg-primary flex-[1_0_auto] px-4 pt-[18px] pb-7 sm:px-6">
               <SeccionEdificio
                 edificio={edificio}
+                intervencion={dg.intervencion}
                 seleccion={sel}
                 onSeleccionar={seleccionar}
                 onAnadirZona={(grupoId) => {

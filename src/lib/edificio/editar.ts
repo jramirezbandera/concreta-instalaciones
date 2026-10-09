@@ -16,6 +16,7 @@ import type {
   Edificio,
   GrupoPlantas,
   NucleoAseos,
+  ObraZona,
   TipoCubierta,
   UnidadTipo,
   UsoZona,
@@ -272,6 +273,18 @@ export function setUso(e: Edificio, zonaId: string, uso: UsoZona): Edificio {
       ...(potencia_kW !== undefined && uso === "instalaciones" ? { potencia_kW } : {}),
       ...(usoPrevisto && uso === "local_sin_uso" ? { usoPrevisto } : {}),
     };
+  });
+}
+
+/**
+ * Qué se hace con la zona en una obra en un edificio existente (feature-27). El
+ * uso anterior solo se guarda si cambia de uso.
+ */
+export function setObra(e: Edificio, zonaId: string, obra: ObraZona, usoAnterior?: UsoZona): Edificio {
+  return conZona(e, zonaId, (z) => {
+    const { obra: _o, usoAnterior: previo, ...resto } = z;
+    const anterior = usoAnterior ?? previo;
+    return { ...resto, obra, ...(obra === "cambia_uso" && anterior ? { usoAnterior: anterior } : {}) };
   });
 }
 

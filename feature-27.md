@@ -235,3 +235,12 @@ Detalle al final de la verificación.
   b y d propios). No se guarda sin motivo, por qué, soluciones y nivel. Lo escrito se guarda en
   `aplicabilidadForzada.flexibilidad` para poder editarlo.
 - Las filas marcan «· a lo intervenido» y «· con flexibilidad».
+
+### Paso 5 (hecho)
+
+- En el editor de zona, fuera de obra nueva: «En esta obra» (se reforma, es nueva, cambia de uso,
+  existente sin tocar) y, si cambia de uso, «Uso que tenía». `setObra` en
+  [editar.ts](src/lib/edificio/editar.ts); cambiar el uso conserva la marca.
+- En la sección, cada zona dice qué se hace con ella y lo que no se toca sale atenuado.
+- La marca vale para todas las plantas del grupo: si solo se reforma una planta de un grupo
+  repetido, se separa el grupo.
