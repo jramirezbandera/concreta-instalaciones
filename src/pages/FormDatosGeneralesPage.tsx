@@ -25,6 +25,7 @@ import { useContext, useEffect, useMemo, useState, type FormEvent, type JSX } fr
 import { useNavigate } from "react-router";
 import { CollapsibleSection } from "../components/ui/CollapsibleSection";
 import { Field, InputLabel, NumberInput, SelectInput } from "../components/ui/InputLabel";
+import { AsistenteAlcance } from "../components/proyecto/AsistenteAlcance";
 import { SelectorMunicipio } from "../components/proyecto/SelectorMunicipio";
 import { PROVINCIAS, altitudCapitalDe, limiteTramoCercano } from "../data/zonasClimaticasHE";
 import { derivarContexto } from "../lib/proyecto/derivar";
@@ -374,6 +375,16 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
     set("presionAcometida_kPa", txt.trim() === "" || !Number.isFinite(n) ? undefined : n);
   }
 
+  // El tipo elegido entra en los tipos de obra del asistente si ya los había
+  // marcado (feature-27): una obra puede ser reforma y ampliación a la vez.
+  function onIntervencion(v: Intervencion): void {
+    setDg((prev) => {
+      const tipos = prev.alcance?.tipos;
+      if (v === "obra_nueva" || !tipos || tipos.includes(v)) return { ...prev, intervencion: v };
+      return { ...prev, intervencion: v, alcance: { ...prev.alcance, tipos: [v, ...tipos] } };
+    });
+  }
+
   const errores = useMemo(() => validar(dg, nombre), [dg, nombre]);
 
   // ¿La altitud roza un límite de tramo del Anejo B? (feature-9) Es el aviso que
@@ -586,9 +597,17 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
                 id="dg-intervencion"
                 value={dg.intervencion}
                 options={INTERVENCION_OPTIONS}
-                onChange={(v) => set("intervencion", v)}
+                onChange={onIntervencion}
               />
             </Field>
+            {dg.intervencion !== "obra_nueva" && (
+              <AsistenteAlcance
+                dg={dg}
+                edificio={edificio}
+                justificaciones={modo === "editar" ? ctx?.proyecto.justificaciones : undefined}
+                onChange={(alcance) => set("alcance", alcance)}
+              />
+            )}
             <CheckRow
               id="dg-piscina"
               label="Piscina"

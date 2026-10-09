@@ -207,3 +207,17 @@ Detalle al final de la verificación.
   la puerta para SUA 3 sale de «vidrios o puertas»; SUA 6 con piscina colectiva queda «a lo
   intervenido» («solo si son objeto de la intervención»), porque el asistente no pregunta por la
   piscina; REBT con instalación nueva completa → `aplica`.
+
+### Paso 3 (hecho)
+
+- [AsistenteAlcance.tsx](src/components/proyecto/AsistenteAlcance.tsx), bajo «Tipo de intervención»
+  cuando la obra no es nueva: tipos de obra (varios), solo mantenimiento, integral, qué cambia de
+  uso, el 10 % y la altura de la ampliación, envolvente (con «nada» distinto de sin responder),
+  el 25 %, lo que pasa a acondicionado, el interior, generación térmica, fontanería, pluviales,
+  eléctrica, estructura, aparcamiento (si hay garaje) y protegido. Debajo, la propuesta agrupada.
+- Lo ampliado y lo que cambia de uso se leen de El edificio y se muestran como nota; si no hay
+  zonas marcadas, la nota pide marcarlas (paso 5).
+- Cambiar «Tipo de intervención» con tipos ya marcados añade el nuevo a la lista.
+- El alcance se crea con la primera respuesta: un proyecto de reforma que no toca el asistente
+  sigue con «alcance pendiente».
+- Capturas con el navegador de gstack: sin errores de consola.
