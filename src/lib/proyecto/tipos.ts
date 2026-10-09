@@ -141,6 +141,107 @@ export interface DatosGenerales {
   ldZona?: number;
   /** HR: el ruido exterior dominante es el de aeronaves (huella acústica de un aeropuerto): + 4 dBA. */
   aeronaves?: boolean;
+  /**
+   * Lo que el asistente de alcance pregunta de una obra en un edificio existente
+   * (feature-27). Sin él, la intervención se queda con la nota «alcance pendiente».
+   */
+  alcance?: Alcance;
+}
+
+// -----------------------------------------------------------------------------
+// ALCANCE DE UNA INTERVENCIÓN EN UN EDIFICIO EXISTENTE (feature-27, UX-RECONCEPT §5)
+// -----------------------------------------------------------------------------
+
+/** Tipos de intervención en los edificios existentes (CTE Parte I, Anejo III). */
+export type TipoObraExistente = "reforma" | "ampliacion" | "cambio_uso";
+
+/**
+ * Elementos de la envolvente térmica o particiones que se sustituyen, incorporan
+ * o modifican sustancialmente (HE 1 ap. 3.1.1 pto 2, 3.2 pto 2). Deciden HS 1,
+ * HS 6, HE 1, SI 2, SI 5, SUA 1 y SUA 2 en una reforma.
+ */
+export type ElementoEnvolvente =
+  | "fachadas"
+  | "huecos"
+  | "cubiertas"
+  | "terreno"
+  | "medianerias"
+  | "particiones";
+
+/**
+ * Lo que una reforma modifica en el interior (verificación K-REF, pregunta P8).
+ * Decide qué secciones del DB-SI y del DB-SUA se aplican a lo reformado (DB-SI
+ * Introducción III criterios 9 y 10; DB-SUA Introducción III criterio 3).
+ */
+export type ElementoInterior =
+  | "distribucion"
+  | "evacuacion"
+  | "compartimentacion"
+  | "revestimientos"
+  | "instalaciones_pci"
+  | "suelos_escaleras"
+  | "vidrios_puertas"
+  | "aseos"
+  | "alumbrado"
+  | "accesibilidad";
+
+/**
+ * Respuestas del asistente de alcance (research/verificacion-reformas.md, bloque E).
+ * Todas opcionales: lo que falta se deduce de El edificio o se queda en la
+ * propuesta más prudente. Lo que El edificio ya sabe (superficie ampliada, zonas
+ * que cambian de uso y a qué, viviendas reformadas) no se pregunta.
+ */
+export interface Alcance {
+  /**
+   * Tipos de obra, que pueden ser varios a la vez (K-REF.1). Sin él, el de
+   * `DatosGenerales.intervencion`.
+   */
+  tipos?: TipoObraExistente[];
+  /** Solo mantenimiento o reparaciones puntuales: fuera del CTE (Parte I, Anejo III). */
+  soloMantenimiento?: boolean;
+  /**
+   * Reforma o rehabilitación integral: se modifican sustancialmente y a la vez
+   * particiones, forjados y envolvente (Guía DB-HR, no reglamentaria; K-REF.3).
+   * Decide HR, HE 4 b) y HE 5 c).
+   */
+  integral?: boolean;
+  /** Cambio de uso característico del edificio (no solo de una parte). */
+  cambioUsoCaracteristico?: boolean;
+  /**
+   * La ampliación incrementa más del 10 % la superficie o el volumen construido
+   * de las unidades de uso sobre las que se interviene (HE 0, HE 1, HE 6).
+   */
+  ampliacionMas10?: boolean;
+  /** La ampliación cambia la altura de evacuación o añade plantas (SI 3, SI 5). */
+  ampliacionCambiaAltura?: boolean;
+  /** P5: elementos de la envolvente o particiones que se modifican. */
+  envolvente?: ElementoEnvolvente[];
+  /** Se renueva más del 25 % de la superficie total de la envolvente térmica final. */
+  envolventeMas25?: boolean;
+  /** Algún espacio pasa a estar acondicionado o algún elemento pasa a ser envolvente. */
+  pasaAcondicionado?: boolean;
+  /** P6: renovación de la instalación de generación térmica. */
+  generacionTermica?: "no" | "general" | "parcial";
+  /** P7a: aparatos de agua (HS 4 y HS 5 ap. 1.1). */
+  aparatos?: "no" | "sin_aumento" | "aumentan" | "nueva";
+  /** P7b: se modifican cubiertas o la red de pluviales. */
+  pluviales?: boolean;
+  /** P8: lo que se modifica en el interior. */
+  interior?: ElementoInterior[];
+  /** P9: actuaciones en la estructura preexistente (Parte I art. 2.4). */
+  estructura?: boolean;
+  /** P10a: se interviene en el aparcamiento. */
+  aparcamiento?: boolean;
+  /**
+   * P10b/c: la intervención en la instalación eléctrica afecta a más del 50 % de la
+   * potencia instalada del edificio (con aparcamiento interior y derecho del
+   * promotor a actuar en él) o del aparcamiento (HE 6 ap. 1 pto 1 b).
+   */
+  electrica50?: boolean;
+  /** P11: edificio protegido oficialmente. */
+  protegido?: boolean;
+  /** P12: instalación eléctrica (REBT art. 2.2). */
+  electrica?: "no" | "modifica" | "nueva";
 }
 
 // -----------------------------------------------------------------------------

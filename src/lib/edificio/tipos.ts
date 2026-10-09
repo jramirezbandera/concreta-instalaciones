@@ -35,6 +35,13 @@ export type UsoZona =
   | "instalaciones";
 
 /**
+ * Qué se hace con una zona en una obra en un edificio existente (feature-27):
+ * nueva (la ampliación), reformada, cambia de uso o existente sin tocar. Lo que
+ * está sin tocar no lo calculan los módulos.
+ */
+export type ObraZona = "nueva" | "reformada" | "cambia_uso" | "existente";
+
+/**
  * De dónde sale una zona o un tipo que el proyectista no tecleó (feature-13): leído
  * con IA de un documento aportado (el cuadro de superficies) y revisado por el
  * proyectista antes de aplicarlo. Editarlo después no lo borra: editar es revisar.
@@ -121,6 +128,13 @@ export interface Zona {
   usoPrevisto?: UsoPrevistoLocal;
   /** Nota libre que acompaña a la zona en la sección («planta alta · noche»). */
   nota?: string;
+  /**
+   * Qué se hace con la zona en una obra en un edificio existente (feature-27). Sin
+   * él, la zona cuenta como intervenida: nueva en obra nueva, reformada si no.
+   */
+  obra?: ObraZona;
+  /** Uso que tenía la zona antes, si `obra` es «cambia_uso». */
+  usoAnterior?: UsoZona;
   /** Si viene del cuadro de superficies (feature-13). */
   origen?: OrigenDocumento;
 }
