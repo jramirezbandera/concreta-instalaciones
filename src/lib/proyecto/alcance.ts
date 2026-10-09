@@ -1,4 +1,4 @@
-import type { DatosGenerales, Intervencion, TipoObraExistente } from "./tipos";
+import type { DatosGenerales, Intervencion, JustificacionKey, Proyecto, TipoObraExistente } from "./tipos";
 import type { Edificio, ObraZona, UsoZona, Zona } from "../edificio/tipos";
 import type { He4Estado } from "../../modules/he4/estado";
 import { demandaReferencia } from "../../modules/he4/justificacion";
@@ -125,4 +125,60 @@ export function alcanceDeEdificio(
       final_l_d: demandaReferencia(edificio, estadoHe4),
     },
   };
+}
+
+// ─── Lo que calcula cada módulo (feature-27, paso 6) ─────────────────────────
+
+/**
+ * Qué parte del edificio lee cada justificación en una obra existente:
+ *  - «intervenido»: solo las zonas que se tocan (lo existente sin tocar fuera);
+ *  - «con_comunes»: lo intervenido más las zonas comunes y vestíbulos, que son
+ *    los medios de evacuación que sirven a la zona (DB-SI criterio 8) y el
+ *    itinerario accesible hasta la vía pública (DB-SUA criterio 2);
+ *  - «edificio»: todo, porque la exigencia es del conjunto (dotación del
+ *    edificio ampliado de SI 4, rayo de SUA 8, HE 4, HE 5, HE 6, previsión de
+ *    cargas de REBT…).
+ * Lo que no figura lee el edificio entero.
+ */
+export const ALCANCE_MODULO: Partial<Record<JustificacionKey, "intervenido" | "con_comunes">> = {
+  hs1: "intervenido",
+  hs3: "intervenido",
+  hs4: "intervenido",
+  hs5: "intervenido",
+  hs6: "intervenido",
+  he1: "intervenido",
+  hr: "intervenido",
+  si1: "intervenido",
+  si2: "intervenido",
+  si6: "intervenido",
+  sua1: "intervenido",
+  sua2: "intervenido",
+  sua3: "intervenido",
+  sua4: "intervenido",
+  sua7: "intervenido",
+  si3: "con_comunes",
+  sua9: "con_comunes",
+};
+
+const COMUNES: ReadonlySet<UsoZona> = new Set(["zona_comun", "vestibulo"]);
+
+/**
+ * El edificio que calcula una justificación: sin las zonas existentes que no se
+ * tocan, si su exigencia es de lo intervenido. Devuelve el MISMO objeto cuando no
+ * hay nada que quitar (obra nueva, ninguna zona sin tocar o exigencia del
+ * conjunto), para que obra nueva siga exactamente igual.
+ */
+export function edificioParaModulo(dg: DatosGenerales, edificio: Edificio, key: JustificacionKey): Edificio {
+  const modo = ALCANCE_MODULO[key];
+  if (!modo || dg.intervencion === "obra_nueva") return edificio;
+  const queda = (z: Zona): boolean =>
+    obraDeZona(z, dg.intervencion) !== "existente" || (modo === "con_comunes" && COMUNES.has(z.uso));
+  if (edificio.grupos.every((g) => g.zonas.every(queda))) return edificio;
+  return soloZonas(edificio, queda);
+}
+
+/** El proyecto tal como lo ve una justificación (ver `edificioParaModulo`). */
+export function proyectoParaModulo(p: Proyecto, key: JustificacionKey): Proyecto {
+  const edificio = edificioParaModulo(p.datosGenerales, p.edificio, key);
+  return edificio === p.edificio ? p : { ...p, edificio };
 }

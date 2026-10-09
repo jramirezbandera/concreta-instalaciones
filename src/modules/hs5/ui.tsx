@@ -34,6 +34,7 @@ import type { EstadoPresentacion } from "../../lib/cte/presentacion";
 import { renderFicha } from "../../lib/pdf/renderFicha";
 import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
+import { edificioParaModulo } from "../../lib/proyecto/alcance";
 import { ajustar } from "../../lib/ui/ajustar";
 import { fmt } from "../../lib/units/format";
 import { DecisionesHs5 } from "./DecisionesHs5";
@@ -82,7 +83,8 @@ export function Hs5Module() {
   const [confirmarEdificio, setConfirmarEdificio] = useState(false);
 
   const deferredState = useDeferredValue(state);
-  const edificio = proyecto.edificio;
+  // En una obra existente, lo intervenido (feature-27).
+  const edificio = edificioParaModulo(proyecto.datosGenerales, proyecto.edificio, "hs5");
   const pluviometria = proyecto.datosGenerales.pluviometria;
   const cotaAlcantarillado_m = proyecto.datosGenerales.cotaAlcantarillado_m;
   const obra: ObraHs5 = useMemo(() => ({ pluviometria, cotaAlcantarillado_m }), [pluviometria, cotaAlcantarillado_m]);

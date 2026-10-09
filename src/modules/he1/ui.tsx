@@ -30,6 +30,7 @@ import { avisosPendientes, estadosElementos, veredictoConRevision } from "../../
 import { textoPlanoMemoria } from "../../lib/cte/memoria";
 import { renderFicha } from "../../lib/pdf/renderFicha";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
+import { edificioParaModulo } from "../../lib/proyecto/alcance";
 import { ajustar } from "../../lib/ui/ajustar";
 import { DecisionesHe1 } from "./DecisionesHe1";
 import { calcularDibujoHe1, tamanoDibujoHe1, vistaDe } from "./dibujo";
@@ -70,7 +71,8 @@ export function He1Module() {
   const [vista, setVista] = useState<VistaModulo>("esquema");
 
   const deferredState = useDeferredValue(state);
-  const edificio = proyecto.edificio;
+  // En una obra existente, lo intervenido (feature-27).
+  const edificio = edificioParaModulo(proyecto.datosGenerales, proyecto.edificio, "he1");
   const dg = proyecto.datosGenerales;
   const obra = useMemo(
     () => ({ provincia: dg.provincia, altitud_m: dg.altitud_m, municipio: dg.municipio }),

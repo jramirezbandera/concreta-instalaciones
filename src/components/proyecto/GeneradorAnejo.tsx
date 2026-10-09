@@ -3,6 +3,7 @@ import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import { estadoDe } from "../../lib/proyecto/progreso";
 import { estadoEfectivo, evaluarExpediente } from "../../lib/obra/evaluar";
 import { notasExcepcionesLocales } from "../../lib/proyecto/herencia";
+import { proyectoParaModulo } from "../../lib/proyecto/alcance";
 import { justificacionRegistry } from "../../data/justificacionRegistry";
 import type { FichaData } from "../../lib/pdf/renderFicha";
 import type { PdfResult } from "../../lib/pdf/utils";
@@ -333,7 +334,8 @@ export function GeneradorAnejo({ children }: GeneradorAnejoProps): JSX.Element {
               overrides: proyecto.justificaciones[key]?.overridesContexto ?? [],
             }),
           },
-          proyecto,
+          // En una obra existente, la ficha de lo intervenido (feature-27).
+          proyectoParaModulo(proyecto, key),
         );
         listos.push({ key, data, nodo });
       } catch {

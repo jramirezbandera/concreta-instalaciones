@@ -11,6 +11,7 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { estadoEfectivo } from "../obra/evaluar";
+import { proyectoParaModulo } from "../proyecto/alcance";
 import type { JustificacionKey, Proyecto } from "../proyecto/tipos";
 import { SECCION_BASE } from "../edificio/seccion";
 import { justificarHs5 } from "../../modules/hs5/justificacion";
@@ -42,7 +43,9 @@ interface Esquema {
 }
 
 /** El dibujo en papel de un módulo, como texto SVG. */
-function svgDe(p: Proyecto, key: "hs5" | "hs4"): string {
+function svgDe(proyecto: Proyecto, key: "hs5" | "hs4"): string {
+  // En una obra existente, la red de lo intervenido (feature-27).
+  const p = proyectoParaModulo(proyecto, key);
   const revisados = p.justificaciones[key]?.revisados ?? [];
   const estado = estadoEfectivo(p, key)!;
   const dg = p.datosGenerales;

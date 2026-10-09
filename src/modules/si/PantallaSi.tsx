@@ -31,6 +31,7 @@ import { textoPlanoMemoria } from "../../lib/cte/memoria";
 import type { Edificio } from "../../lib/edificio/tipos";
 import { renderFicha } from "../../lib/pdf/renderFicha";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
+import { edificioParaModulo } from "../../lib/proyecto/alcance";
 import { formatearFecha } from "../../lib/ui/fecha";
 import { ajustar } from "../../lib/ui/ajustar";
 import type { DefinicionSi } from "./definicion";
@@ -64,8 +65,11 @@ export function PantallaSi<E extends Record<string, unknown>, J extends Justific
   const [vista, setVista] = useState<VistaModulo>("esquema");
 
   const deferredState = useDeferredValue(state);
-  const edificio = proyecto.edificio;
   const dg = proyecto.datosGenerales;
+  // En una obra existente, el módulo calcula lo intervenido (feature-27); lo que
+  // se edita y se guarda sigue siendo El edificio entero.
+  const edificioCompleto = proyecto.edificio;
+  const edificio = edificioParaModulo(dg, edificioCompleto, def.key);
   const justificaciones = proyecto.justificaciones;
   const j = useMemo(
     () => def.justificar(deferredState, { edificio, datosGenerales: dg, justificaciones }),
@@ -127,7 +131,7 @@ export function PantallaSi<E extends Record<string, unknown>, J extends Justific
               etiqueta: a.etiqueta,
               onClick: () => {
                 for (const k of Object.keys(a.cambios) as (keyof E)[]) setField(k, a.cambios[k] as E[keyof E]);
-                if (a.edificio) cambiarEdificio(a.edificio(edificio));
+                if (a.edificio) cambiarEdificio(a.edificio(edificioCompleto));
               },
             }
           : undefined,
@@ -170,7 +174,7 @@ export function PantallaSi<E extends Record<string, unknown>, J extends Justific
       enlace={{ to: `/p/${proyecto.id}/edificio`, label: "Editar el edificio" }}
     />
   );
-  const entradas = <Decisiones state={state} setField={setField} j={j} edificio={edificio} cambiarEdificio={cambiarEdificio} />;
+  const entradas = <Decisiones state={state} setField={setField} j={j} edificio={edificioCompleto} cambiarEdificio={cambiarEdificio} />;
 
   // ── El dibujo ──────────────────────────────────────────────────────────────
   const etiquetasDibujo = dibujo.etiquetas.flatMap((e) => {

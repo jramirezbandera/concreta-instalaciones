@@ -34,6 +34,7 @@ import { avisosPendientes, estadosElementos, veredictoConRevision } from "../../
 import { textoPlanoMemoria } from "../../lib/cte/memoria";
 import { renderFicha } from "../../lib/pdf/renderFicha";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
+import { edificioParaModulo } from "../../lib/proyecto/alcance";
 import { ajustar } from "../../lib/ui/ajustar";
 import { fmt } from "../../lib/units/format";
 import { DecisionesHs4 } from "./DecisionesHs4";
@@ -78,7 +79,8 @@ export function Hs4Module() {
   const [confirmarEdificio, setConfirmarEdificio] = useState(false);
 
   const deferredState = useDeferredValue(state);
-  const edificio = proyecto.edificio;
+  // En una obra existente, lo intervenido (feature-27).
+  const edificio = edificioParaModulo(proyecto.datosGenerales, proyecto.edificio, "hs4");
   const presionAcometida_kPa = proyecto.datosGenerales.presionAcometida_kPa;
   const obra: ObraHs4 = useMemo(() => ({ presionAcometida_kPa }), [presionAcometida_kPa]);
   const j = useMemo(() => justificarHs4(deferredState, edificio, obra), [deferredState, edificio, obra]);

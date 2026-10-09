@@ -27,6 +27,7 @@ import { avisosPendientes, estadosElementos, veredictoConRevision } from "../../
 import { textoPlanoMemoria } from "../../lib/cte/memoria";
 import { renderFicha } from "../../lib/pdf/renderFicha";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
+import { edificioParaModulo } from "../../lib/proyecto/alcance";
 import { ajustar } from "../../lib/ui/ajustar";
 import { DecisionesHs6 } from "./DecisionesHs6";
 import { filasQueEntraHs6 } from "./entra";
@@ -56,7 +57,8 @@ export function Hs6Module() {
   const [vista, setVista] = useState<VistaModulo>("esquema");
 
   const deferredState = useDeferredValue(state);
-  const edificio = proyecto.edificio;
+  // En una obra existente, lo intervenido (feature-27).
+  const edificio = edificioParaModulo(proyecto.datosGenerales, proyecto.edificio, "hs6");
   const j = useMemo(() => justificarHs6(deferredState, edificio), [deferredState, edificio]);
 
   // ── Avisos y estados ───────────────────────────────────────────────────────

@@ -14,6 +14,7 @@
 
 import { justificacionRegistry, type JustificacionEntry } from "../../data/justificacionRegistry";
 import { avisosPendientes, veredictoConRevision } from "../cte/estados";
+import { proyectoParaModulo } from "../proyecto/alcance";
 import { aplicabilidadEfectiva } from "../proyecto/aplicabilidad";
 import { contextoDe } from "../proyecto/derivar";
 import { heredadosDe, mergeInputsHeredados } from "../proyecto/herencia";
@@ -109,7 +110,8 @@ function evaluarPublicada(
   const revisados = p.justificaciones[key]?.revisados ?? [];
   let calculado: ModuloCalculado;
   try {
-    calculado = modulo.calcular(estadoEfectivo(p, key)!, p, revisados);
+    // En una obra existente, cada módulo calcula lo intervenido (feature-27).
+    calculado = modulo.calcular(estadoEfectivo(p, key)!, proyectoParaModulo(p, key), revisados);
   } catch {
     return { estado: "error", avisos: [], incumplimientos: [ERROR_CALCULO] };
   }

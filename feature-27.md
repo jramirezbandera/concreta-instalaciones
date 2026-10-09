@@ -244,3 +244,22 @@ Detalle al final de la verificación.
 - En la sección, cada zona dice qué se hace con ella y lo que no se toca sale atenuado.
 - La marca vale para todas las plantas del grupo: si solo se reforma una planta de un grupo
   repetido, se separa el grupo.
+
+### Paso 6 (hecho)
+
+- `edificioParaModulo` / `proyectoParaModulo` en [alcance.ts](src/lib/proyecto/alcance.ts), con
+  `ALCANCE_MODULO`: lo intervenido en HS 1, HS 3–HS 6, HE 1, HR, SI 1, SI 2, SI 6, SUA 1–4 y SUA 7;
+  lo intervenido más zonas comunes y vestíbulos en SI 3 y SUA 9; el edificio entero en el resto
+  (SI 4, SI 5, SUA 6, SUA 8, HS 2, HE 4, HE 5, HE 6, REBT). Devuelve el mismo objeto si no hay nada
+  que quitar: obra nueva no cambia.
+- Se aplica en La obra y la memoria (`evaluar.ts`), el anejo (`GeneradorAnejo.tsx`), la DXF de
+  HS4/HS5, `PantallaSi` y las páginas de HS1, HS3, HS4, HS5, HS6 y HE1. Los grupos de plantas se
+  conservan aunque se queden sin zonas: las cotas y la altura de evacuación no cambian.
+- **Lo que se guarda sigue siendo El edificio entero**: en `PantallaSi`, los arreglos y las
+  Decisiones que editan zonas reciben el edificio completo.
+- La herencia de datos (`derivados`) sigue saliendo del edificio entero: altura de evacuación,
+  zona térmica… son del edificio.
+- Test: el Demo como reforma con cada zona sin tocar, cada zona sola intervenida, todo y nada: ningún
+  módulo da error.
+- Criterio a validar: SI 5 y SUA 6 leen el edificio entero; SUA 7 lo intervenido (si el garaje no se
+  toca, no hay nada que calcular).
