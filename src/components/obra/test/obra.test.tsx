@@ -68,15 +68,60 @@ describe("Lo que se justifica", () => {
   });
 
   describe("menú ⋯ de aplicabilidad", () => {
-    it("forzar «no aplica» saca la fila de su estado y la marca como forzada", async () => {
+    it("forzar «no aplica» pide el párrafo, saca la fila de su estado y la marca como forzada", async () => {
       const user = userEvent.setup();
-      vi.spyOn(window, "prompt").mockReturnValue("Lo justifica el acústico");
       montar(<LoQueSeJustifica />);
       await user.click(screen.getByRole("button", { name: "Opciones de aplicabilidad de HS6" }));
       await user.click(screen.getByRole("menuitem", { name: "Forzar no aplica…" }));
+      const editor = screen.getByRole("group", { name: /No aplica: HS6/ });
+      await user.type(within(editor).getByRole("textbox"), "Lo justifica el acústico");
+      await user.click(within(editor).getByRole("button", { name: "Guardar" }));
       const fila = screen.getByRole("button", { name: /HS6.*radón/ });
       expect(within(fila).getByText("no aplica")).toBeInTheDocument();
       expect(within(fila).getByText("· forzado")).toBeInTheDocument();
+      await user.click(fila);
+      expect(screen.getByText("Lo justifica el acústico")).toBeVisible();
+    });
+
+    it("en obra nueva no ofrece «a lo intervenido» ni la flexibilidad", async () => {
+      const user = userEvent.setup();
+      montar(<LoQueSeJustifica />);
+      await user.click(screen.getByRole("button", { name: "Opciones de aplicabilidad de HS4" }));
+      expect(screen.queryByRole("menuitem", { name: /a lo intervenido/ })).toBeNull();
+      expect(screen.queryByRole("menuitem", { name: /flexibilidad/ })).toBeNull();
+    });
+
+    it("en una reforma, la flexibilidad redacta el párrafo con su cita y no se guarda incompleta", async () => {
+      const user = userEvent.setup();
+      const p = demo();
+      p.datosGenerales = { ...p.datosGenerales, intervencion: "reforma", alcance: {} };
+      montar(<LoQueSeJustifica />, p);
+      await user.click(screen.getByRole("button", { name: "Opciones de aplicabilidad de SUA1" }));
+      await user.click(screen.getByRole("menuitem", { name: "Aplica con flexibilidad…" }));
+      const editor = screen.getByRole("group", { name: /Aplica con flexibilidad: SUA1/ });
+      const guardar = within(editor).getByRole("button", { name: "Guardar" });
+      expect(guardar).toBeDisabled();
+      await user.selectOptions(within(editor).getByRole("combobox", { name: "Motivo" }), "tecnica");
+      await user.type(within(editor).getByRole("textbox", { name: "Por qué" }), "la escalera existente no admite otra huella");
+      await user.type(within(editor).getByRole("textbox", { name: "Soluciones que se adoptan" }), "banda antideslizante y pasamanos doble");
+      await user.type(within(editor).getByRole("textbox", { name: "Nivel de prestación que se alcanza" }), "una huella de 26 cm");
+      expect(within(editor).getByText(/DB-SUA, Introducción III\)\.$/)).toBeInTheDocument();
+      await user.click(guardar);
+      const fila = screen.getByRole("link", { name: /SUA1/ });
+      expect(within(fila).getByText("· con flexibilidad")).toBeInTheDocument();
+      expect(within(fila).getByText("· forzado")).toBeInTheDocument();
+    });
+
+    it("en una reforma, la propuesta «a lo intervenido» se marca en la fila y se puede leer", async () => {
+      const user = userEvent.setup();
+      const p = demo();
+      p.datosGenerales = { ...p.datosGenerales, intervencion: "reforma", alcance: {} };
+      montar(<LoQueSeJustifica />, p);
+      const fila = screen.getByRole("link", { name: /HS4/ });
+      expect(within(fila).getByText("· a lo intervenido")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Opciones de aplicabilidad de HS4" }));
+      await user.click(screen.getByRole("menuitem", { name: "Ver el párrafo" }));
+      expect(screen.getByText(/DB-HS 4 Suministro de agua: se aplica/)).toBeVisible();
     });
 
     it("se cierra al pulsar fuera y con Escape; el botón lo alterna", async () => {

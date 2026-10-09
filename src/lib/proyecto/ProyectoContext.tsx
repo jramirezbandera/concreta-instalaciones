@@ -18,6 +18,7 @@ import type {
   JustificacionEnProyecto,
   JustificacionKey,
   Edificio,
+  Flexibilidad,
   Proyecto,
 } from "./tipos";
 import { contextoDe } from "./derivar";
@@ -61,7 +62,7 @@ export interface ProyectoContextValue {
   /** El edificio entero (feature-12). Edición del usuario → toca `modificado`. */
   actualizarEdificio(edificio: Edificio, nowIso: string): void;
   /** `valor: null` quita el forzado y vuelve a mandar `aplicabilidadBase`. */
-  forzarAplicabilidad(key: JustificacionKey, valor: Aplicabilidad | null, nota?: string): void;
+  forzarAplicabilidad(key: JustificacionKey, valor: Aplicabilidad | null, nota?: string, flexibilidad?: Flexibilidad): void;
   setRefExterna(key: JustificacionKey, ref: string): void;
   /** Marca (o desmarca) un aviso de una justificación como revisado (feature-14). */
   marcarRevisado(key: JustificacionKey, avisoId: string, revisado: boolean): void;
@@ -184,10 +185,10 @@ export function ProyectoProvider(props: {
   }, []);
 
   const forzarAplicabilidad = useCallback(
-    (key: JustificacionKey, valor: Aplicabilidad | null, nota?: string) => {
+    (key: JustificacionKey, valor: Aplicabilidad | null, nota?: string, flexibilidad?: Flexibilidad) => {
       setProyecto((prev) =>
         conJustificacion(prev, key, {
-          aplicabilidadForzada: valor === null ? undefined : { valor, nota },
+          aplicabilidadForzada: valor === null ? undefined : { valor, nota, ...(flexibilidad ? { flexibilidad } : {}) },
         }),
       );
     },

@@ -393,6 +393,11 @@ export function aplicabilidadEfectiva(
   if (forzada) {
     return { aplicabilidad: forzada.valor, nota: forzada.nota, forzada: true };
   }
+  return { ...aplicabilidadPropuesta(p, key), forzada: false };
+}
+
+/** Lo que propone el motor para una justificación, se haya forzado o no. */
+export function aplicabilidadPropuesta(p: Proyecto, key: JustificacionKey): AplicabilidadCalculada {
   const he4 = p.justificaciones.he4?.inputs as Partial<He4Estado> | undefined;
-  return { ...aplicabilidadBase(atributosDe(p.datosGenerales, p.edificio, he4, p.justificaciones))[key], forzada: false };
+  return aplicabilidadBase(atributosDe(p.datosGenerales, p.edificio, he4, p.justificaciones))[key];
 }

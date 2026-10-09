@@ -4,7 +4,10 @@ import { ChevronRight } from "lucide-react";
 import { useProyecto } from "../../lib/proyecto/ProyectoContext";
 import type { EstadoObra } from "../../lib/obra/evaluar";
 import { filasObra, recuentoObra, textoRecuento, type FilaObra, type PiezaObra } from "../../lib/obra/filas";
-import { MenuAplicabilidad, type AccionesAplicabilidad } from "./MenuAplicabilidad";
+import { aplicabilidadPropuesta } from "../../lib/proyecto/aplicabilidad";
+import type { Proyecto } from "../../lib/proyecto/tipos";
+import { EditorAplicabilidad } from "./EditorAplicabilidad";
+import { MenuAplicabilidad, type AccionesAplicabilidad, type AplicabilidadConParrafo } from "./MenuAplicabilidad";
 
 // =============================================================================
 // «Lo que se justifica» (feature-16 §B, maqueta v4 de La obra): todas las
@@ -73,6 +76,8 @@ function Cuerpo({ f, chevron }: { f: FilaObra; chevron: boolean }): JSX.Element 
       <span className="text-text-disabled font-mono text-[11px] whitespace-nowrap">{f.codigo}</span>
       <span className="text-text-primary min-w-0 text-[13px]">
         {f.titulo}
+        {f.aplicabilidad === "aplica_reformado" && <span className="text-accent ml-1.5 text-[10.5px] whitespace-nowrap">· a lo intervenido</span>}
+        {f.aplicabilidad === "aplica_flexibilidad" && <span className="text-accent ml-1.5 text-[10.5px] whitespace-nowrap">· con flexibilidad</span>}
         {f.forzada && <span className="text-state-warn ml-1.5 text-[10.5px] whitespace-nowrap">· forzado</span>}
       </span>
       <span className={PIEZAS_CELDA}>
@@ -85,18 +90,42 @@ function Cuerpo({ f, chevron }: { f: FilaObra; chevron: boolean }): JSX.Element 
   );
 }
 
+/** El párrafo de partida del editor: lo forzado o, si es el mismo caso, lo que propone la herramienta. */
+function notaDePartida(p: Proyecto, f: FilaObra, valor: AplicabilidadConParrafo): string | undefined {
+  const k = f.claves[0];
+  const forzada = p.justificaciones[k]?.aplicabilidadForzada;
+  if (forzada?.valor === valor) return forzada.nota;
+  const propuesta = aplicabilidadPropuesta(p, k);
+  return propuesta.aplicabilidad === valor ? propuesta.nota : undefined;
+}
+
 function FilaJustificacion({
   f,
   acciones,
   onReferencia,
 }: {
   f: FilaObra;
-  acciones: AccionesAplicabilidad;
+  acciones: Omit<AccionesAplicabilidad, "editar" | "verParrafo">;
   onReferencia: (f: FilaObra) => void;
 }): JSX.Element {
+  const { proyecto } = useProyecto();
   const [abierta, setAbierta] = useState(false);
+  const [editando, setEditando] = useState<AplicabilidadConParrafo | null>(null);
   const panelId = useId();
   const unica = f.claves.length === 1;
+  const existente = proyecto.datosGenerales.intervencion !== "obra_nueva";
+  const conParrafo = f.nota !== undefined;
+  const accionesFila: AccionesAplicabilidad = {
+    ...acciones,
+    editar: (_k, v) => {
+      setEditando(v);
+      setAbierta(false);
+    },
+    verParrafo: () => {
+      setEditando(null);
+      setAbierta((a) => !a);
+    },
+  };
 
   let principal: JSX.Element;
   if (f.ruta) {
@@ -150,11 +179,33 @@ function FilaJustificacion({
         {principal}
         <div className="flex w-9 shrink-0 items-center justify-center">
           {unica && (
-            <MenuAplicabilidad clave={f.claves[0]} codigo={f.codigo} forzada={f.forzada} acciones={acciones} />
+            <MenuAplicabilidad
+              clave={f.claves[0]}
+              codigo={f.codigo}
+              forzada={f.forzada}
+              existente={existente}
+              conParrafo={conParrafo}
+              acciones={accionesFila}
+            />
           )}
         </div>
       </div>
-      {f.estado === "no_aplica" && f.nota && (
+      {editando && (
+        <EditorAplicabilidad
+          key={editando}
+          clave={f.claves[0]}
+          nombre={`${f.codigo} ${f.titulo}`}
+          valor={editando}
+          nota={notaDePartida(proyecto, f, editando)}
+          flexibilidad={proyecto.justificaciones[f.claves[0]]?.aplicabilidadForzada?.flexibilidad}
+          onGuardar={(nota, flex) => {
+            acciones.forzar(f.claves[0], editando, nota, flex);
+            setEditando(null);
+          }}
+          onCancelar={() => setEditando(null)}
+        />
+      )}
+      {f.nota && !editando && (
         <div id={panelId} hidden={!abierta} className="text-text-secondary px-3.5 pb-3 text-[12.5px] leading-relaxed md:pl-[166px]">
           <p>{f.nota}</p>
           {f.cita && <p className="text-text-disabled mt-1 font-mono text-[10.5px]">{f.cita}</p>}
@@ -169,8 +220,8 @@ export function LoQueSeJustifica(): JSX.Element {
   const grupos = filasObra(proyecto);
   const recuento = textoRecuento(recuentoObra(proyecto));
 
-  const acciones: AccionesAplicabilidad = {
-    forzar: (key, valor, nota) => forzarAplicabilidad(key, valor, nota),
+  const acciones: Omit<AccionesAplicabilidad, "editar" | "verParrafo"> = {
+    forzar: (key, valor, nota, flex) => forzarAplicabilidad(key, valor, nota, flex),
   };
   const onReferencia = (f: FilaObra) => {
     const ref = window.prompt("Referencia del documento externo (expediente, archivo, código):", f.refExterna ?? "");

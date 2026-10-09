@@ -148,6 +148,32 @@ export interface DatosGenerales {
   alcance?: Alcance;
 }
 
+/**
+ * Motivo del criterio de flexibilidad (CTE Parte I art. 2.3; los dos últimos,
+ * solo DB-HE, Introducción IV, criterio 2 b y d). Feature-27.
+ */
+export type MotivoFlexibilidad =
+  | "urbanistica"
+  | "tecnica"
+  | "economica"
+  | "naturaleza"
+  | "proteccion"
+  | "sin_mejora"
+  | "otros_elementos";
+
+/** Lo que el proyectista escribe para justificar la flexibilidad. */
+export interface Flexibilidad {
+  motivo: MotivoFlexibilidad;
+  /** Por qué: «la fachada catalogada no admite aislamiento por el exterior». */
+  porque: string;
+  /** Las soluciones que se adoptan. */
+  soluciones: string;
+  /** El nivel de prestación que se alcanza. */
+  nivel: string;
+  /** Condicionantes de uso y mantenimiento, si los hay. */
+  condicionantes?: string;
+}
+
 // -----------------------------------------------------------------------------
 // ALCANCE DE UNA INTERVENCIÓN EN UN EDIFICIO EXISTENTE (feature-27, UX-RECONCEPT §5)
 // -----------------------------------------------------------------------------
@@ -281,8 +307,12 @@ export interface JustificacionEnProyecto {
   schemaVersion?: string;
   /** Campos del contexto heredado con override local declarado (viajan a la ficha como excepción). */
   overridesContexto?: string[];
-  /** Aplicabilidad FORZADA por el proyectista (prevalece sobre `aplicabilidadBase`). */
-  aplicabilidadForzada?: { valor: Aplicabilidad; nota?: string };
+  /**
+   * Aplicabilidad FORZADA por el proyectista (prevalece sobre `aplicabilidadBase`).
+   * Con flexibilidad (feature-27), lo que justifica el criterio; `nota` es el
+   * párrafo que se redacta con ello.
+   */
+  aplicabilidadForzada?: { valor: Aplicabilidad; nota?: string; flexibilidad?: Flexibilidad };
   /** Referencia de documento externo (p.ej. expediente HULC) para justificaciones `externo`. */
   refExterna?: string;
   /**

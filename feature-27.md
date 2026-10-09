@@ -221,3 +221,17 @@ Detalle al final de la verificación.
 - El alcance se crea con la primera respuesta: un proyecto de reforma que no toca el asistente
   sigue con «alcance pendiente».
 - Capturas con el navegador de gstack: sin errores de consola.
+
+### Paso 4 (hecho)
+
+- Menú ⋯ de cada fila de La obra: «Forzar aplica», y en un edificio existente «Aplica a lo
+  intervenido…» y «Aplica con flexibilidad…»; «Forzar no aplica…», «Ver el párrafo» y «Volver a la
+  propuesta». Se acabó el `window.prompt`: el párrafo se edita bajo la fila
+  ([EditorAplicabilidad.tsx](src/components/obra/EditorAplicabilidad.tsx)) y parte del que propone
+  la herramienta si es el mismo caso.
+- Flexibilidad ([flexibilidad.ts](src/lib/proyecto/flexibilidad.ts)): motivo, por qué, soluciones,
+  nivel y condicionantes; el párrafo D.0.3 se redacta solo, con la cita que admite cada DB (DB-SI
+  solo por protección; DB-SUA por razones técnicas, económicas o de protección; DB-HE con sus casos
+  b y d propios). No se guarda sin motivo, por qué, soluciones y nivel. Lo escrito se guarda en
+  `aplicabilidadForzada.flexibilidad` para poder editarlo.
+- Las filas marcan «· a lo intervenido» y «· con flexibilidad».

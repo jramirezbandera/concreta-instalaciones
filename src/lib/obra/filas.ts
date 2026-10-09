@@ -10,7 +10,7 @@
 
 import type { FilaQueEntra } from "../../components/justificacion/QueEntra";
 import { resumenEdificio, type ResumenEdificio } from "../edificio/derivar";
-import type { JustificacionKey, Proyecto } from "../proyecto/tipos";
+import type { Aplicabilidad, JustificacionKey, Proyecto } from "../proyecto/tipos";
 import { evaluarExpediente, type EstadoObra, type EvaluacionJustificacion } from "./evaluar";
 
 /** Una parte del edificio que entra: «6 viviendas», «garaje · bombeo». */
@@ -32,7 +32,9 @@ export interface FilaObra {
   ruta?: string;
   /** Lo forzó el proyectista. */
   forzada: boolean;
-  /** Párrafo del «no aplica», con su cita. */
+  /** Aplicabilidad efectiva (feature-27: «a lo intervenido», flexibilidad). */
+  aplicabilidad?: Aplicabilidad;
+  /** Párrafo de la aplicabilidad (el «no aplica», el acotamiento…), con su cita. */
   nota?: string;
   cita?: string;
   /** Externas: con qué se justifica y la referencia aportada. */
@@ -162,6 +164,7 @@ function filaDe(ev: EvaluacionJustificacion, p: Proyecto, r: ResumenEdificio): F
     titulo: e.label,
     piezas: [],
     forzada: ev.forzada,
+    aplicabilidad: ev.aplicabilidad,
     ...(ev.nota !== undefined ? { nota: ev.nota } : {}),
     ...(ev.cita !== undefined ? { cita: ev.cita } : {}),
   };
