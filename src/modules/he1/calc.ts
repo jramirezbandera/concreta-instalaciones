@@ -207,6 +207,11 @@ export interface CerramientoInput {
    */
   fRsiExento?: boolean;
   /**
+   * Glaser exento: el cerramiento lleva barrera contra el vapor en la cara
+   * caliente. «No es necesaria la comprobación» (DA DB-HE/2 §4.2.1, leído en el PDF).
+   */
+  glaserExento?: boolean;
+  /**
    * Encuentros (puentes térmicos lineales) asociados al cerramiento, para el
    * H_PT informativo. ψ §10 PENDIENTE de verificación literal (confianza BAJA).
    */
@@ -866,7 +871,7 @@ function calcularCerramiento(
   // No procede en huecos ni puertas (sin capas que difundan, §6.1); en las
   // particiones interiores no es exigible (el ap. 3.3 habla de la envolvente).
   const glaserAplica =
-    cer.tipoElemento !== "hueco" && cer.tipoElemento !== "puerta" && cer.tipoElemento !== "particion_interior";
+    cer.tipoElemento !== "hueco" && cer.tipoElemento !== "puerta" && cer.tipoElemento !== "particion_interior" && cer.glaserExento !== true;
   const glaserCalc = calcularGlaser(
     capas,
     rsi_m2K_W,

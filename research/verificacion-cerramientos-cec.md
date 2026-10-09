@@ -1,6 +1,6 @@
 # Verificación normativa: catálogo común de cerramientos del CEC para HE1, HR y HS1 (feature-26, paso 0)
 
-**Fecha:** 2026-10-05 · Agente: cte-normativa · **No se ha editado código.** Bloque H añadido el 2026-10-09.
+**Fecha:** 2026-10-05 · Agente: cte-normativa · **No se ha editado código.** Bloque H añadido el 2026-10-09. Bloque I (láminas y barrera de vapor) añadido el 2026-10-09.
 **Ámbito:** fijar, para cada fachada, cubierta, forjado y ventana del catálogo común, la composición por capas, la R0 de la fórmula del CEC, el grado de impermeabilidad que da el CEC y los rasgos que HS1 necesita, y comprobar si el cálculo por capas de HE1 reproduce el CEC. Bloques A a G del encargo, en ese orden. Los valores acústicos ya verificados (`research/verificacion-hr-cec.md`) solo se cotejan.
 
 **Regla de veredictos** (la misma que en `verificacion-hr-cec.md`):
@@ -17,7 +17,7 @@
 
 | Clave | Documento | Edición | Lectura en esta sesión |
 |---|---|---|---|
-| [CEC] | Catálogo de Elementos Constructivos del CTE (IETcc, CEPCO, AICIA) | «Versión preliminar: Marzo 10. Borrador», archivo CAT-EC-v06.3 (marzo 2010). Sin carácter reglamentario (avisos 1 a 5 de `verificacion-hr-cec.md` §0) | Imagen: pp. 17, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31, 32 (materiales); 37, 38, 41, 45, 46, 49 (cubiertas); 53 a 61, 63 a 69, 73, 75, 76 (fachadas); 90, 92, 93, 95 (ventanas); 114, 115 (particiones horizontales). Texto: cabeceras de pp. 39 a 51, 91, 94. **Bloque H (2026-10-09), imagen:** pp. 14, 37, 38, 39, 40, 42, 43, 44, 47, 48, 50, 51, 52 |
+| [CEC] | Catálogo de Elementos Constructivos del CTE (IETcc, CEPCO, AICIA) | «Versión preliminar: Marzo 10. Borrador», archivo CAT-EC-v06.3 (marzo 2010). Sin carácter reglamentario (avisos 1 a 5 de `verificacion-hr-cec.md` §0) | Imagen: pp. 17, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31, 32 (materiales); 37, 38, 41, 45, 46, 49 (cubiertas); 53 a 61, 63 a 69, 73, 75, 76 (fachadas); 90, 92, 93, 95 (ventanas); 114, 115 (particiones horizontales). Texto: cabeceras de pp. 39 a 51, 91, 94. **Bloque H (2026-10-09), imagen:** pp. 14, 37, 38, 39, 40, 42, 43, 44, 47, 48, 50, 51, 52. **Bloque I (2026-10-09), imagen:** pp. 9, 15, 22, 23, 37; **texto:** pp. 33 a 36 (3.20) |
 | [DA/1] | DA DB-HE/1 «Cálculo de parámetros característicos de la envolvente» | enero 2020 | No releído aquí; se usa lo ya codificado en `he1/tablas.ts` (Rsi/Rse Tabla 1, cámaras Tabla 2, ec. (10), Tabla 10) |
 | [HS1] | DB-HS1, tabla 2.7 y condiciones de fachada | La edición que usa el repo (`hs1/tablas.ts`, `hs1/condiciones.ts`, `research/verificacion-hs1.md`) | No releído aquí; se coteja con el repo |
 
@@ -332,7 +332,7 @@ VERIFICADO, p. 53 («4.2 Fachadas. Consideraciones previas»): B3 (revestimiento
 | K-CER.14 | Proyecto sin `cerramientos` | HE1 conserva sus composiciones de hoy, con sus λ, para que no cambie ningún veredicto; la corrección de B.3.3 se aplica solo a los proyectos con `cerramientos` (o se acepta el cambio y se dice en la ficha). Decisión del usuario | B.3.3, B.3.4 |
 | K-CER.15 | Fachada habitual | **F 3.2**, no F 3.1: es la composición que hoy calcula HE1 (con cámara) y tiene los mismos RA/RAtr/m que F 3.1 en HR | A.3.1 |
 
-Criterios propuestos en el bloque H (a validar): **K-CER.16** (tierra de la ajardinada), **K-CER.17** (capa de rodadura sin solución del CEC), **K-CER.18** (aislante de la lámina autoprotegida adherida). Ver H.6.
+Criterios propuestos en el bloque H (a validar): **K-CER.16** (tierra de la ajardinada), **K-CER.17** (capa de rodadura sin solución del CEC), **K-CER.18** (aislante de la lámina autoprotegida adherida). Ver H.6. Criterios propuestos en el bloque I (a validar): **K-CER.19** (Sd de la impermeabilización bituminosa), **K-CER.20** (Sd de la barrera de vapor), **K-CER.21** (qué hacer cuando Glaser condensa en enero con barrera). Ver I.6.
 
 ---
 
@@ -424,6 +424,121 @@ Capas de **interior a exterior** (leyenda del CEC: SR soporte resistente; FP for
 
 ---
 
+## Bloque I. Láminas de cubierta y barrera de vapor: µ y Sd para Glaser (2026-10-09)
+
+**Encargo:** HE1 modela hoy la impermeabilización y la barrera de vapor de la cubierta convencional como lámina bituminosa de 4 mm con **Sd 50 m** «orientativo, sin verificar» (`he1/envolvente.ts`, `cubiertaDe`). Con Sd 50 m en las dos láminas, la convencional de Burgos condensa en enero aun con barrera. Se pide sustituirlo por valores del CEC (3.20 y tablas de materiales) y recoger lo que digan el CEC y el DA DB-HE/2 sobre la barrera y el balance anual.
+
+**Lectura.** (1) **Imagen**: PNG de 200 ppp de la sesión 3ecb9da7 (`cec/pNNN.png`), mismo archivo CAT-EC-v06.3: pp. 9 (definición de µ), 15 (3.2 Metales), 22 (3.9.1 Plásticos), 23 (3.10 Cauchos, 3.11 Sellantes, 3.12 Bituminosos) y 37 (leyenda de 4.1.1). (2) **Texto**: pp. 33 a 36 (3.20) en `hr/cec_texto.txt` de la sesión b82be346. **Las pp. 33 a 36 no están renderizadas** en ningún scratchpad, y en esta sesión no se han podido renderizar: hay copia del PDF (`3ecb9da7/scratchpad/CEC.pdf`), pero la lectura de PDF por páginas falla por falta de `pdftoppm` y no hay shell. Por la misma razón el DA DB-HE/2 (`research/pdf/DA_DB-HE-2.pdf`, y la copia oficial de codigotecnico.org `/pdf/Documentos/HE/DA-DB-HE-2_-_Condensaciones.pdf`, 142,1 KB) **no se ha podido leer** en esta sesión: lo que se cita de él viene de `research/verificacion-he1-v4.md` (2026-10-04), que sí lo leyó.
+
+### I.1 Láminas y films en las tablas de materiales del CEC
+
+Sd = µ·e (DA DB-HE/2 ec. [18], `Sdn = en • µn`, cita de `verificacion-he1-v4.md` 6.1). El CEC no da espesores de lámina: los de esta tabla salen de 3.20 (I.2) o son criterio, y se dice en cada caso.
+
+| # | Material (fila del CEC) | Apartado, página | ρ [kg/m³] | λ [W/mK] | µ | Espesor | Sd = µ·e | Veredicto |
+|---|---|---|---|---|---|---|---|---|
+| I.1.1 | **Betún fieltro o lámina** | 3.12 Bituminosos, p. 23 | 1 100 | **0,23** | **50 000** | No lo da el CEC. Por masa nominal de 3.20 (e = m/ρ): monocapa 4 kg/m² → 3,6 mm; bicapa 6 kg/m² → 5,5 mm; 3 kg/m² → 2,7 mm | **182 m** / **273 m** / **136 m** | VERIFICADO (ρ, λ, µ); LEÍDO (texto) (masas, I.2.4); ARITMÉTICA (e y Sd) |
+| I.1.2 | Betún puro | 3.12, p. 23 | 1 050 | 0,17 | 50 000 | — | — | VERIFICADO |
+| I.1.3 | Asfalto | 3.12, p. 23 | 2 100 | 0,70 | 50 000 | (aglomerado, no lámina) | — | VERIFICADO |
+| I.1.4 | **Cloruro de polivinilo (PVC)** | 3.9.1 Plásticos, p. 22 | 1 390 | 0,17 | **50 000** | ≥ 1,2 mm (espesor efectivo de 3.20) | **60 m** | VERIFICADO (µ, λ); LEÍDO (texto) (espesor); ARITMÉTICA |
+| I.1.5 | Cloruro de polivinilo (PVC) + 40 % plastificante | 3.11 **Sellantes**, p. 23 | 1 200 | 0,14 | 100 000 | 1,2 mm | 120 m | VERIFICADO. Es la fila de sellantes, no de láminas: no usarla por defecto (INTERPRETACIÓN) |
+| I.1.6 | **Etileno propileno dieno monómero (EPDM)** | 3.10 Cauchos, p. 23 | 1 150 | 0,25 | **6 000** | ≥ 1,2 mm | **7,2 m** | VERIFICADO (µ, λ); LEÍDO (texto) (espesor); ARITMÉTICA |
+| I.1.7 | Polipropileno (PP), como aproximación de la «poliolefina» de 3.20 | 3.9.1, p. 22 | 910 | 0,22 | 10 000 | ≥ 1,2 mm | 12 m | VERIFICADO (fila PP); INTERPRETACIÓN (que una lámina de poliolefina se comporte como PP) |
+| I.1.8 | **Polietileno baja densidad (LDPE)** | 3.9.1, p. 22 | 920 | 0,33 | **100 000** | No lo da el CEC. Film de 0,2 mm (criterio) | **20 m** | VERIFICADO (µ, λ); CRITERIO (espesor); ARITMÉTICA |
+| I.1.9 | Polietileno alta densidad (HDPE) | 3.9.1, p. 22 | 980 | 0,50 | 100 000 | 0,2 mm (criterio) | 20 m | VERIFICADO; CRITERIO; ARITMÉTICA |
+| I.1.10 | **Aluminio** (la hoja de una barrera «con aluminio») | 3.2 Metales, p. 15 | 2 700 | 230 | **∞** | — | **∞** | VERIFICADO. El CEC no tiene la lámina con aluminio como producto: solo el metal |
+| I.1.11 | Espuma de polietileno | 3.11 Sellantes, p. 23 | 70 | 0,05 | 100 | — | — | VERIFICADO. No es barrera (se cita porque se usa como capa separadora) |
+
+| # | Afirmación | Veredicto | Detalle |
+|---|---|---|---|
+| I.1.12 | **El CEC no tiene ninguna fila de «barrera de vapor»**, ni de lámina bituminosa por tipo (oxiasfalto, betún modificado SBS o APP, mono o bicapa), ni de lámina con aluminio. Para todo lo bituminoso hay un único µ: **50 000** («Betún fieltro o lámina») | VERIFICADO (pp. 22, 23: tablas completas de plásticos, cauchos, sellantes y bituminosos); LEÍDO (texto) (búsqueda de «barrera», «vapor», «Sd», «aluminio», «oxiasfalto» en todo el catálogo) | Las únicas otras apariciones de «barrera contra el vapor» son las leyendas B de las cubiertas y fachadas |
+| I.1.13 | El µ del CEC es el **seco**: «iii) el factor de resistencia a la difusión del vapor de agua: seco, µ, adimensional» | VERIFICADO | 1 «Estructura del catálogo», p. 9 |
+| I.1.14 | El EPDM del CEC (µ 6 000) deja pasar **unas 40 veces más vapor** que una bicapa bituminosa (7,2 m frente a 273 m), y el PVC (60 m) unas 4,5 veces más | ARITMÉTICA | Relevante para Glaser: con una impermeabilización sintética la convencional condensa mucho menos que con bituminosa (I.4) |
+
+### I.2 Qué da el apartado 3.20
+
+| # | Afirmación | Veredicto | Detalle |
+|---|---|---|---|
+| I.2.1 | Las cubiertas remiten a 3.20 para la impermeabilización: «(1) Las características de la capa de impermeabilización están definidas en el apartado 3.20» | VERIFICADO | 4.1.1 nota (1), p. 37 |
+| I.2.2 | 3.20 «Propiedades de la capa de impermeabilización de cubiertas»: 3.20.1 planas (pp. 33–34) y 3.20.2 inclinadas (pp. 35–36). Tablas por tipo de cubierta (plana convencional con capa de protección, transitable o no; plana invertida; plana convencional autoprotegida no transitable; con lámina vista; inclinadas) y por tipo de lámina (material bituminoso monocapa y bicapa, PVC, EPDM, poliolefina) | LEÍDO (texto) | Índice del CEC (3.20, 3.20.1, 3.20.2) y pp. 33–36 |
+| I.2.3 | **3.20 no da λ, µ ni Sd.** Las propiedades que lista son: espesor efectivo, masa nominal, estanquidad, comportamiento frente a un fuego externo (BROOF(t1) en las vistas), resistencia a la penetración de raíces, flexibilidad a bajas temperaturas, resistencia a la fluencia a elevadas temperaturas, estabilidad dimensional, envejecimiento artificial, tracción (fuerza y elongación), carga estática, impacto y exposición UV | LEÍDO (texto), pp. 33 a 36 | Ninguna fila con «µ», «vapor» ni «difusión» en el texto de esas cuatro páginas. Para darlo como VERIFICADO hay que ver las páginas en imagen |
+| I.2.4 | **Bituminosa, cubierta plana convencional con capa de protección: masa nominal 4 kg/m² la monocapa y 6 kg/m² la bicapa**; las sintéticas (PVC, EPDM, poliolefina), espesor efectivo ≥ 1,2 mm | LEÍDO (texto), p. 33 (se repite en la autoprotegida y en la invertida, pp. 33–34) | Columnas «monocapa (1)(9)» y «bicapa (2)(3)»; fila «masa nominal (kg/m2) (4)»: «4», «6 (9)» (en la invertida, «6 (8)»). La asignación de cada cifra a su columna sale del orden del texto extraído: INTERPRETACIÓN hasta verlo en imagen |
+| I.2.5 | Notas de 3.20.1: «(1) Puede realizarse una monocapa mejorada mediante la colocación adicional de una lámina de oxiasfalto de masa nomina≥3 kg/m2»; «(2) Una de las láminas debe tener al menos una armadura de fieltro de poliéster»; «(3) Los valores especificados deben cumplirse por al menos una de las láminas del sistema»; «(4) La masa de las láminas acabadas con gránulos minerales se incrementará en en 1 kg/m2 sobre la nominal indicada»; «(5) Valor sólo aplicable a la lámina superior en cubiertas ajardinadas»; (9) cubiertas para vehículos: bicapa, y junto a ella «Cuando se utilice una membrana bicapa, ésta debe tener una masa nominal≥7,0 kg/m2», «La resistencia al impacto debe ser ≥ 2000 mm», «La resistencia a tracción debe ser ≥ 400 N/50mm», «La resistencia a una carga estática debe ser ≥ 25 kg» | LEÍDO (texto), p. 34 | Que las cuatro condiciones pertenezcan a la nota (9) es INTERPRETACIÓN (el texto extraído las da sueltas) |
+| I.2.6 | Inclinadas (3.20.2): bituminosa monocapa con masa nominal 3 kg/m² («3(2)»); «(2) La masa nominal de las láminas autoadhesivas será ≥ 1,5 kg/m2» | LEÍDO (texto), pp. 35–36 | Fuera de este encargo (cubierta plana) |
+| I.2.7 | El espesor de una lámina bituminosa se obtiene aquí como **e = masa nominal / ρ**, con ρ = 1 100 kg/m³ de «Betún fieltro o lámina» (3.12) | ARITMÉTICA (regla) + INTERPRETACIÓN | El CEC no da ese espesor ni esa regla. La armadura y los gránulos no se descuentan. Como la masa de 3.20 es un **mínimo**, el Sd que sale es también un mínimo del sistema que cumple 3.20 |
+
+### I.3 Barrera de vapor: qué es y cuándo hace falta
+
+| # | Afirmación | Veredicto | Detalle |
+|---|---|---|---|
+| I.3.1 | CEC, leyenda de las cubiertas planas convencionales: «B barrera contra el vapor en cubierta convencional. Sólo si hay riesgo de condensación según lo dispuesto en el Documento Básico DB HE-1 Limitación de la demanda energética». En la invertida, la capa separadora bajo protección «será difusora de vapor» | VERIFICADO | 4.1.1, p. 37 (igual en 4.1.6 y 4.1.7, H.4.3). El CEC **no** dice qué Sd debe tener la barrera |
+| I.3.2 | DB-HS1, cubiertas: barrera contra el vapor **inmediatamente debajo del aislante** cuando el cálculo de HE 1 prevea condensaciones en él | VERIFICADO en `verificacion-hs1.md` 7.11 ([HS22] p. 28), no releído aquí | DB-HS1 ap. 2.4.2 b) |
+| I.3.3 | DB-HS1: «Los productos para la barrera contra el vapor se definen mediante la resistencia al paso del vapor de agua (MN·s/g ó m2·h·Pa/mg).» | LEÍDO (texto) | DB-HS1 ap. 4.1.1 párr. 3 (texto extraído del DB HS, p. 39). No da un valor mínimo |
+| I.3.4 | DA DB-HE/2 (octubre 2013), Apéndice A: barrera de vapor = elemento con **resistencia a la difusión > 10 MN·s/g (= 2,7 m²·h·Pa/mg)** | Cita de `verificacion-he1-v4.md` §2 (fuente F3, leída el 2026-10-04); **no releído aquí** | Es el umbral para llamar «barrera» a una capa, no un Sd de cálculo |
+| I.3.5 | En Sd, ese umbral es **≈ 2 m** | ARITMÉTICA con δ0 = 2·10⁻¹⁰ kg/(m·s·Pa) (permeabilidad del aire de UNE-EN ISO 10456 / 13788: **criterio externo, no leído aquí**) | 10 MN·s/g = 10¹⁰ m²·s·Pa/kg; × 2·10⁻¹⁰ = 2,0 m (con 2,7 m²·h·Pa/mg: 1,94 m). Todas las láminas de I.1 lo superan, también el EPDM (7,2 m) y el film de PE (20 m): todas «son barrera» según la definición. Para Glaser hace falta su Sd real |
+| I.3.6 | DB-HE 2019, 5.1: «Los productos para los cerramientos se definen mediante su conductividad térmica λ (W/m·K), su emisividad ε, si fuese particularmente relevante, y el factor de resistencia a la difusión del vapor de agua μ» (párr. 2); «Los valores de diseño de las propiedades citadas deben obtenerse de valores declarados por el fabricante para cada producto» (párr. 5) | LEÍDO (texto) (texto extraído del DB-HE, p. 19); párr. 5 VERIFICADO en `verificacion-he1-v4.md` 5.4 | El µ o Sd del CEC es un valor por defecto; el del fabricante manda |
+| I.3.7 | DB-HE 2019, 3.3: «En el caso de que se produzcan condensaciones intersticiales en la envolvente térmica del edificio, estas serán tales que no produzcan una merma significativa en sus prestaciones térmicas o supongan un riesgo de degradación o pérdida de su vida útil. En ningún caso, la máxima condensación acumulada en cada periodo anual podrá superar la cantidad de evaporación posible en el mismo periodo.» | LEÍDO (texto) aquí; VERIFICADO en `verificacion-he1-v4.md` 6.3 (F1 p. 18) | La exigencia es el **balance anual**, no «no condensar en enero» |
+| I.3.8 | DA DB-HE/2 §4.2.1: **no sería necesaria la comprobación de condensación intersticial en los cerramientos con barrera contra el vapor en la cara caliente** (además de los que están en contacto con el terreno) | **LEÍDO (texto)** el 2026-10-09 en `research/pdf/DA_DB-HE-2.pdf` (pdftotext), p. 6 | Literal: «No es necesaria la comprobación aquellos cerramientos en contacto con el terreno y los cerramientos que dispongan de barrera contra el vapor de agua en la parte caliente del cerramiento.» Y sigue: «En caso de que se produzcan condensaciones intersticiales en una capa distinta a la de aislamiento, se aconseja evitar que la cantidad de agua condensada en cada periodo anual supere la cantidad de agua evaporada posible en el mismo periodo. Para ello, se puede repetir el procedimiento [...] para cada mes del año [...] Como criterio general y salvo justificación expresa, no es recomendable admitir la presencia de agua condensada en los materiales aislantes.» §4.2.5: la barrera «se debe colocar en la cara caliente del cerramiento». Apéndice A: barrera, «resistencia a la difusión de vapor mayor que 10 MN·s/g equivalente a 2,7 m2·h·Pa/mg» (la de 3 kg/m², Sd ≈ 136 m, lo supera de largo) |
+| I.3.9 | Procedimiento mensual del DA/2 (cantidad condensada y evaporada mes a mes) | **LEÍDO (texto)**, p. 6 | Solo como consejo («se aconseja», «se puede repetir el procedimiento [...] para cada mes del año»), cuando condensa en una capa distinta del aislante; no da el método de acumulación |
+
+### I.4 Glaser de enero con los valores del CEC (Burgos)
+
+**Regla (ARITMÉTICA).** En la convencional, el plano crítico es la cara inferior de la impermeabilización (cara fría del aislante). No condensa si Pe + (Pi − Pe)·Sd_I/Sd_T ≤ Psat(θc), es decir, si
+
+**Sd_int ≥ k · Sd_I**, con **k = (Pi − Psat(θc)) / (Psat(θc) − Pe)**,
+
+donde Sd_I es el Sd de la impermeabilización y Sd_int la suma de los Sd de todo lo que queda por debajo (enlucido, forjado, pendientes, barrera y aislante). Solo importa el **cociente** entre los dos lados, no el valor absoluto.
+
+**Datos.** Burgos, enero (DA DB-HE/2 Tabla C.1, la del repo, `CLIMA_TABLA_C1`): θe 2,6 °C, HR 86 % → Psat 736 Pa, **Pe 633 Pa**. Interior 20 °C, 55 % → **Pi 1 285 Pa**. Psat con las ec. [3]/[4] del DA/2. U de la cubierta 0,33 (Ulim UC de la zona E). θc = θe + U·(Rse + R_I)·(θi − θe), con Rse 0,04 y R_I = e/0,23 → θc ≈ 2,9–3,0 °C → Psat(θc) ≈ 753–756 Pa. **k ≈ 4,3** (bicapa) **a 4,4** (monocapa o lámina de 4 mm). Resto de capas del repo bajo el aislante (`cubiertaDe`): enlucido 15 mm (µ 6) 0,09 m + forjado FU BH 300 (µ 80, K-CER.11) 24 m + pendientes 100 mm (µ 80, el que usa hoy el repo) 8 m = **32 m**; con XPS de 100 mm (µ 150) **47 m**; con lana mineral, 32 m.
+
+| Impermeabilización | Sd_I | k | Sd_int mínimo | **Sd de barrera necesario** (XPS 100 / MW) | Veredicto |
+|---|---|---|---|---|---|
+| Bituminosa **bicapa** 6 kg/m² (CEC) | 273 m | 4,32 | 1 180 m | **≈ 1 130 m / 1 150 m** | ARITMÉTICA |
+| Bituminosa **monocapa** 4 kg/m² (CEC) | 182 m | 4,43 | 806 m | **≈ 760 m / 775 m** | ARITMÉTICA |
+| Modelo de hoy (Sd 50 m) | 50 m | 4,4 | 220 m | ≈ 175 m / 190 m | ARITMÉTICA |
+| PVC 1,2 mm (CEC) | 60 m | 4,4 | 265 m | ≈ 220 m / 235 m | ARITMÉTICA |
+| EPDM 1,2 mm (CEC) | 7,2 m | 4,4 | 32 m | **0**: no hace falta barrera (el resto ya da 32–47 m) | ARITMÉTICA |
+
+Barreras disponibles con valores del CEC: film de PE 0,2 mm **20 m**; lámina bituminosa de 3 kg/m² **136 m**; de 4 kg/m² **182 m**; con aluminio, µ ∞ (Sd solo del fabricante).
+
+| # | Afirmación | Veredicto | Detalle |
+|---|---|---|---|
+| I.4.1 | **Con los valores del CEC, en Burgos ninguna barrera sin aluminio evita la condensación de enero bajo una impermeabilización bituminosa.** Pasar de «Sd 50 m» a valores del CEC no lo arregla: lo empeora, porque la impermeabilización sube más (273 m) que la barrera (136 m) | ARITMÉTICA | Con barrera e impermeabilización del mismo Sd, el cociente es Sd_I/(2·Sd_I + resto) < 0,5; en Burgos el máximo admisible es f = (Psat(θc) − Pe)/(Pi − Pe) ≈ 0,19 |
+| I.4.2 | En clima templado la misma cubierta no condensa. **Cáceres** (7,8 °C, 78 %; U 0,40): Pe 825 Pa, θc ≈ 8,1 °C, Psat(θc) ≈ 1 080 Pa → f ≈ 0,55; bicapa 273 + barrera 136 + resto 47: 273/456 = 0,60 > 0,55 → condensa por poco; con barrera de igual Sd que la bicapa (273): 273/593 = 0,46 < 0,55 → **no condensa** | ARITMÉTICA | El resultado depende de la provincia: no se puede fijar «con barrera, nunca condensa» |
+| I.4.3 | Las únicas formas de que Glaser de enero dé «sin condensación» en Burgos son: barrera con aluminio (Sd declarado ≥ ≈ 1 150 m), impermeabilización sintética de poco Sd (EPDM), o la cubierta **invertida** | ARITMÉTICA | La invertida lleva la impermeabilización en la cara caliente: el Sd alto de la lámina favorece |
+
+### I.5 Balance anual (estimación)
+
+**Regla (ARITMÉTICA, estimación propia, no el procedimiento literal del DA/2, que está PENDIENTE: I.3.9).** Plano de condensación fijo bajo la impermeabilización; flujo de cada mes g = δ0·[(Pi − Psat(θc))/Sd_int − (Psat(θc) − Pe)/Sd_I] (positivo: condensa; negativo: capacidad de evaporación); meses de igual duración (2,63·10⁶ s); sin radiación solar sobre la cubierta (lado seguro en verano); clima de la Tabla C.1 del repo para Burgos. δ0 se anula en el cociente condensación/evaporación.
+
+| Caso (Burgos, XPS 100) | Meses que condensan | Σ condensación | Σ evaporación posible (mayo–octubre) | Cociente | Veredicto |
+|---|---|---|---|---|---|
+| Bicapa 273 m + barrera bituminosa 136 m | nov–abr (abril casi nulo) | 8,8 → **≈ 4,6 g/m²** | 27,9 → **≈ 14,7 g/m²** | 0,32 | ARITMÉTICA: el balance del DB-HE 3.3 se cumple con holgura |
+| Bicapa 273 m sin barrera | nov–abr | 46,8 → ≈ 25 g/m² | 70,9 → ≈ 37 g/m² | 0,66 | ARITMÉTICA: también se cumpliría, con menos margen |
+
+(Unidades de la columna: Pa/m·mes y, tras la flecha, g/m² con δ0 = 2·10⁻¹⁰ kg/(m·s·Pa), criterio externo.)
+
+| # | Afirmación | Veredicto | Detalle |
+|---|---|---|---|
+| I.5.1 | **El Glaser de enero no decide el cumplimiento del DB-HE 3.3**: decide el balance anual. Con los valores del CEC, la convencional de Burgos con barrera bituminosa condensa en enero pero evaporaría en el año unas tres veces lo condensado | ARITMÉTICA (estimación) | Coincide con lo que ya dice `he1/textos.ts`: «El DB admite que la haya si se evapora a lo largo del año». Para afirmarlo en la ficha hace falta el cálculo mensual del DA/2 |
+| I.5.2 | La barrera sigue siendo obligatoria en ese caso por **HS1** (2.4.2 b: Glaser prevé condensación en el aislante), aunque HE1 cumpla por balance | INTERPRETACIÓN (I.3.2 + I.3.7) | Dos comprobaciones distintas: HS1 pide la barrera; HE1 3.3 juzga el balance |
+
+### I.6 Propuesta para HE1
+
+| Capa | Propuesta | λ | µ | e | Sd | Justificación | Veredicto |
+|---|---|---|---|---|---|---|---|
+| (a) **Impermeabilización bituminosa** de la plana convencional | **Bicapa de 6 kg/m²**, modelada **por µ** con la fila «Betún fieltro o lámina» (no por Sd declarado) | 0,23 | 50 000 | **5,5 mm** | **≈ 273 m** | µ y ρ del CEC (3.12); masa mínima de la bicapa en 3.20.1; e = m/ρ. Bicapa porque en la convencional la lámina está en la cara fría y **más Sd es lado seguro** para Glaser; es además la que 3.20 exige con vehículos (nota (9)). Alternativa monocapa 4 kg/m²: 3,6 mm, ≈ 182 m. En la invertida (lámina en la cara caliente) el lado seguro sería la monocapa, pero ahí no hay condensación con ninguna de las dos (I.4.3) | VERIFICADO (λ, µ, ρ, p. 23); LEÍDO (texto) (6 kg/m², p. 33); ARITMÉTICA; **CRITERIO K-CER.19** |
+| (b) **Barrera de vapor** bajo el aislante | **Lámina bituminosa sin aluminio de 3 kg/m²**, por µ con la misma fila | 0,23 | 50 000 | **2,7 mm** | **≈ 136 m** | El CEC no tiene barreras (I.1.12) ni masa para ellas; 3 kg/m² es la única masa «ligera» de 3.20 (la lámina de oxiasfalto de la nota (1)). En la barrera, **menos Sd es lado seguro**, así que se toma la más ligera de las bituminosas. Alternativas: film de PE 0,2 mm (20 m, peor); barrera con aluminio, **solo con el Sd declarado por el fabricante** (el CEC da µ ∞ al aluminio y el motor no debe tomar ∞) | VERIFICADO (λ, µ); LEÍDO (texto) (3 kg/m², nota (1), p. 34); ARITMÉTICA; **CRITERIO K-CER.20** |
+
+| # | Caso | Propuesta | Por qué |
+|---|---|---|---|
+| K-CER.19 | Sd de la impermeabilización bituminosa | Capa «Betún fieltro o lámina» (CEC 3.12: λ 0,23, µ 50 000) de **5,5 mm** (bicapa de 6 kg/m², 3.20.1) → Sd ≈ 273 m. Editable: monocapa (3,6 mm), sintética (PVC 1,2 mm µ 50 000; EPDM 1,2 mm µ 6 000) o Sd del fabricante. Ficha: «CEC 3.12 y 3.20.1; espesor por masa nominal (criterio)» | I.1, I.2, I.6 |
+| K-CER.20 | Sd de la barrera de vapor | Capa «Betún fieltro o lámina» de **2,7 mm** (3 kg/m²) → Sd ≈ 136 m. Opción «barrera con aluminio» que **obliga** a declarar el Sd del producto. Ficha: «barrera de vapor: lámina bituminosa, µ del CEC 3.12; espesor de 3 kg/m² (criterio)» | I.1.10, I.1.12, I.6 |
+| K-CER.21 | Glaser condensa en enero con la barrera puesta | No dar NO CUMPLE por eso. Opciones, por orden: (1) **calcular el balance de los 12 meses** con la Tabla C.1 que ya está en el repo y dar el veredicto del DB-HE 3.3 (condensación anual ≤ evaporación anual), rotulando el método; (2) mientras no exista, aviso «requiere comprobación del balance anual (DA DB-HE/2)», como hoy; (3) la exención de I.3.8 **solo** tras leer el párrafo literal del DA/2. En los tres casos HS1 mantiene la barrera (I.5.2). Decisión del usuario. **Resuelto (2026-10-09), opción (3)**: con I.3.8 leído, HE1 no comprueba Glaser en la cubierta con barrera en la cara caliente (`glaserExento`) | I.4, I.5 |
+
+Notas para `motor-calculo` (sin tocar código aquí): `cubiertaDe` usa hoy `sd_m: 50` para las dos láminas; con K-CER.19/20 pasarían a µ·e. El texto de `he1/textos.ts` y `he1/ficha.ts` que dice «Sd 50 m (orientativo)» tendría que cambiar a la cita del CEC. Como el EPDM del CEC no necesita barrera en Burgos, convendría que la impermeabilización fuese elegible.
+
+---
+
 ## Correcciones o matices al plan de feature-26.md
 
 1. **La fachada habitual debe ser F 3.2, no F 3.1.** La de HE1 lleva cámara de 30 mm (F 3.2, R0 0,71); F 3.1 no tiene cámara (R0 0,54). En HR valen lo mismo (48 [49] / 45 [46] / 220 [240]), así que HR no cambia; en HS1, F 3.2 da B2 (grado 4 con R1) y F 3.1 B1 (grado 3). (A.3.1, K-CER.15)
@@ -441,16 +556,20 @@ Capas de **interior a exterior** (leyenda del CEC: SR soporte resistente; FP for
 13. **Capa de rodadura: el CEC no tiene solución** (todas sus transitables son «Transitable peatón»). Si se quiere conservar en HS1, decidir K-CER.17. (H.1.1)
 14. **Ajardinada (C 7.3)**: el CEC la llama no transitable, como el criterio del repo; su R0_paquete de 0,82 supone unos 30 cm de tierra y no es lado seguro con sustratos finos. Decidir K-CER.16. (H.4.5, H.5)
 15. **Lámina autoprotegida (C 6.3)**: solo convencional y con pendiente del 1 al 5 % (el DB admite hasta el 15 %); con lámina adherida, aislante soldable. (H.4.1, H.4.7, H.4.8)
+16. **Láminas de cubierta**: el CEC no tiene barreras de vapor ni da µ en 3.20; sí da µ 50 000 para la lámina bituminosa (3.12), 50 000 para el PVC, 6 000 para el EPDM, 100 000 para el polietileno y ∞ para el aluminio. Con esos valores (bicapa ≈ 273 m, barrera bituminosa ≈ 136 m) **la convencional de Burgos sigue condensando en enero**: haría falta una barrera de ≈ 1 150 m (solo con aluminio). La salida reglamentaria es el **balance anual** del DB-HE 3.3, que por estimación se cumple con holgura. Decidir K-CER.19 a K-CER.21. (I.4, I.5, I.6) **Hecho (2026-10-09):** HE1 usa K-CER.19 y K-CER.20 (µ 50 000; 5,5 y 2,7 mm) y, para K-CER.21, la exención literal del DA/2 §4.2.1 (I.3.8).
 
 ## PENDIENTES
 
 - **Definiciones de B1, B2, C2 y H1 del CEC**: no están en la p. 52, que es «Cubiertas 16» (C 14.5 y C 14.6), VERIFICADO en imagen el 2026-10-09. Las consideraciones previas de fachadas empiezan en la p. 53 (F.2); falta localizar dónde define el CEC esas cuatro (o confirmar que no las define).
 - **DB-HS1, texto de B2** («cámara por el lado exterior del aislante»): no releído aquí (F.4.4).
 - **DA DB-HE/1, regla de cámaras muy ventiladas** (Rse = Rsi, se excluyen las capas exteriores): aquí solo por aritmética sobre el CEC; leerla en el DA antes de citarla en la ficha.
-- **Cubiertas**: todas las tablas de 4.1 (4.1.1 a 4.1.14, pp. 37 a 52) leídas ya en imagen (bloques C y H). Solo queda en texto la p. 34 (3.20: nota (9) de la impermeabilización bicapa para cubiertas transitables para vehículos y nota (5) de resistencia a raíces).
+- **Cubiertas**: todas las tablas de 4.1 (4.1.1 a 4.1.14, pp. 37 a 52) leídas ya en imagen (bloques C y H). Queda en texto todo 3.20 (pp. 33 a 36): masas de 4 y 6 kg/m², espesor ≥ 1,2 mm de las sintéticas, nota (1) del oxiasfalto de 3 kg/m², nota (5) de raíces y nota (9) de la bicapa para vehículos.
+- **3.20 impermeabilizaciones**: leídas en texto (bloque I, 2026-10-09). **No dan λ, µ ni Sd**; los µ salen de las tablas de materiales (pp. 15, 22, 23, VERIFICADO). Falta verlas en imagen para: (a) confirmar que no hay ninguna fila de µ o Sd; (b) confirmar a qué columna va cada masa (4 monocapa, 6 bicapa). No están renderizadas en ningún scratchpad (`3ecb9da7/scratchpad/cec/` salta de p032 a p037) y en esta sesión la lectura de PDF falla (falta `pdftoppm`). Para renderizarlas: `pdftoppm -r 200 -f 33 -l 36 -png CEC.pdf p` sobre `…\3ecb9da7-…\scratchpad\CEC.pdf`.
+- **DA DB-HE/2 (oct. 2013)**: no se ha podido leer en esta sesión (mismo motivo; la descarga de codigotecnico.org llega como binario sin texto). **Leído después en texto (2026-10-09, `research/pdf/DA_DB-HE-2.pdf` con pdftotext):** Apéndice A, §4.2.1 (I.3.8) y §4.2.5; el procedimiento mensual es solo un consejo (I.3.9).
+- **δ0 = 2·10⁻¹⁰ kg/(m·s·Pa)** (conversión de I.3.5 y gramos de I.5): es de UNE-EN ISO 10456 / 13788, no leído aquí. No afecta a los veredictos (en I.5 se anula en el cociente).
+- **Espesor de las barreras y de los films**: el CEC no los da. Los 3 kg/m² (barrera bituminosa) y 0,2 mm (film de PE) son criterio (K-CER.20). En proyecto, el Sd del fabricante.
 - **Fachadas no leídas en imagen**: F 3.28 a F 3.37 (p. 62), 4.2.6 resto y notas (pp. 70–72), 4.2.7 F 7.7 a F 7.15 (p. 74), 4.2.9 (p. 77).
 - **Ventanas**: RPT 4–12 (p. 91), PVC dos cámaras (p. 94) y ventanas dobles (p. 96) solo en texto.
-- **3.20 impermeabilizaciones** (λ, µ o Sd de láminas): pp. 33–36 no renderizadas.
 - **4.5.1 resto y nota (8) HE** (R_AR de los materiales de impactos, S02, S03): pp. 116–117 no leídas en esta sesión.
 - **Preámbulo (p. 3)**: sigue leído solo en texto.
-- **Bloque H**: las imágenes son renders de una sesión anterior del mismo PDF; no se ha vuelto a descargar ni a renderizar en esta sesión (sin shell). Si se quiere trazabilidad completa, re-renderizar pp. 14, 39, 40, 42, 43, 44, 47, 48, 50, 51, 52 y comprobar que coinciden.
+- **Bloques H e I**: las imágenes son renders de una sesión anterior del mismo PDF; no se ha vuelto a descargar ni a renderizar (sin shell). Si se quiere trazabilidad completa, re-renderizar pp. 9, 14, 15, 22, 23, 33 a 36, 37, 39, 40, 42, 43, 44, 47, 48, 50, 51, 52 y comprobar que coinciden.

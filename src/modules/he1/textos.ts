@@ -144,7 +144,17 @@ function filasCondensacion(j: JustificacionHe1, rol: RolCerramiento): { k: strin
       k: "Condensación superficial",
       v: r.fRsiAplica ? `fRsi ${n2(r.fRsi)} ${r.cumpleFRsi ? "≥" : "<"} ${n2(r.fRsiMin)}` : "no se comprueba",
     },
-    { k: "Condensación intersticial", v: !r.glaserAplica ? "no procede" : r.glaser.condensaIntersticial ? "posible · revisar" : "no hay · Glaser" },
+    {
+      k: "Condensación intersticial",
+      v:
+        rol === "cubierta" && j.propuesta.montajeCubierta.barrera
+          ? "no se comprueba · barrera de vapor en la cara caliente (DA DB-HE/2 §4.2.1)"
+          : !r.glaserAplica
+            ? "no procede"
+            : r.glaser.condensaIntersticial
+              ? "posible · revisar"
+              : "no hay · Glaser",
+    },
   ];
 }
 
@@ -191,7 +201,7 @@ export function franjaDe(el: ElementoHe1, j: JustificacionHe1, estado: EstadoPre
           clase: "Cubierta",
           titulo: inclinada ? "Cubierta inclinada" : `Cubierta plana ${montajeEnTexto(j)}`,
           unidad,
-          manda: `El aislante: ${aislanteCubiertaDe(j)} de ${a?.espesor_mm ?? 0} mm ${inclinada ? "sobre el forjado, bajo la teja" : j.propuesta.montajeCubierta.invertida ? "sobre la impermeabilización" : j.propuesta.montajeCubierta.barrera ? "bajo la impermeabilización, sobre una barrera de vapor: sin ella, Glaser prevé condensaciones" : "bajo la impermeabilización"}.${desde}${porFRsi}`,
+          manda: `El aislante: ${aislanteCubiertaDe(j)} de ${a?.espesor_mm ?? 0} mm ${inclinada ? "sobre el forjado, bajo la teja" : j.propuesta.montajeCubierta.invertida ? "sobre la impermeabilización" : j.propuesta.montajeCubierta.barrera ? "bajo la impermeabilización, sobre una barrera de vapor: sin ella, Glaser prevé condensaciones; con ella, no es necesaria la comprobación (DA DB-HE/2 §4.2.1)" : "bajo la impermeabilización"}.${desde}${porFRsi}`,
           filas: [
             limite,
             { k: "Forjado", v: `${j.propuesta.tipos.forjado.nombre} · R ${n2(j.propuesta.tipos.forjado.R)}` },
@@ -364,12 +374,10 @@ export function textoAviso(a: Aviso, j: JustificacionHe1): TextoAviso {
   }
   if (a.id.startsWith("intersticial-")) {
     const rol = String(a.datos.rol) as RolCerramiento;
-    const conBarrera = rol === "cubierta" && j.propuesta.montajeCubierta.barrera;
     return {
       titulo: `Puede condensar dentro de ${NOMBRE_ROL[rol]} en enero.`,
-      detalle: conBarrera
-        ? "Glaser marca condensación en el mes más frío aun con la barrera de vapor bajo el aislante (lámina con Sd 50 m, orientativo). El DB admite que la haya si se evapora a lo largo del año: hay que comprobar el balance anual (DA DB-HE/2) o usar una barrera de más Sd, con el dato del producto, o la cubierta invertida."
-        : "Glaser marca condensación en el mes más frío. El DB admite que la haya si se evapora a lo largo del año: hay que comprobar el balance anual (DA DB-HE/2) o poner una barrera de vapor en la cara caliente.",
+      detalle:
+        "Glaser marca condensación en el mes más frío. El DB admite que la haya si se evapora a lo largo del año: hay que comprobar el balance anual (DA DB-HE/2) o poner una barrera de vapor en la cara caliente.",
     };
   }
   return { titulo: "Revisa la envolvente.", detalle: "" };

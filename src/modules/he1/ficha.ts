@@ -182,7 +182,7 @@ export function toFichaData(j: JustificacionHe1, o: OpcionesFichaHe1): FichaData
     ...(j.propuesta.montajeCubierta.invertida
       ? []
       : [
-          "Criterio: la cubierta convencional lleva barrera de vapor bajo el aislante solo si, sin ella, Glaser prevé condensaciones (CEC: «solo si hay riesgo de condensación según el DB HE-1»); la barrera y la impermeabilización, láminas bituminosas con Sd 50 m (orientativo).",
+          "Criterio: la cubierta convencional lleva barrera de vapor bajo el aislante solo si, sin ella, Glaser prevé condensaciones (CEC: «solo si hay riesgo de condensación según el DB HE-1»); con ella, la comprobación no es necesaria (DA DB-HE/2 §4.2.1). La impermeabilización, bicapa bituminosa de 6 kg/m² (Sd ≈ 273 m), y la barrera, lámina bituminosa de 3 kg/m² (Sd ≈ 136 m), con el µ 50 000 del CEC y el espesor de su masa.",
         ]),
     `Criterio: el forjado sobre ${suelo.suelo?.tipo === "terreno" ? "la cámara sanitaria" : suelo.suelo?.tipo === "garaje" ? "el garaje" : "el local"} no comprueba fRsi por la escasa producción de vapor del espacio inferior (DA DB-HE/2 §4.1.1); a los huecos no se les aplican fRsi ni Glaser.`,
     "Criterio: la ventana tipo es de 1,20 × 1,40 m de dos hojas; la fracción de marco es 0,25 (DB-HE Anejo A) y la junta, el perímetro de los vidrios. La Ug es la del CEC para un doble 4/16/4; las lunas las fija el tipo de ventana, y su espesor apenas cambia la Ug.",

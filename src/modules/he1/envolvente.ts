@@ -334,6 +334,9 @@ export interface MontajeCubierta {
 
 const INVERTIDA: MontajeCubierta = { invertida: true, barrera: false };
 
+/** µ del betún en fieltro o lámina (CEC p. 23, verificado): todas las bituminosas. */
+export const MU_LAMINA_BITUMINOSA = 50_000;
+
 export function cubiertaDe(
   tipo: TipoCubierta,
   e_mm: number,
@@ -341,15 +344,17 @@ export function cubiertaDe(
   m: MontajeCubierta = INVERTIDA,
   clave: ClaveAislante = "xps",
 ): CerramientoInput {
-  // Lámina bituminosa: Sd del producto (orientativo, criterio); la barrera de vapor, la misma lámina.
-  const lamina = (id: string, nombre: string): CapaInput => ({ id, nombre, material: "betun_lamina_asfaltica", espesor_m: 0.004, sd_m: 50 });
+  // Láminas bituminosas con el µ 50 000 del CEC («Betún fieltro o lámina», p. 23) y el
+  // espesor de su masa (ρ 1 100): la impermeabilización, bicapa de 6 kg/m², 5,5 mm, Sd ≈ 273 m
+  // (K-CER.19); la barrera de vapor, de 3 kg/m², 2,7 mm, Sd ≈ 136 m (K-CER.20). Bloque I.
+  const lamina = (id: string, nombre: string, e_m: number): CapaInput => ({ id, nombre, material: "betun_lamina_asfaltica", espesor_m: e_m, mu: MU_LAMINA_BITUMINOSA });
   const aislante: CapaInput = { id: capaAislante("cubierta"), nombre: MATERIALES_CEC[clave].nombre, material: MATERIAL_HE1[clave]!, espesor_m: e_mm / 1000 };
   const plana: CapaInput[] = [
     { id: "cubierta-enlucido", nombre: "Enlucido de yeso", material: "enlucido_yeso", espesor_m: 0.015 },
     capaForjado("cubierta-forjado", "Forjado", forjado),
     { id: "cubierta-pendientes", nombre: "Hormigón de pendientes", material: "hormigon_masa_aridos_densos", materialDifusion: "hormigon_armado", espesor_m: 0.1 },
   ];
-  const impermeabilizacion = lamina("cubierta-impermeabilizacion", "Impermeabilización");
+  const impermeabilizacion = lamina("cubierta-impermeabilizacion", "Impermeabilización", 0.0055);
   const capas: CapaInput[] =
     tipo === "inclinada"
       ? [
@@ -360,12 +365,14 @@ export function cubiertaDe(
         ]
       : m.invertida
         ? [...plana, impermeabilizacion, aislante]
-        : [...plana, ...(m.barrera ? [lamina("cubierta-barrera", "Barrera de vapor")] : []), aislante, impermeabilizacion];
+        : [...plana, ...(m.barrera ? [lamina("cubierta-barrera", "Barrera de vapor", 0.0027)] : []), aislante, impermeabilizacion];
   return {
     id: "cubierta",
     nombre: "Cubierta",
     tipoElemento: "cubierta_exterior",
     direccionFlujo: "ascendente",
+    // Con barrera contra el vapor en la cara caliente, Glaser no es necesario (DA DB-HE/2 §4.2.1).
+    glaserExento: tipo !== "inclinada" && !m.invertida && m.barrera,
     capas,
   };
 }

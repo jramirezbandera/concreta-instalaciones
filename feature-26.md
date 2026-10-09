@@ -410,8 +410,14 @@ Revisadas con el usuario todas las «Decisiones a validar» de los pasos 1 a 7.
     habitual») y, con revestimiento, «El revestimiento exterior ha de ser R3 (resistencia muy
     alta a la filtración): se exige en el pliego». La ficha, «lo mínimo para el grado N (al
     pliego)».
-  - **Sd de las láminas de la cubierta:** el agente de normativa lee el 3.20 del CEC (Bloque I
-    de la verificación) para sustituir el Sd 50 m orientativo.
+  - **Láminas de la cubierta y Glaser (Bloque I de la verificación):** el CEC da µ 50 000 para
+    toda lámina bituminosa (p. 23). La impermeabilización pasa a bicapa de 6 kg/m² (5,5 mm,
+    Sd ≈ 273 m, K-CER.19) y la barrera a lámina de 3 kg/m² (2,7 mm, Sd ≈ 136 m, K-CER.20), en
+    vez del Sd 50 m orientativo. Con eso la convencional pide barrera en Cáceres y en Burgos
+    (en Sevilla, no). Y con la barrera en la cara caliente **no es necesaria la comprobación**
+    de Glaser: lo dice el DA DB-HE/2 §4.2.1, leído en el PDF del repo (K-CER.21). HE1 lo marca
+    (`glaserExento`), lo explica en la franja, la ficha y la memoria, y ya no avisa. La invertida
+    no cambia (el test de cierre sigue igual).
 - **Para cuando un proyecto lo pida:** C 12.3 (inclinada ventilada sobre forjado horizontal),
   la capa de rodadura como criterio y el balance anual de Glaser.
 

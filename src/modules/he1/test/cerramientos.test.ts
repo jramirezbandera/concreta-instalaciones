@@ -12,7 +12,7 @@ import { he1EstadoDefaults, type He1Estado } from "../estado";
 import { toFichaData } from "../ficha";
 import { cerramientoDe, justificarHe1, rolesDe, type ObraHe1 } from "../justificacion";
 import { memoriaHe1 } from "../memoria";
-import { textoAviso, textoIncumplimiento } from "../textos";
+import { textoIncumplimiento } from "../textos";
 import { estadosElementos } from "../../../lib/cte/estados";
 
 // =============================================================================
@@ -79,9 +79,13 @@ describe("HE1 · la cubierta convencional (El edificio)", () => {
   });
 
   it("convencional: el aislante bajo la impermeabilización, y la barrera de vapor solo si Glaser la pide", () => {
-    const caceres = justificar(conv);
-    expect(caceres.propuesta.montajeCubierta).toEqual({ invertida: false, barrera: false });
-    expect(capas(caceres).slice(-2)).toEqual(["XPS", "Impermeabilización"]);
+    // En Sevilla, sin barrera no condensa.
+    const sevilla = justificar(conv, {}, { provincia: "Sevilla", altitud_m: 7, municipio: "Sevilla" });
+    expect(sevilla.propuesta.montajeCubierta).toEqual({ invertida: false, barrera: false });
+    expect(capas(sevilla).slice(-2)).toEqual(["XPS", "Impermeabilización"]);
+    expect(cerramientoDe(sevilla, "cubierta").detalle.r.glaserAplica).toBe(true);
+    // Con la bicapa del CEC (µ 50 000, Sd ≈ 273 m) encima, en Cáceres y en Burgos sí la pide.
+    expect(justificar(conv).propuesta.montajeCubierta).toEqual({ invertida: false, barrera: true });
     const burgos = justificar(conv, {}, BURGOS);
     expect(burgos.propuesta.montajeCubierta).toEqual({ invertida: false, barrera: true });
     expect(capas(burgos).slice(-3)).toEqual(["Barrera de vapor", "XPS", "Impermeabilización"]);
@@ -100,13 +104,16 @@ describe("HE1 · la cubierta convencional (El edificio)", () => {
     expect(textoPlanoMemoria(memoriaHe1(j))).toMatch(/\(CEC C 6\.3, p\. 42\), convencional.*y lana mineral de/);
   });
 
-  it("la ficha y la memoria lo dicen; si aun con barrera condensa, el aviso no pide ponerla", () => {
+  it("con barrera de vapor en la cara caliente no es necesaria la comprobación (DA DB-HE/2 §4.2.1): sin aviso", () => {
     const j = justificar(conv, {}, BURGOS);
+    expect(cerramientoDe(j, "cubierta").detalle.r.glaserAplica).toBe(false);
+    expect(j.avisos.some((x) => x.id === "intersticial-cubierta")).toBe(false);
     const f = toFichaData(j, { estado: he1EstadoDefaults, edificio: conv, revisados: [], svg: tamanoDibujoHe1() });
     expect(f.datosPartida.find((d) => d.concepto === "Cubierta")?.valor).toContain("(CEC C 5.3, p. 41) · convencional con barrera de vapor · XPS");
-    expect(textoPlanoMemoria(memoriaHe1(j))).toContain("(CEC C 5.3, p. 41), convencional con barrera de vapor, con forjado");
-    const a = j.avisos.find((x) => x.id === "intersticial-cubierta");
-    if (a) expect(textoAviso(a, j).detalle).toContain("aun con la barrera de vapor");
+    expect((f.observaciones ?? []).some((o) => o.includes("la comprobación no es necesaria (DA DB-HE/2 §4.2.1)"))).toBe(true);
+    const m = textoPlanoMemoria(memoriaHe1(j));
+    expect(m).toContain("(CEC C 5.3, p. 41), convencional con barrera de vapor, con forjado");
+    expect(m).toContain("En la cubierta, con barrera contra el vapor bajo el aislante, en su cara caliente, no es necesaria la comprobación (DA DB-HE/2 §4.2.1).");
   });
 });
 

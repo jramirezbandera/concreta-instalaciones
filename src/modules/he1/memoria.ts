@@ -124,6 +124,9 @@ export function memoriaHe1(j: JustificacionHe1): MemoriaDoc {
     condensan.length === 0
       ? "no se producen."
       : `puede haberlas en ${listaY(condensan.map((r) => (r === "suelo" ? "el forjado" : r === "fachada-pb" ? "la fachada de la planta baja" : `la ${r}`)))}, y se justifica aparte el balance anual de evaporación.`,
+    j.propuesta.montajeCubierta.barrera
+      ? " En la cubierta, con barrera contra el vapor bajo el aislante, en su cara caliente, no es necesaria la comprobación (DA DB-HE/2 §4.2.1)."
+      : "",
   ];
   return {
     titulo: "Envolvente térmica",
