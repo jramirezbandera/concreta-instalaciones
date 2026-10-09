@@ -60,7 +60,8 @@ export const NOMBRE_PROTECCION: Record<ProteccionPlana, string> = {
   tierra_vegetal: "Tierra vegetal",
 };
 
-export function cubiertaDe(s: SolCubierta, d: DecisionesEfectivasHs1): CubiertaHs1 {
+/** `invertida`: la posición del aislante que da El edificio (`cerramientosDe`). */
+export function cubiertaDe(s: SolCubierta, invertida: boolean, d: DecisionesEfectivasHs1): CubiertaHs1 {
   const tipo = s.tipo;
   const sol = { nombre: s.nombre, codigo: s.codigo, pagina: s.pagina, soloInvertida: s.soloInvertida };
   const plana = tipo !== "inclinada";
@@ -71,7 +72,6 @@ export function cubiertaDe(s: SolCubierta, d: DecisionesEfectivasHs1): CubiertaH
   if (plana && s.proteccion) {
     // Las protecciones de la tabla 2.9, aunque el Catálogo solo tenga tres.
     const p = s.proteccion as ProteccionPlana;
-    const invertida = s.soloInvertida || d.cubiertaAislante === "sobre";
     const autoprotegida = p === "lamina_autoprotegida";
     const t = PENDIENTES_CUBIERTA_PLANA_TABLA_2_9.datos[p];
     add("a", "Sistema de formación de pendientes", "siempre en cubierta plana", true);

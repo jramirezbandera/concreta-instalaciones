@@ -319,8 +319,32 @@ leído en imagen, bloques A a G y criterios K-CER.4 a K-CER.15. Lo que cambia el
      CEC que faltan (4.1.3, 4.1.4, 4.1.6…). Lo guardado en `cubiertaProteccion` se ignora.
    - Una cubierta elegida de otro tipo (solado fijo en una no transitable) se descarta con
      aviso, y con ella sus valores propios de HR.
-   - Sigue pendiente: HE1 calcula siempre la plana invertida; si en HS1 se dice
-     «Convencional», las dos fichas no coinciden en la posición del aislante.
+   - ~~HE1 siempre invertida y HS1 podía decir convencional~~: arreglado (abajo).
+
+   **Hecho (2026-10-09), la posición del aislante de la cubierta, en El edificio:**
+   - `Cerramientos.aislanteCubierta?: "invertida" | "convencional"` (sin dar, invertida; sin
+     migración). `cerramientosDe` da `cubierta.invertida` (C 2.3, siempre; la inclinada, false).
+     En El edificio, «Aislante de la cubierta» con Invertida / Convencional bajo la cubierta
+     plana; con C 2.3, «Invertida: el Catálogo solo la da así». La tarjeta lo dice.
+   - **HE1** calcula también la convencional (`MontajeCubierta`): forjado, pendientes, XPS e
+     impermeabilización encima. La **barrera de vapor** bajo el aislante la pone HE1 solo si,
+     sin ella, Glaser prevé condensaciones (el CEC: «B, solo si hay riesgo de condensación según
+     el DB HE-1»); es la misma lámina que la impermeabilización (Sd 50 m, orientativo). El
+     mínimo del aislante se calcula sin barrera (lado seguro; no cambia en el Plurifamiliar).
+     Ficha, memoria y franja: «convencional con barrera de vapor». Si aun con la barrera
+     condensa, el aviso pide el balance anual o una barrera de más Sd, no «poner una barrera».
+   - **HS1** deja de decidir el aislante (`cubiertaAislante` sale de sus decisiones): lo lee
+     de El edificio y lo enseña («Invertida, como en El edificio»).
+   - Ningún proyecto cambia: sin decirlo, sigue invertida. Lo guardado en HS1 como
+     convencional se ignora.
+   - Tests: 1320 en verde (lógica, HE1 con Cáceres y Burgos, fichas y editor).
+
+   **Decisiones a validar:**
+   - En Burgos (y sin clima de la obra), la convencional con la barrera de Sd 50 m sigue
+     marcando condensación en enero: el Sd orientativo de la lámina es bajo frente al de la
+     impermeabilización de encima. Se queda en aviso (el DB admite condensación que se evapore
+     en el año), sin inventar un Sd mayor.
+   - El aislante de la cubierta sigue siendo XPS también en la convencional.
 7. **Tests**:
    - un proyecto sin `cerramientos` da el mismo veredicto que hoy en HE1, HR y HS1;
    - en HE1, la U por capas de cada fachada frente a la del CEC;

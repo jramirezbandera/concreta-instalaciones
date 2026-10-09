@@ -70,8 +70,11 @@ export interface CerramientosDelEdificio {
   fachadaPB: Cerramiento<SolFachada> | null;
   ventana: CerramientoVentana;
   ventanaPB: CerramientoVentana | null;
-  /** `habitual`: la del tipo de cubierta; `descartada`: la elegida no casaba con él. */
-  cubierta: Cerramiento<SolCubierta> & { habitual: boolean; descartada: boolean };
+  /**
+   * `habitual`: la del tipo de cubierta; `descartada`: la elegida no casaba con él;
+   * `invertida`: plana con el aislante sobre la impermeabilización (false en la inclinada).
+   */
+  cubierta: Cerramiento<SolCubierta> & { habitual: boolean; descartada: boolean; invertida: boolean };
   forjado: Cerramiento<SolForjado>;
   /** No se han indicado: son los habituales. */
   supuestos: boolean;
@@ -97,6 +100,7 @@ export function cerramientosDe(e: Edificio): CerramientosDelEdificio {
   const elegida = c.cubierta ? solucion(c.cubierta.id) : undefined;
   const vale = elegida?.categoria === "cubierta" && elegida.tipo === e.cubierta.tipo;
   const cubierta = vale && c.cubierta ? c.cubierta : { id: habitual };
+  const cubiertaSol = solucionDe("cubierta", cubierta.id);
   return {
     fachada: fachadaDe(c.fachada),
     fachadaPB: c.fachadaPB ? fachadaDe(c.fachadaPB) : null,
@@ -104,9 +108,10 @@ export function cerramientosDe(e: Edificio): CerramientosDelEdificio {
     ventanaPB: c.ventanaPB ? ventanaDe(c.ventanaPB) : null,
     cubierta: {
       eleccion: cubierta,
-      sol: solucionDe("cubierta", cubierta.id),
+      sol: cubiertaSol,
       habitual: cubierta.id === habitual && !cubierta.valores,
       descartada: c.cubierta !== null && !vale,
+      invertida: cubiertaSol.tipo !== "inclinada" && (cubiertaSol.soloInvertida || c.aislanteCubierta !== "convencional"),
     },
     forjado: { eleccion: c.forjado, sol: solucionDe("forjado", c.forjado.id) },
     supuestos: e.cerramientos === undefined,

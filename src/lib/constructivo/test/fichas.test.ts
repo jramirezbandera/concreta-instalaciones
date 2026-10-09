@@ -79,4 +79,10 @@ describe("el nombre de un cerramiento (feature-26, paso 6)", () => {
     for (const m of [f.he1, f.hr, f.hs1]) expect(dato(m.ficha, "Cubierta")).toContain(cubierta);
     expect(f.hs1.memoria).toContain(`La cubierta es ${designacionEnFrase(solucionDe("cubierta", "cu-plana-grava"))}, invertida.`);
   });
+
+  it("la posición del aislante de la cubierta, la de El edificio en HE1 y en HS1", () => {
+    const f = fichas(setCerramientos(edificioDeCaso("plurifamiliar"), { aislanteCubierta: "convencional" }));
+    expect(dato(f.he1.ficha, "Cubierta")).toMatch(/· convencional/);
+    expect(dato(f.hs1.ficha, "Cubierta")).toMatch(/, convencional$/);
+  });
 });

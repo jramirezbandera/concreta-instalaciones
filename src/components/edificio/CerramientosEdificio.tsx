@@ -47,7 +47,7 @@ export function CerramientosEdificio(props: {
     {
       k: "Cubierta",
       nombre: r.cubierta.sol.nombre,
-      linea: `CEC ${r.cubierta.sol.codigo}, p. ${r.cubierta.sol.pagina}`,
+      linea: `${r.cubierta.sol.tipo === "inclinada" ? "" : r.cubierta.invertida ? "invertida · " : "convencional · "}CEC ${r.cubierta.sol.codigo}, p. ${r.cubierta.sol.pagina}`,
     },
     { k: "Forjado", nombre: r.forjado.sol.nombre, linea: lineaForjado(r.forjado.sol) },
   ];

@@ -73,6 +73,18 @@ describe("cerramientos de El edificio (feature-26)", () => {
     expect(avisosCerramientos(e).some((a) => a.includes("no es plana no transitable"))).toBe(true);
   });
 
+  it("el aislante de la cubierta plana: invertida si no se dice; C 2.3, siempre; la inclinada, no", () => {
+    const base = setCubierta(edificioDeCaso("plurifamiliar"), { tipo: "plana_no_transitable" });
+    expect(cerramientosDe(base).cubierta.invertida).toBe(true);
+    expect(cerramientosDe(setCerramientos(base, { aislanteCubierta: "convencional" })).cubierta.invertida).toBe(false);
+    const flotante = setCerramientos(setCubierta(base, { tipo: "plana_transitable" }), {
+      cubierta: { id: "cu-plana-solado-flotante" },
+      aislanteCubierta: "convencional",
+    });
+    expect(cerramientosDe(flotante).cubierta.invertida).toBe(true);
+    expect(cerramientosDe(setCubierta(base, { tipo: "inclinada" })).cubierta.invertida).toBe(false);
+  });
+
   it("la cubierta casa con el tipo, no solo con la forma: el solado fijo no vale en una no transitable", () => {
     const base = setCubierta(edificioDeCaso("plurifamiliar"), { tipo: "plana_no_transitable" });
     const e = setCerramientos(base, { cubierta: { id: "cu-plana-fu-bovhorm-300" } });

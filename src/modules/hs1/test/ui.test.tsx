@@ -44,9 +44,10 @@ describe("HS1 · desde El edificio (feature-17)", () => {
     const muro = within(decisiones).getByRole("group", { name: "El muro del sótano" });
     expect(within(muro).getByRole("button", { name: "Por fuera" })).toHaveAttribute("aria-pressed", "true");
     expect(within(decisiones).getByRole("combobox", { name: "Tipo de muro" })).toHaveValue("flexorresistente");
-    // La cubierta es la de El edificio; aquí solo la posición del aislante.
+    // La cubierta es la de El edificio, con la posición del aislante.
     expect(decisiones).toHaveTextContent("Plana no transitable, con grava");
-    expect(within(decisiones).getByRole("button", { name: "Invertida" })).toHaveAttribute("aria-pressed", "true");
+    expect(decisiones).toHaveTextContent("Invertida, como en El edificio.");
+    expect(within(decisiones).queryByRole("button", { name: "Invertida" })).toBeNull();
 
     // Lo seleccionado por defecto: la fachada.
     const aside = await findByRole("complementary", { name: DIBUJO });

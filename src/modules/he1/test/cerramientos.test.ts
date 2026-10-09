@@ -12,7 +12,7 @@ import { he1EstadoDefaults, type He1Estado } from "../estado";
 import { toFichaData } from "../ficha";
 import { cerramientoDe, justificarHe1, rolesDe, type ObraHe1 } from "../justificacion";
 import { memoriaHe1 } from "../memoria";
-import { textoIncumplimiento } from "../textos";
+import { textoAviso, textoIncumplimiento } from "../textos";
 import { estadosElementos } from "../../../lib/cte/estados";
 
 // =============================================================================
@@ -65,6 +65,37 @@ describe("HE1 · la cubierta sobre el forjado de El edificio (K-CER.10)", () => 
     expect(eps.cubierta!).toBeLessThan(base.cubierta!);
     expect(eps.suelo!).toBeLessThan(base.suelo!);
     expect(eps.fachada).toBe(base.fachada);
+  });
+});
+
+describe("HE1 · la cubierta convencional (El edificio)", () => {
+  const conv = setCerramientos(edificioDeCaso("plurifamiliar"), { aislanteCubierta: "convencional" });
+  const capas = (j: ReturnType<typeof justificar>) => cerramientoDe(j, "cubierta").detalle.r.capas.map((c) => c.nombre);
+
+  it("sin decirlo, invertida: el aislante sobre la impermeabilización, como antes", () => {
+    const j = justificar(edificioDeCaso("plurifamiliar"), {}, BURGOS);
+    expect(j.propuesta.montajeCubierta).toEqual({ invertida: true, barrera: false });
+    expect(capas(j).slice(-2)).toEqual(["Impermeabilización", "XPS"]);
+  });
+
+  it("convencional: el aislante bajo la impermeabilización, y la barrera de vapor solo si Glaser la pide", () => {
+    const caceres = justificar(conv);
+    expect(caceres.propuesta.montajeCubierta).toEqual({ invertida: false, barrera: false });
+    expect(capas(caceres).slice(-2)).toEqual(["XPS", "Impermeabilización"]);
+    const burgos = justificar(conv, {}, BURGOS);
+    expect(burgos.propuesta.montajeCubierta).toEqual({ invertida: false, barrera: true });
+    expect(capas(burgos).slice(-3)).toEqual(["Barrera de vapor", "XPS", "Impermeabilización"]);
+    // La U apenas cambia: el mínimo del aislante es el mismo que en la invertida.
+    expect(burgos.propuesta.minimos.cubierta).toBe(justificar(edificioDeCaso("plurifamiliar"), {}, BURGOS).propuesta.minimos.cubierta);
+  });
+
+  it("la ficha y la memoria lo dicen; si aun con barrera condensa, el aviso no pide ponerla", () => {
+    const j = justificar(conv, {}, BURGOS);
+    const f = toFichaData(j, { estado: he1EstadoDefaults, edificio: conv, revisados: [], svg: tamanoDibujoHe1() });
+    expect(f.datosPartida.find((d) => d.concepto === "Cubierta")?.valor).toContain("(CEC C 5.3, p. 41) · convencional con barrera de vapor · XPS");
+    expect(textoPlanoMemoria(memoriaHe1(j))).toContain("(CEC C 5.3, p. 41), convencional con barrera de vapor, con forjado");
+    const a = j.avisos.find((x) => x.id === "intersticial-cubierta");
+    if (a) expect(textoAviso(a, j).detalle).toContain("aun con la barrera de vapor");
   });
 });
 

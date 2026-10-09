@@ -86,6 +86,13 @@ export function textoEtiqueta(el: ElementoHe1): string {
   }
 }
 
+/** «invertida», «convencional», «convencional con barrera de vapor»; la inclinada, «». */
+export function montajeEnTexto(j: JustificacionHe1): string {
+  if (j.propuesta.envolvente.cubierta === "inclinada") return "";
+  const m = j.propuesta.montajeCubierta;
+  return m.invertida ? "invertida" : m.barrera ? "convencional con barrera de vapor" : "convencional";
+}
+
 /** «F 3.2 · XPS 60», «plana invertida · XPS 100», «EPS 60», «PVC de tres cámaras · bajo emisivo». */
 export function composicionCorta(j: JustificacionHe1, rol: RolCerramiento): string {
   const d = j.propuesta.decisiones;
@@ -95,7 +102,7 @@ export function composicionCorta(j: JustificacionHe1, rol: RolCerramiento): stri
       return `${f.codigo} · ${MATERIALES_CEC[f.aislante].nombre} ${aislanteDe(d, rol as "fachada" | "fachada-pb")}`;
     }
     case "cubierta":
-      return `${j.propuesta.envolvente.cubierta === "inclinada" ? "inclinada" : "plana invertida"} · XPS ${d.aislanteCubierta_mm}`;
+      return `${j.propuesta.envolvente.cubierta === "inclinada" ? "inclinada" : `plana ${montajeEnTexto(j)}`} · XPS ${d.aislanteCubierta_mm}`;
     case "suelo":
       return `${cerramientoDe(j, "suelo").detalle.aislante?.nombre ?? "aislante"} ${d.aislanteSuelo_mm} bajo el forjado`;
     case "ventanas":
@@ -177,9 +184,9 @@ export function franjaDe(el: ElementoHe1, j: JustificacionHe1, estado: EstadoPre
         return {
           ...base,
           clase: "Cubierta",
-          titulo: inclinada ? "Cubierta inclinada" : "Cubierta plana invertida",
+          titulo: inclinada ? "Cubierta inclinada" : `Cubierta plana ${montajeEnTexto(j)}`,
           unidad,
-          manda: `El aislante: XPS de ${a?.espesor_mm ?? 0} mm ${inclinada ? "sobre el forjado, bajo la teja" : "sobre la impermeabilización"}.${desde}${porFRsi}`,
+          manda: `El aislante: XPS de ${a?.espesor_mm ?? 0} mm ${inclinada ? "sobre el forjado, bajo la teja" : j.propuesta.montajeCubierta.invertida ? "sobre la impermeabilización" : j.propuesta.montajeCubierta.barrera ? "bajo la impermeabilización, sobre una barrera de vapor: sin ella, Glaser prevé condensaciones" : "bajo la impermeabilización"}.${desde}${porFRsi}`,
           filas: [
             limite,
             { k: "Forjado", v: `${j.propuesta.tipos.forjado.nombre} · R ${n2(j.propuesta.tipos.forjado.R)}` },
@@ -352,10 +359,12 @@ export function textoAviso(a: Aviso, j: JustificacionHe1): TextoAviso {
   }
   if (a.id.startsWith("intersticial-")) {
     const rol = String(a.datos.rol) as RolCerramiento;
+    const conBarrera = rol === "cubierta" && j.propuesta.montajeCubierta.barrera;
     return {
       titulo: `Puede condensar dentro de ${NOMBRE_ROL[rol]} en enero.`,
-      detalle:
-        "Glaser marca condensación en el mes más frío. El DB admite que la haya si se evapora a lo largo del año: hay que comprobar el balance anual (DA DB-HE/2) o poner una barrera de vapor en la cara caliente.",
+      detalle: conBarrera
+        ? "Glaser marca condensación en el mes más frío aun con la barrera de vapor bajo el aislante (lámina con Sd 50 m, orientativo). El DB admite que la haya si se evapora a lo largo del año: hay que comprobar el balance anual (DA DB-HE/2) o usar una barrera de más Sd, con el dato del producto, o la cubierta invertida."
+        : "Glaser marca condensación en el mes más frío. El DB admite que la haya si se evapora a lo largo del año: hay que comprobar el balance anual (DA DB-HE/2) o poner una barrera de vapor en la cara caliente.",
     };
   }
   return { titulo: "Revisa la envolvente.", detalle: "" };

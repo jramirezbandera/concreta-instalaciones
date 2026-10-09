@@ -196,14 +196,18 @@ describe("justificación", () => {
     const e: Edificio = { ...E("plurifamiliar_locales"), cubierta: { tipo: "plana_transitable", superficie_m2: 210 } };
     const j = justificarHs1(est(), e, OBRA);
     expect(j.cubierta).toMatchObject({ proteccion: "solado_fijo", invertida: true, sol: { codigo: "C 1.3" } });
-    const g = justificarHs1(est({ cubiertaAislante: "bajo" }), E("plurifamiliar_locales"), OBRA);
+    // La convencional se elige en El edificio.
+    const g = justificarHs1(est(), setCerramientos(E("plurifamiliar_locales"), { aislanteCubierta: "convencional" }), OBRA);
     expect(g.cubierta).toMatchObject({ proteccion: "grava", invertida: false, sol: { codigo: "C 5.3" } });
     expect(g.cubierta.capas.find((c) => c.letra === "g")).toMatchObject({ exigida: true });
   });
 
   it("con solado flotante (C 2.3) va invertida aunque se diga convencional", () => {
-    const e = setCerramientos({ ...E("plurifamiliar_locales"), cubierta: { tipo: "plana_transitable", superficie_m2: 210 } }, { cubierta: { id: "cu-plana-solado-flotante" } });
-    const j = justificarHs1(est({ cubiertaAislante: "bajo" }), e, OBRA);
+    const e = setCerramientos(
+      { ...E("plurifamiliar_locales"), cubierta: { tipo: "plana_transitable", superficie_m2: 210 } },
+      { cubierta: { id: "cu-plana-solado-flotante" }, aislanteCubierta: "convencional" },
+    );
+    const j = justificarHs1(est(), e, OBRA);
     expect(j.cubierta).toMatchObject({ proteccion: "solado_flotante", invertida: true });
     expect(j.cubierta.capas.find((c) => c.letra === "h")).toMatchObject({ exigida: true });
   });

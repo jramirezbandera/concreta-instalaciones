@@ -11,10 +11,9 @@
 //   - la fachada es la de El edificio (feature-26): sus rasgos dan la columna,
 //     las hojas y la combinación (`fachada.ts`); aquí solo se declara lo que el
 //     catálogo no sabe (la R del revestimiento, J, N y H);
-//   - la cubierta es la de El edificio (feature-26), con su protección; aquí
-//     solo se decide la posición del aislante en la plana (invertida, salvo que
-//     se diga) y, en la inclinada, la teja (mixta) y si lleva impermeabilización
-//     bajo el tejado (no).
+//   - la cubierta es la de El edificio (feature-26), con su protección y la
+//     posición del aislante; aquí solo se decide, en la inclinada, la teja
+//     (mixta) y si lleva impermeabilización bajo el tejado (no).
 // =============================================================================
 
 import type { DeclaraFachadas } from "./fachada";
@@ -27,8 +26,6 @@ export type ImpermeabilizacionMuro = "exterior" | "interior" | "parcialmente_est
 export type TipoSuelo = "solera" | "placa" | "elevado";
 /** Tipo de intervención en el terreno (tabla 2.4). */
 export type IntervencionTerreno = "sub_base" | "inyecciones" | "sin_intervencion";
-/** Dónde va el aislante de una cubierta plana: bajo la impermeabilización o encima (invertida). */
-export type AislantePlana = "bajo" | "sobre";
 /** Si una cubierta inclinada lleva capa de impermeabilización bajo el tejado. */
 export type ImpermeabilizacionInclinada = "sin" | "con";
 
@@ -46,7 +43,6 @@ export interface DecisionesHs1 {
   sueloIntervencion: Opcion<IntervencionTerreno>;
   /** Lo declarado de cada fachada de El edificio; sin dar, lo habitual (feature-26). */
   fachadaDeclara?: DeclaraFachadas;
-  cubiertaAislante: Opcion<AislantePlana>;
   /** Fila de la tabla 2.10. */
   cubiertaTejado: Opcion<number>;
   cubiertaImpermeabilizacion: Opcion<ImpermeabilizacionInclinada>;
@@ -57,7 +53,6 @@ export interface DecisionesEfectivasHs1 {
   muroImper: ImpermeabilizacionMuro;
   sueloTipo: TipoSuelo;
   sueloIntervencion: IntervencionTerreno;
-  cubiertaAislante: AislantePlana;
   cubiertaTejado: number;
   cubiertaImpermeabilizacion: ImpermeabilizacionInclinada;
 }
@@ -67,7 +62,6 @@ export const DECISIONES_HS1_POR_DEFECTO: DecisionesHs1 = {
   muroImper: "habitual",
   sueloTipo: "habitual",
   sueloIntervencion: "habitual",
-  cubiertaAislante: "habitual",
   cubiertaTejado: "habitual",
   cubiertaImpermeabilizacion: "habitual",
 };
@@ -94,7 +88,6 @@ export function decisionesHabitualesHs1(suelo: SueloHabitual = SUELO_HABITUAL): 
     muroImper: "exterior",
     sueloTipo: suelo.tipo,
     sueloIntervencion: suelo.intervencion,
-    cubiertaAislante: "sobre",
     cubiertaTejado: TEJADO_HABITUAL,
     cubiertaImpermeabilizacion: "sin",
   };
@@ -109,7 +102,6 @@ export function resolverDecisionesHs1(d: DecisionesHs1, suelo: SueloHabitual = S
     muroImper: v("muroImper"),
     sueloTipo: v("sueloTipo"),
     sueloIntervencion: v("sueloIntervencion"),
-    cubiertaAislante: v("cubiertaAislante"),
     cubiertaTejado: v("cubiertaTejado"),
     cubiertaImpermeabilizacion: v("cubiertaImpermeabilizacion"),
   };

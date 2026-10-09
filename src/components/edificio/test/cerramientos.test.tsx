@@ -66,6 +66,24 @@ describe("Cerramientos en El edificio", () => {
     expect(getByText(/no entran en HE1/)).toBeInTheDocument();
   });
 
+  it("la cubierta plana se elige invertida o convencional; con solado flotante, solo invertida", async () => {
+    const user = userEvent.setup();
+    const { getByRole, getByText, queryByRole, onCambiar, rerender } = montar(edificioDeCaso("plurifamiliar"));
+    const grupo = getByRole("group", { name: "Aislante de la cubierta" });
+    expect(within(grupo).getByRole("button", { name: "Invertida" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(grupo).getByRole("button", { name: "Convencional" }));
+    expect(onCambiar.mock.lastCall![0].cerramientos?.aislanteCubierta).toBe("convencional");
+
+    const transitable: Edificio = {
+      ...edificioDeCaso("plurifamiliar"),
+      cubierta: { tipo: "plana_transitable", superficie_m2: 210 },
+      cerramientos: { ...onCambiar.mock.lastCall![0].cerramientos!, cubierta: { id: "cu-plana-solado-flotante" } },
+    };
+    rerender(<EditorSeleccion edificio={transitable} seleccion={{ tipo: "cerramientos" }} onCambiar={onCambiar} onSeleccionar={() => {}} />);
+    expect(queryByRole("group", { name: "Aislante de la cubierta" })).toBeNull();
+    expect(getByText(/el Catálogo solo la da así/)).toBeInTheDocument();
+  });
+
   it("la cubierta lleva a Cerramientos", async () => {
     const user = userEvent.setup();
     const onSeleccionar = vi.fn();

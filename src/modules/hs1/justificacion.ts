@@ -721,7 +721,7 @@ export function justificarHs1(estado: Hs1Estado, edificio: Edificio, obra: ObraH
   }
 
   // ── La cubierta: la de El edificio (feature-26) ───────────────────────────
-  const cubierta = cubiertaDe(cer.cubierta.sol, d);
+  const cubierta = cubiertaDe(cer.cubierta.sol, cer.cubierta.invertida, d);
   const p = cubierta.pendiente;
   elementos.push({
     id: "cubierta",

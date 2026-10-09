@@ -100,6 +100,35 @@ function Ventana(props: {
   );
 }
 
+/** Dos o tres opciones excluyentes, como botones. */
+function Segmentado<T>(props: { etiqueta: string; opciones: { valor: T; label: string }[]; valor: T; onChange: (v: T) => void }): JSX.Element {
+  return (
+    <div role="group" aria-label={props.etiqueta} className="border-border-main bg-bg-surface flex gap-0.5 rounded border p-0.5">
+      {props.opciones.map((o) => (
+        <button
+          key={o.label}
+          type="button"
+          aria-pressed={props.valor === o.valor}
+          onClick={() => props.onChange(o.valor)}
+          className={[
+            "h-[26px] rounded-[3px] px-2 text-[12px] whitespace-nowrap transition-colors",
+            props.valor === o.valor
+              ? "bg-bg-primary text-text-primary ring-border-main font-medium ring-1"
+              : "text-text-secondary hover:text-text-primary",
+          ].join(" ")}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const OPCIONES_AISLANTE: { valor: "invertida" | "convencional"; label: string }[] = [
+  { valor: "invertida", label: "Invertida" },
+  { valor: "convencional", label: "Convencional" },
+];
+
 const OPCIONES_PB: { valor: boolean; label: string }[] = [
   { valor: false, label: "La misma" },
   { valor: true, label: "Distinta" },
@@ -156,6 +185,20 @@ export function EditorCerramientos(props: { edificio: Edificio; onCambiar: (e: E
         )}
         <Linea>{`sobre el forjado de abajo · CEC ${r.cubierta.sol.codigo}, p. ${r.cubierta.sol.pagina}`}</Linea>
       </Fila>
+      {r.cubierta.sol.tipo !== "inclinada" && (
+        <Fila etiqueta="Aislante de la cubierta">
+          {r.cubierta.sol.soloInvertida ? (
+            <span className="text-text-secondary text-[12px]">Invertida: el Catálogo solo la da así</span>
+          ) : (
+            <Segmentado<"invertida" | "convencional">
+              etiqueta="Aislante de la cubierta"
+              opciones={OPCIONES_AISLANTE}
+              valor={r.cubierta.invertida ? "invertida" : "convencional"}
+              onChange={(v) => onCambiar(setCerramientos(e, { aislanteCubierta: v }))}
+            />
+          )}
+        </Fila>
+      )}
 
       <Fila etiqueta="Forjado" htmlFor="ed-cer-forjado" columna>
         <select
@@ -175,28 +218,7 @@ export function EditorCerramientos(props: { edificio: Edificio; onCambiar: (e: E
 
       <Sub>Planta baja</Sub>
       <Fila etiqueta="Fachada y ventana">
-        <div
-          role="group"
-          aria-label="Planta baja"
-          className="border-border-main bg-bg-surface flex gap-0.5 rounded border p-0.5"
-        >
-          {OPCIONES_PB.map((o) => (
-            <button
-              key={o.label}
-              type="button"
-              aria-pressed={pb === o.valor}
-              onClick={() => onCambiar(setPlantaBajaDistinta(e, o.valor))}
-              className={[
-                "h-[26px] rounded-[3px] px-2 text-[12px] whitespace-nowrap transition-colors",
-                pb === o.valor
-                  ? "bg-bg-primary text-text-primary ring-border-main font-medium ring-1"
-                  : "text-text-secondary hover:text-text-primary",
-              ].join(" ")}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
+        <Segmentado etiqueta="Planta baja" opciones={OPCIONES_PB} valor={pb} onChange={(v) => onCambiar(setPlantaBajaDistinta(e, v))} />
       </Fila>
       {pb && (
         <>
@@ -234,9 +256,9 @@ export function EditorCerramientos(props: { edificio: Edificio; onCambiar: (e: E
       <Sub>Lo usan</Sub>
       <LoUsan
         filas={[
-          { codigo: "HE1", texto: "U de cada fachada, de la cubierta, del suelo y de las ventanas; el aislante y el vidrio se deciden allí", trato: "si" },
+          { codigo: "HE1", texto: "U de cada fachada, de la cubierta, del suelo y de las ventanas; el espesor del aislante y el vidrio se deciden allí; la convencional, con barrera de vapor si Glaser la pide", trato: "si" },
           { codigo: "HR", texto: "parte ciega y huecos frente al ruido exterior, flancos y forjados; los valores propios se dan allí", trato: "si" },
-          { codigo: "HS1", texto: "grado de impermeabilidad de cada fachada por sus rasgos (tabla 2.7) y la protección de la cubierta (tabla 2.9); el revestimiento y el aislante de la cubierta se declaran allí", trato: "si" },
+          { codigo: "HS1", texto: "grado de impermeabilidad de cada fachada por sus rasgos (tabla 2.7) y los elementos de la cubierta (2.4.2); el revestimiento de la fachada se declara allí", trato: "si" },
         ]}
       />
     </Tarjeta>

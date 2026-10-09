@@ -55,6 +55,11 @@ export interface Cerramientos {
   ventanaPB: EleccionVentana | null;
   /** El paquete de cubierta; null = el habitual del tipo de cubierta. */
   cubierta: Eleccion | null;
+  /**
+   * La posición del aislante en la cubierta plana: el CEC da sus cubiertas
+   * convencionales o invertidas (C 2.3, solo invertida). Sin dar, invertida.
+   */
+  aislanteCubierta?: "invertida" | "convencional";
   /** El forjado de todas las plantas (y el soporte de la cubierta, K-CER.10). */
   forjado: Eleccion;
 }

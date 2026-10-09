@@ -37,7 +37,7 @@ import {
   ULIM_PARTICIONES_TABLA_3_2,
   ULIM_TABLA_3_1_1_a,
 } from "./tablas";
-import { composicionCorta, descripcionEnvolvente, lugar, textoAviso } from "./textos";
+import { composicionCorta, descripcionEnvolvente, lugar, montajeEnTexto, textoAviso } from "./textos";
 
 const ORIGEN_EDIFICIO = "El edificio";
 const ORIGEN_DECISION = "Decisión del proyectista";
@@ -135,7 +135,7 @@ export function toFichaData(j: JustificacionHe1, o: OpcionesFichaHe1): FichaData
     })),
     {
       concepto: NOMBRE_CERRAMIENTO.cubierta,
-      valor: `${designacion(t.cubierta)} · ${j.propuesta.envolvente.cubierta === "inclinada" ? "" : "invertida · "}XPS ${d.aislanteCubierta_mm} mm`,
+      valor: `${designacion(t.cubierta)} · ${montajeEnTexto(j) ? `${montajeEnTexto(j)} · ` : ""}XPS ${d.aislanteCubierta_mm} mm`,
       origen: `${ORIGEN_EDIFICIO} · composición tipo · λ orientativas`,
     },
     { concepto: cerramientoDe(j, "suelo").nombre, valor: composicionCorta(j, "suelo"), origen: ORIGEN_TIPO },
@@ -179,6 +179,11 @@ export function toFichaData(j: JustificacionHe1, o: OpcionesFichaHe1): FichaData
     `Composiciones, de dentro afuera. ${t.fachadas.map((f) => `${f.nombre} (CEC ${f.sol.codigo}): ${capasDe(j, f.rol)} mm.`).join(" ")} Cubierta: ${capasDe(j, "cubierta")} mm. ${cerramientoDe(j, "suelo").nombre}: ${capasDe(j, "suelo")} mm.`,
     "Predimensionado por elementos con composiciones tipo: λ, µ, Ug y Uf son orientativos del Catálogo de Elementos Constructivos y se sustituyen por los declarados por el fabricante (HE1 ap. 5.1). Las fábricas entran con la R de la pieza del Catálogo (apartado 3.17), no con una λ.",
     `Los forjados de la cubierta y del suelo son el elegido en El edificio y entran con la R y la µ de su fila del Catálogo (apartado 3.18). Criterio: el contacto con espacios no habitables, con b = 1 (lado seguro, DA DB-HE/1 ec. 6).`,
+    ...(j.propuesta.montajeCubierta.invertida
+      ? []
+      : [
+          "Criterio: la cubierta convencional lleva barrera de vapor bajo el aislante solo si, sin ella, Glaser prevé condensaciones (CEC: «solo si hay riesgo de condensación según el DB HE-1»); la barrera y la impermeabilización, láminas bituminosas con Sd 50 m (orientativo).",
+        ]),
     `Criterio: el forjado sobre ${suelo.suelo?.tipo === "terreno" ? "la cámara sanitaria" : suelo.suelo?.tipo === "garaje" ? "el garaje" : "el local"} no comprueba fRsi por la escasa producción de vapor del espacio inferior (DA DB-HE/2 §4.1.1); a los huecos no se les aplican fRsi ni Glaser.`,
     "Criterio: la ventana tipo es de 1,20 × 1,40 m de dos hojas; la fracción de marco es 0,25 (DB-HE Anejo A) y la junta, el perímetro de los vidrios. La Ug es la del CEC para un doble 4/16/4; las lunas las fija el tipo de ventana, y su espesor apenas cambia la Ug.",
   );
