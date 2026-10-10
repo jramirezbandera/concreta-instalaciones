@@ -136,9 +136,28 @@ describe("lo no respondido se queda en lo prudente", () => {
   const r = propuesta("reforma", { tipos: ["reforma"] });
 
   it("aplica a lo reformado lo que depende de una respuesta", () => {
-    for (const k of ["hs1", "hs3", "hs4", "hs5", "hs6", "si1", "si2", "si3", "si4", "si5", "si6", "sua1", "sua2", "sua3", "sua4", "sua9", "he1", "rebt"] as const) {
+    for (const k of ["hs1", "hs3", "hs4", "hs5", "hs6", "si1", "si2", "si3", "si4", "si5", "si6", "sua1", "sua2", "sua3", "sua4", "sua9", "rebt"] as const) {
       expect(r[k].aplicabilidad, k).toBe("aplica_reformado");
     }
+  });
+
+  it("HE1: sin saber si se renueva más del 25 % de la envolvente, va a HULC con la global", () => {
+    expect(r.he1.aplicabilidad).toBe("externo");
+    expect(r.he1.nota).toContain("elementos de la envolvente");
+    expect(r.he1.nota).toContain("Se justifica con HULC, junto con la verificación energética global.");
+  });
+
+  it("HE1: reforma de la envolvente sin superar el 25 %, por elementos en la app", () => {
+    const f = propuesta("reforma", { ...BANOS, envolvente: ["huecos"] });
+    expect(f.he0he1_global.aplicabilidad).toBe("no_aplica");
+    expect(f.he1.aplicabilidad).toBe("aplica_reformado");
+  });
+
+  it("HE1: reforma de más del 25 % de la envolvente, a HULC con la global", () => {
+    const f = propuesta("reforma", { ...BANOS, envolvente: ["huecos"], envolventeMas25: true });
+    expect(f.he0he1_global.aplicabilidad).toBe("externo");
+    expect(f.he1.aplicabilidad).toBe("externo");
+    expect(f.he1.nota).toContain("25 %");
   });
 
   it("estructura sin responder: DB-SE externo; HE 4 aplica mientras no se precise", () => {
@@ -202,7 +221,7 @@ describe("cambio de uso", () => {
     expect(r.hr.aplicabilidad).toBe("aplica");
     expect(r.hs2.aplicabilidad).toBe("aplica");
     expect(r.hs2.nota).toContain("estudio específico");
-    expect(r.he1.aplicabilidad).toBe("aplica");
+    expect(r.he1.aplicabilidad).toBe("externo");
     expect(r.si3.aplicabilidad).toBe("aplica");
     expect(r.dbse.aplicabilidad).toBe("no_aplica");
   });

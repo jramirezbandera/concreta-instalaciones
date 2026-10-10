@@ -8,6 +8,8 @@ import antes from "./foto-antes.json";
 // proyectos: el Demo y los cuatro casos de El edificio, cada intervención, con
 // y sin piscina. Por justificación: aplicabilidad, estado, veredicto, nota y
 // cita; y la huella del texto entero de la memoria.
+// Regenerada una vez al llevar HE1 a HULC con la verificación global: solo
+// cambiaron la fila de HE1 y la huella de la memoria de los 40 proyectos.
 // =============================================================================
 
 describe("sin asistente de alcance, nada cambia", () => {

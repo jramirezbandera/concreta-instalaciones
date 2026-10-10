@@ -56,10 +56,11 @@ describe("justificacionRegistry — consistencia estructural", () => {
     expect(smoke.route).toBe("_smoke");
   });
 
-  it("externo ⇔ formato 'externo', y externo.destino no vacío", () => {
+  it("externo ⇔ formato 'externo' (salvo HE1), y externo.destino no vacío", () => {
     for (const j of justificacionRegistry) {
       if (j.externo) {
-        expect(j.formato, `formato de ${j.key}`).toBe("externo");
+        // HE1 es un módulo que, con verificación global, va a HULC con ella.
+        if (j.key !== "he1") expect(j.formato, `formato de ${j.key}`).toBe("externo");
         expect(j.externo.destino.length, `destino de ${j.key}`).toBeGreaterThan(0);
       }
       if (j.formato === "externo") {
@@ -73,6 +74,7 @@ describe("justificacionRegistry — consistencia estructural", () => {
 
   it("las externas apuntan a los destinos del reconcept (§3/§10)", () => {
     expect(getJustificacion("he0he1_global")?.externo?.destino).toBe("HULC");
+    expect(getJustificacion("he1")?.externo?.destino).toBe("HULC");
     expect(getJustificacion("dbse")?.externo?.destino).toBe("Concreta estructura");
   });
 });

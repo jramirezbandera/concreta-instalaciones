@@ -328,9 +328,18 @@ const KEYS_EXPEDIENTE: readonly JustificacionKey[] = justificacionRegistry
  *  3. Edificio existente con el asistente respondido → `REGLAS_EXISTENTES`.
  *  4. Resto → `aplica`; en un edificio existente sin asistente, con el aviso de
  *     alcance pendiente.
+ *  5. HE 1 va a HULC si la verificación global se hace allí (`he1SegunGlobal`).
  * Función pura y determinista: mismos atributos ⇒ mismo resultado.
  */
 export function aplicabilidadBase(
+  a: AtributosProyecto,
+): Record<JustificacionKey, AplicabilidadCalculada> {
+  const r = propuestasSinGlobal(a);
+  return { ...r, he1: he1SegunGlobal(r.he1, r.he0he1_global.aplicabilidad) };
+}
+
+/** Pasos 0–4 de `aplicabilidadBase`: HE 1 aún sin mirar la verificación global. */
+function propuestasSinGlobal(
   a: AtributosProyecto,
 ): Record<JustificacionKey, AplicabilidadCalculada> {
   const resultado = {} as Record<JustificacionKey, AplicabilidadCalculada>;
@@ -381,6 +390,24 @@ export function aplicabilidadBase(
 }
 
 /**
+ * HE 1 por elementos (el módulo de la app) solo cuando no hay verificación
+ * energética global: es la reforma que no renueva más del 25 % de la envolvente.
+ * Si la global se hace en HULC (obra nueva, ampliación, cambio de uso, reforma
+ * de más del 25 %), HULC justifica también la envolvente elemento a elemento, y
+ * HE 1 va con ella. El proyectista puede forzar que se aplique aquí.
+ */
+function he1SegunGlobal(he1: AplicabilidadCalculada, global: Aplicabilidad): AplicabilidadCalculada {
+  if (global !== "externo" || he1.aplicabilidad === "no_aplica") return he1;
+  const destino = justificacionRegistry.find((j) => j.key === "he1")?.externo?.destino ?? "HULC";
+  const conGlobal = `Se justifica con ${destino}, junto con la verificación energética global.`;
+  return {
+    aplicabilidad: "externo",
+    nota: he1.nota && he1.nota !== NOTA_ALCANCE_PENDIENTE ? `${he1.nota} ${conGlobal}` : conGlobal,
+    cita: he1.cita && he1.cita !== CITA_PARTE_I ? he1.cita : "DB-HE1",
+  };
+}
+
+/**
  * Aplicabilidad EFECTIVA de una justificación en un proyecto: si el proyectista
  * la forzó (`aplicabilidadForzada`) prevalece su valor con su nota (la
  * herramienta propone, el proyectista dispone); si no, la propuesta del motor.
@@ -399,5 +426,9 @@ export function aplicabilidadEfectiva(
 /** Lo que propone el motor para una justificación, se haya forzado o no. */
 export function aplicabilidadPropuesta(p: Proyecto, key: JustificacionKey): AplicabilidadCalculada {
   const he4 = p.justificaciones.he4?.inputs as Partial<He4Estado> | undefined;
-  return aplicabilidadBase(atributosDe(p.datosGenerales, p.edificio, he4, p.justificaciones))[key];
+  const base = propuestasSinGlobal(atributosDe(p.datosGenerales, p.edificio, he4, p.justificaciones));
+  if (key !== "he1") return base[key];
+  // HE 1 sigue a la verificación global efectiva, también si el proyectista la forzó.
+  const global = p.justificaciones.he0he1_global?.aplicabilidadForzada?.valor ?? base.he0he1_global.aplicabilidad;
+  return he1SegunGlobal(base.he1, global);
 }

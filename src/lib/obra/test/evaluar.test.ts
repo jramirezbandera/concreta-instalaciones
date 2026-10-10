@@ -26,7 +26,8 @@ describe("evaluarExpediente — el Demo", () => {
     expect(ev.hs4!.estado).toBe("revisar");
     expect(ev.hs5!.estado).toBe("revisar");
     expect(ev.hs6!.estado).toBe("revisar");
-    expect(ev.he1!.estado).toBe("cumple");
+    // Obra nueva: HE1 va a HULC con la verificación global.
+    expect(ev.he1!.estado).toBe("externo");
     expect(ev.sua6!.estado).toBe("no_aplica");
     expect(ev.he0he1_global!.estado).toBe("externo");
     // HS1 (feature-17): cumple, con el clima supuesto por revisar.

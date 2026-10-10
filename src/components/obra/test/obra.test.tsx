@@ -40,7 +40,7 @@ afterEach(() => {
 describe("Lo que se justifica", () => {
   it("el recuento y las filas con su estado, enlazadas al módulo", () => {
     montar(<LoQueSeJustifica />);
-    expect(screen.getByText("6 cumple · 19 por revisar · 2 no aplica · 2 externo")).toBeInTheDocument();
+    expect(screen.getByText("5 cumple · 19 por revisar · 2 no aplica · 3 externo")).toBeInTheDocument();
     const hs5 = screen.getByRole("link", { name: /HS5.*Evacuación de aguas/ });
     expect(hs5).toHaveAttribute("href", "/hs/saneamiento");
     expect(within(hs5).getByText("revisar")).toBeInTheDocument();
@@ -63,8 +63,12 @@ describe("Lo que se justifica", () => {
     const user = userEvent.setup();
     vi.spyOn(window, "prompt").mockReturnValue("EXP-HULC-7");
     montar(<LoQueSeJustifica />);
-    await user.click(screen.getByRole("button", { name: "HULC · adjuntar documento" }));
+    // En obra nueva van a HULC HE1 y, tras ella, la verificación global (HE0).
+    const hulc = screen.getAllByRole("button", { name: "HULC · adjuntar documento" });
+    expect(hulc).toHaveLength(2);
+    await user.click(hulc[1]);
     expect(await screen.findByRole("button", { name: "HULC · EXP-HULC-7" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "HULC · adjuntar documento" })).toHaveLength(1);
   });
 
   describe("menú ⋯ de aplicabilidad", () => {
@@ -204,15 +208,15 @@ describe("Antes de entregar", () => {
 describe("Lo que se entrega", () => {
   it("el recuento de cada entregable", () => {
     montar(<LoQueSeEntrega />);
-    expect(screen.getByText("27 apartados")).toBeInTheDocument();
-    expect(screen.getByText("25 fichas")).toBeInTheDocument();
+    expect(screen.getByText("26 apartados")).toBeInTheDocument();
+    expect(screen.getByText("24 fichas")).toBeInTheDocument();
     expect(screen.getByText("2 esquemas")).toBeInTheDocument();
   });
 
   it("con algo que no cumple, lo nombra y no lo cuenta", () => {
     const p = demo();
     montar(<LoQueSeEntrega />, { ...p, datosGenerales: { ...p.datosGenerales, presionAcometida_kPa: 60 } });
-    expect(screen.getByText("26 de 27 apartados")).toBeInTheDocument();
+    expect(screen.getByText("25 de 26 apartados")).toBeInTheDocument();
     expect(screen.getAllByText("HS4 no cumple")).toHaveLength(3);
     expect(screen.getByText("1 de 2 esquemas")).toBeInTheDocument();
   });

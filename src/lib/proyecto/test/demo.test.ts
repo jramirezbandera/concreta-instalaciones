@@ -108,11 +108,12 @@ describe("crearProyectoDemo — el estado calculado coincide con el motor (featu
     // Cumple sin nada por revisar: la envolvente propuesta y el clima de Cáceres.
     expect(r.veredicto).toBe("ok");
     expect(r.avisos).toEqual([]);
-    expect(estadoDe(p, "he1").veredicto).toBe("ok");
+    // En obra nueva La obra la lleva a HULC con la verificación global.
+    expect(estadoDe(p, "he1").aplicabilidad).toBe("externo");
   });
 
-  it("los 5 veredictos calculados son 'ok' o 'warn' (el Demo se ve en verde/ámbar)", () => {
-    for (const clave of CLAVES_DEMO) {
+  it("los veredictos calculados son 'ok' o 'warn' (el Demo se ve en verde/ámbar)", () => {
+    for (const clave of CLAVES_DEMO.filter((c) => c !== "he1")) {
       expect(["ok", "warn"], `veredicto de ${clave}`).toContain(estadoDe(p, clave).veredicto);
     }
   });

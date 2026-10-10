@@ -43,7 +43,13 @@ describe("filasObra — el Demo", () => {
       { texto: "local · previsión", acento: true },
     ]);
     expect(textos(fila(p, "hs3"))).toEqual(["6 viviendas", "garaje", "trasteros", "local → RITE"]);
-    expect(textos(fila(p, "he1"))).toEqual(["fachada", "cubierta", "forjado sobre el local", "ventanas"]);
+    // HE1 va a HULC en obra nueva; forzada a «aplica», el módulo con sus partes.
+    expect(fila(p, "he1")).toMatchObject({ estado: "externo", destino: "HULC" });
+    expect(fila(p, "he1").ruta).toBeUndefined();
+    const he1 = { ...p.justificaciones.he1!, aplicabilidadForzada: { valor: "aplica" as const } };
+    const conHe1: Proyecto = { ...p, justificaciones: { ...p.justificaciones, he1 } };
+    expect(fila(conHe1, "he1")).toMatchObject({ estado: "cumple", ruta: "he/envolvente" });
+    expect(textos(fila(conHe1, "he1"))).toEqual(["fachada", "cubierta", "forjado sobre el local", "ventanas"]);
     expect(fila(p, "hs5").frase).toMatch(/^Residuales y pluviales/);
   });
 
@@ -150,8 +156,8 @@ describe("piezasDeQueEntra", () => {
 describe("recuento", () => {
   it("una a una, no por filas", () => {
     const r = recuentoObra(demo());
-    expect(r).toMatchObject({ cumple: 6, revisar: 19, no_cumple: 0, no_aplica: 2, externo: 2, pronto: 0 });
-    expect(textoRecuento(r)).toBe("6 cumple · 19 por revisar · 2 no aplica · 2 externo");
+    expect(r).toMatchObject({ cumple: 5, revisar: 19, no_cumple: 0, no_aplica: 2, externo: 3, pronto: 0 });
+    expect(textoRecuento(r)).toBe("5 cumple · 19 por revisar · 2 no aplica · 3 externo");
   });
 
   it("rotuloGrupo", () => {

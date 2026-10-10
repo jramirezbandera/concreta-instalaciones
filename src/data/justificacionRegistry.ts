@@ -345,6 +345,9 @@ export const justificacionRegistry: JustificacionEntry[] = [
     edicionDB: "DB-HE 2019 (consolidado 2022)",
     formato: "calculo",
     shipped: true,
+    // El módulo justifica por elementos (reformas de ≤ 25 % de la envolvente);
+    // con verificación global, HE 1 va con ella a HULC (aplicabilidad.ts).
+    externo: { destino: "HULC" },
     route: "he/envolvente",
     icon: Thermometer,
     schemaVersion: "1",

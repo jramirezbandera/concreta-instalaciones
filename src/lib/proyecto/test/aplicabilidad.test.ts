@@ -157,11 +157,19 @@ describe("aplicabilidadBase — reglas de atributos (obra nueva)", () => {
     expect(aplicabilidadBase(dg()).hr.aplicabilidad).toBe("aplica");
   });
 
-  it("obra nueva colectiva completa: el resto queda aplica sin nota (hs4, si3, he1…)", () => {
+  it("obra nueva colectiva completa: el resto queda aplica sin nota (hs4, si3…)", () => {
     const base = aplicabilidadBase(dg());
-    for (const key of ["hs3", "hs4", "hs5", "hs6", "he1", "si3", "sua1", "rebt"] as const) {
+    for (const key of ["hs3", "hs4", "hs5", "hs6", "si3", "sua1", "rebt"] as const) {
       expect(base[key]).toEqual({ aplicabilidad: "aplica" });
     }
+  });
+
+  it("obra nueva: HE1 va a HULC con la verificación global", () => {
+    expect(aplicabilidadBase(dg()).he1).toEqual({
+      aplicabilidad: "externo",
+      nota: "Se justifica con HULC, junto con la verificación energética global.",
+      cita: "DB-HE1",
+    });
   });
 });
 
@@ -236,6 +244,14 @@ describe("aplicabilidadEfectiva — el proyectista dispone", () => {
     expect(r.aplicabilidad).toBe("no_aplica");
     expect(r.forzada).toBe(true);
     expect(r.nota).toBe("La instalación de fontanería no se modifica.");
+  });
+
+  it("HE1 sigue a la verificación global forzada: sin ella, por elementos en la app", () => {
+    expect(aplicabilidadEfectiva(proyecto(), "he1").aplicabilidad).toBe("externo");
+    const p = proyecto({}, {
+      he0he1_global: { aplicabilidadForzada: { valor: "no_aplica", nota: "Sin verificación global." } },
+    });
+    expect(aplicabilidadEfectiva(p, "he1")).toEqual({ aplicabilidad: "aplica", forzada: false });
   });
 
   it("forzado sin nota ⇒ valor forzado con nota undefined", () => {

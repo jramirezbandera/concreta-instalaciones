@@ -61,10 +61,11 @@ afterEach(() => {
 /**
  * Los módulos publicados que aplican al Demo, ordenados por clave (feature-19 añade
  * SI1 a SI6; feature-20, las SUA salvo SUA5 y SUA6, que no le aplican; feature-21, HS2;
- * feature-22, HE4 y HE5; feature-23, el REBT; feature-25, HR).
+ * feature-22, HE4 y HE5; feature-23, el REBT; feature-25, HR). HE1 no: en obra
+ * nueva va a HULC con la verificación global.
  */
 const PUBLICADAS = [
-  "he1", "he4", "he5", "he6", "hr", "hs1", "hs2", "hs3", "hs4", "hs5", "hs6", "rebt", "si1", "si2", "si3", "si4", "si5", "si6",
+  "he4", "he5", "he6", "hr", "hs1", "hs2", "hs3", "hs4", "hs5", "hs6", "rebt", "si1", "si2", "si3", "si4", "si5", "si6",
   "sua1", "sua2", "sua3", "sua4", "sua7", "sua8", "sua9",
 ];
 
