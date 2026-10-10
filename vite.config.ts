@@ -53,7 +53,7 @@ export default defineConfig(({ mode }) => {
         registerType: "prompt", // prompt user before SW update (show toast + "Actualizar")
         devOptions: { enabled: false }, // preserve Vite HMR in dev
         workbox: {
-          globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico}"],
+          globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico,webp}"],
           runtimeCaching: [], // offline-first: the whole app-shell is precached
           // Los SDK de IA y pdf.js no se precachean: sin red no hay lectura con
           // IA, así que tenerlos en caché no sirve de nada y engordaría el SW.

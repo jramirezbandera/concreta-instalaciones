@@ -112,6 +112,23 @@ describe("Nuevo proyecto", () => {
 
     await user.type(await screen.findByLabelText("Nombre del proyecto"), "Oficinas Norte");
     await user.selectOptions(screen.getByLabelText("Provincia"), "Madrid");
+    // La zona de radón sale del municipio (Apéndice B del DB-HS6): Alcobendas, zona I…
+    await user.type(screen.getByRole("combobox", { name: "Municipio" }), "Alcobendas");
+    const radon = screen.getByRole("combobox", { name: /Zona de radón/ });
+    expect(radon).toHaveValue("I");
+    expect(screen.getByText(/Del Apéndice B del DB-HS6: Alcobendas figura en zona I\./)).toBeInTheDocument();
+    // …y si se cambia a mano, se avisa de que no casa con el listado.
+    await user.selectOptions(radon, "II");
+    await user.click(screen.getByRole("button", { name: "usar la del listado" }));
+    expect(radon).toHaveValue("I");
+
+    // Las zonas que el CTE solo da en mapa abren su figura al momento.
+    await user.click(screen.getByRole("button", { name: /Ver el mapa: Zonas eólicas/ }));
+    const dialogo = screen.getByRole("dialog", { name: /Zonas eólicas/ });
+    expect(dialogo.querySelector("img")?.getAttribute("src")).toMatch(/mapas\/hs1-fig2-5\.webp$/);
+    await user.click(screen.getByRole("button", { name: "Cerrar el mapa" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
     await user.click(screen.getByLabelText("Oficinas"));
     await user.click(screen.getByRole("button", { name: "Crear proyecto" }));
 
@@ -119,5 +136,7 @@ describe("Nuevo proyecto", () => {
     expect(window.location.hash).toMatch(/\/edificio$/);
     const creado = listarProyectos().find((p) => p.nombre === "Oficinas Norte");
     expect(creado?.edificio).toEqual(edificioDeCaso("oficinas"));
+    expect(creado?.datosGenerales.zonaRadon).toBe("I");
+    expect(creado?.datosGenerales.municipio).toBe("Alcobendas");
   });
 });

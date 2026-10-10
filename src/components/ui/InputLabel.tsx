@@ -41,6 +41,10 @@ interface FieldProps {
   unit?: string;
   /** Aviso inline (validación / advertencia normativa). */
   warning?: string;
+  /** Acción compacta tras la etiqueta (p. ej. el botón del mapa normativo). */
+  accion?: ReactNode;
+  /** Control ancho (w-52; w-40 en móvil) para selects con opciones largas; por defecto w-32. */
+  ancho?: boolean;
   children: ReactNode;
 }
 
@@ -48,12 +52,15 @@ interface FieldProps {
  * Fila densa de formulario (label-izq / control-der + unidad), al estilo del
  * panel de inputs del hermano. Feedback inmediato; sin botón "calcular".
  */
-export function Field({ id, label, sub, help, refText, unit, warning, children }: FieldProps) {
+export function Field({ id, label, sub, help, refText, unit, warning, accion, ancho, children }: FieldProps) {
   return (
     <div className="py-1">
       <div className="flex items-center justify-between gap-3">
-        <InputLabel htmlFor={id} label={label} sub={sub} help={help} refText={refText} />
-        <div className="flex w-32 shrink-0 items-center gap-1.5">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <InputLabel htmlFor={id} label={label} sub={sub} help={help} refText={refText} />
+          {accion}
+        </span>
+        <div className={`flex ${ancho ? "w-40 sm:w-52" : "w-32"} shrink-0 items-center gap-1.5`}>
           <div className="flex-1">{children}</div>
           {unit && <span className="text-text-disabled w-8 shrink-0 text-[11px]">{unit}</span>}
         </div>

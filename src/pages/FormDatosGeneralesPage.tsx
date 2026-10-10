@@ -28,7 +28,10 @@ import { Field, InputLabel, NumberInput, SelectInput } from "../components/ui/In
 import { AsistenteAlcance } from "../components/proyecto/AsistenteAlcance";
 import { obraDeCaso } from "../lib/proyecto/alcance";
 import { SelectorMunicipio } from "../components/proyecto/SelectorMunicipio";
+import { BotonMapa, EnlaceVisor } from "../components/proyecto/MapaNormativo";
+import { Map as MapaIcon } from "lucide-react";
 import { PROVINCIAS, altitudCapitalDe, limiteTramoCercano } from "../data/zonasClimaticasHE";
+import { zonaRadonDeIne } from "../data/radonHS6";
 import { derivarContexto } from "../lib/proyecto/derivar";
 import { CASOS_EDIFICIO, edificioDeCaso, type CasoEdificio } from "../lib/edificio/casos";
 import { ProyectoContext } from "../lib/proyecto/ProyectoContext";
@@ -94,7 +97,7 @@ const NG_OPTIONS: { value: string; label: string }[] = [
 
 /** Ld de los mapas de ruido, de 5 en 5 dBA: el límite superior de cada banda (HR, tabla 2.1). */
 const LD_OPTIONS: { value: string; label: string }[] = [
-  { value: "", label: "— Sin datos oficiales (60 dBA) —" },
+  { value: "", label: "— Sin datos (60 dBA) —" },
   ...[50, 55, 60, 65, 70, 75, 80].map((v) => ({ value: String(v), label: `${v} dBA` })),
 ];
 
@@ -125,6 +128,9 @@ const PROVINCIA_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "— Selecciona —" },
   ...PROVINCIAS.map((prov) => ({ value: prov, label: prov })),
 ];
+
+/** Visor oficial de los mapas estratégicos de ruido (MITECO / CEDEX). */
+const SICA_URL = "https://sicaweb.cedex.es/";
 
 /** Defaults del modo crear. */
 function datosGeneralesIniciales(): DatosGenerales {
@@ -242,6 +248,46 @@ function FilaDerivado(props: { etiqueta: string; valor: string; procedencia: str
   );
 }
 
+/** De dónde sale la zona de radón, o aviso si no casa con el Apéndice B. */
+function NotaRadon(props: {
+  municipio: string;
+  apendice: ZonaRadon | null;
+  elegida: ZonaRadon;
+  onUsar: (z: ZonaRadon) => void;
+}): JSX.Element {
+  const { municipio, apendice, elegida, onUsar } = props;
+  if (apendice === null) {
+    return (
+      <p className="text-text-disabled mb-1 text-[11px] leading-snug">
+        Elige el municipio y se toma del Apéndice B del DB-HS6.
+      </p>
+    );
+  }
+  const dice =
+    apendice === "sin_exigencia"
+      ? `${municipio} no figura en el listado: sin exigencia`
+      : `${municipio} figura en zona ${apendice}`;
+  if (apendice === elegida) {
+    return (
+      <p className="text-text-disabled mb-1 text-[11px] leading-snug">
+        Del Apéndice B del DB-HS6: {dice}.
+      </p>
+    );
+  }
+  return (
+    <p role="note" className="text-state-warn mb-1 text-[11px] leading-snug">
+      No coincide con el Apéndice B del DB-HS6: {dice}.{" "}
+      <button
+        type="button"
+        onClick={() => onUsar(apendice)}
+        className="text-accent hover:text-accent-hover font-medium underline"
+      >
+        usar la del listado
+      </button>
+    </p>
+  );
+}
+
 // -----------------------------------------------------------------------------
 // Página
 // -----------------------------------------------------------------------------
@@ -322,6 +368,27 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
     setDg((prev) => ({ ...prev, [k]: v }));
   }
 
+  function onMunicipio(c: { municipio: string; municipioIne?: string }): void {
+    // La zona de radón SÍ se escribe sola: la fija el propio DB-HS6 por
+    // municipio (Apéndice B), no una fuente orientativa como la altitud.
+    const radon = zonaRadonDeIne(c.municipioIne);
+    setDg((prev) => ({
+      ...prev,
+      municipio: c.municipio,
+      municipioIne: c.municipioIne,
+      ...(radon !== null ? { zonaRadon: radon } : {}),
+    }));
+    // Solo hay altitud verificada para las capitales de provincia
+    // (`altitudCapital_m`, la de la tabla a-Anejo G). Y aun esa se OFRECE, no se
+    // escribe: el DB-HE pide la cota del emplazamiento.
+    const cap = altitudCapitalDe(dg.provincia);
+    setSugerencia(
+      cap !== null && clave(c.municipio) === clave(cap.capital)
+        ? { municipio: cap.capital, altitud_m: cap.altitud_m }
+        : null,
+    );
+  }
+
   // Borrador textual de la cota del alcantarillado (mismo motivo que la presión).
   const [cotaTxt, setCotaTxt] = useState<string>(() => {
     const c = modo === "editar" && ctx !== null ? ctx.proyecto.datosGenerales.cotaAlcantarillado_m : undefined;
@@ -398,6 +465,10 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
 
   const errores = useMemo(() => validar(dg, nombre), [dg, nombre]);
 
+  // Zona de radón que da el Apéndice B del DB-HS6 para el municipio elegido
+  // (null sin municipio del listado INE). Si el valor guardado no coincide, se avisa.
+  const radonApendice = useMemo(() => zonaRadonDeIne(dg.municipioIne), [dg.municipioIne]);
+
   // ¿La altitud roza un límite de tramo del Anejo B? (feature-9) Es el aviso que
   // de verdad protege: la zona climática salta de golpe en cotas concretas.
   const limiteCercano = useMemo(
@@ -431,499 +502,519 @@ export function FormDatosGeneralesPage({ modo }: { modo: "crear" | "editar" }): 
 
   return (
     <div className="bg-bg-primary h-full min-h-0 overflow-y-auto">
-      <form
-        onSubmit={onSubmit}
-        noValidate
-        className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start lg:gap-8"
-      >
-        <div className="min-w-0 flex-1">
+      <form onSubmit={onSubmit} noValidate className="mx-auto flex w-full max-w-6xl flex-col px-4 pt-6 lg:px-8">
+        <header className="mb-4 max-w-3xl">
           <h1 className="text-text-primary mb-1 text-lg font-semibold">
             {modo === "crear" ? "Nuevo proyecto" : "Datos de la obra"}
           </h1>
-          <p className="text-text-disabled mb-4 text-[12px] leading-snug">
+          <p className="text-text-disabled text-[12px] leading-snug">
             Emplazamiento, intervención y suministro: se rellenan una vez y de ellos se deriva el
             contexto que heredan todas las justificaciones. El edificio se describe en su propia
             pantalla.
           </p>
+        </header>
 
-          <CollapsibleSection label="Identificación">
-            <div className="py-1">
-              <InputLabel htmlFor="dg-nombre" label="Nombre del proyecto" />
-              <input
-                id="dg-nombre"
-                type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="p. ej. 12 viviendas en c/ Mayor"
-                autoFocus={modo === "crear"}
-                className={`${INPUT_CLS} mt-1`}
-              />
-              {avisoDe(errores, "nombre") !== undefined && (
-                <p className="text-state-warn mt-0.5 text-[11px]">{avisoDe(errores, "nombre")}</p>
-              )}
-            </div>
-            {/* La provincia va PRIMERO: filtra el listado de municipios. */}
-            <Field
-              id="dg-provincia"
-              label="Provincia"
-              help="Provincia/ciudad autónoma del emplazamiento (Tabla a-Anejo B del DB-HE). Junto con la altitud determina la zona climática y la zona térmica HS3."
-              refText="DB-HE Anejo B"
-              warning={avisoDe(errores, "provincia")}
-            >
-              <SelectInput<string>
-                id="dg-provincia"
-                value={dg.provincia}
-                options={PROVINCIA_OPTIONS}
-                onChange={(v) => {
-                  // Cambiar de provincia invalida el municipio elegido (y su
-                  // código INE): pertenecen a la provincia anterior.
-                  setDg((prev) => ({
-                    ...prev,
-                    provincia: v,
-                    municipio: "",
-                    municipioIne: undefined,
-                  }));
-                }}
-              />
-            </Field>
-            <Field
-              id="dg-municipio"
-              label="Municipio"
-              help="Se elige del listado oficial (INE) de la provincia. El código INE es lo que permite cruzar el municipio con las tablas que clasifican por municipio; escrito a mano no serviría."
-            >
-              <SelectorMunicipio
-                provincia={dg.provincia}
-                municipio={dg.municipio}
-                onChange={(c) => {
-                  setDg((prev) => ({
-                    ...prev,
-                    municipio: c.municipio,
-                    municipioIne: c.municipioIne,
-                  }));
-                  // Solo hay altitud verificada para las capitales de provincia
-                  // (`altitudCapital_m`, la de la tabla a-Anejo G). Y aun esa se OFRECE, no se
-                  // escribe: el DB-HE pide la cota del emplazamiento.
-                  const cap = altitudCapitalDe(dg.provincia);
-                  setSugerencia(
-                    cap !== null && clave(c.municipio) === clave(cap.capital)
-                      ? { municipio: cap.capital, altitud_m: cap.altitud_m }
-                      : null,
-                  );
-                }}
-              />
-            </Field>
-            <Field
-              id="dg-altitud"
-              label="Altitud"
-              unit="m"
-              help="Altitud del EMPLAZAMIENTO sobre el nivel del mar. Corrige la zona climática de la capital por tramos (Tabla a-Anejo B). Al elegir municipio se propone la altitud de su núcleo: corrígela si tu parcela está a otra cota."
-              refText="DB-HE Anejo B"
-              warning={avisoDe(errores, "altitud")}
-            >
-              <NumberInput
-                id="dg-altitud"
-                value={dg.altitud_m}
-                min={0}
-                max={3500}
-                onChange={(v) => {
-                  set("altitud_m", v);
-                  setSugerencia(null); // el usuario toma el mando
-                }}
-              />
-            </Field>
-
-            {/* Sugerencia de altitud: se OFRECE, no se aplica sola. */}
-            {sugerencia !== null && sugerencia.altitud_m !== dg.altitud_m && (
-              <p className="text-text-secondary -mt-1 text-[11px] leading-snug">
-                {sugerencia.municipio} figura a{" "}
-                <span className="text-text-primary font-mono">{sugerencia.altitud_m} m</span>{" "}
-                (altitud del núcleo, orientativa){" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    set("altitud_m", sugerencia.altitud_m);
-                    setSugerencia(null);
-                  }}
-                  className="text-accent hover:text-accent-hover font-medium underline"
-                >
-                  usar este valor
-                </button>
-                . El DB-HE exige la altitud del emplazamiento: compruébala si tu parcela
-                está a otra cota.
-              </p>
-            )}
-
-            {/* Aviso de borde de tramo: unos metros cambian la zona climática. */}
-            {limiteCercano !== null && (
-              <p role="note" className="text-state-warn -mt-1 text-[11px] leading-snug">
-                Ojo: {dg.altitud_m} m está muy cerca del límite de tramo de{" "}
-                <span className="font-mono">{limiteCercano.limite_m} m</span> del Anejo B
-                (por debajo {limiteCercano.zonaDebajo}, por encima {limiteCercano.zonaEncima}).
-                Confirma la cota real del emplazamiento: unos metros cambian la zona
-                climática y con ella la transmitancia límite exigida.
-              </p>
-            )}
-          </CollapsibleSection>
-
-          {modo === "crear" && (
-            <CollapsibleSection label="El edificio">
-              <fieldset className="py-1">
-                <legend className="text-text-secondary mb-1.5 text-[12px]">
-                  Partir de un caso
-                </legend>
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  {CASOS_EDIFICIO.map((c) => (
-                    <label
-                      key={c.key}
-                      className={[
-                        "flex cursor-pointer items-center gap-2 rounded border px-2.5 py-2 text-[13px] transition-colors",
-                        caso === c.key
-                          ? "border-accent bg-tint-accent text-text-primary"
-                          : "border-border-main text-text-secondary hover:border-text-disabled",
-                      ].join(" ")}
-                    >
-                      <input
-                        type="radio"
-                        name="dg-caso"
-                        value={c.key}
-                        checked={caso === c.key}
-                        onChange={() => elegirCaso(c.key)}
-                        className="accent-accent"
-                      />
-                      {c.etiqueta}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <p className="text-text-disabled mb-1 text-[11px] leading-snug">
-                Al crear el proyecto se abre El edificio con este caso: plantas, zonas y
-                viviendas tipo se ajustan allí.
-              </p>
-            </CollapsibleSection>
-          )}
-
-          <CollapsibleSection label="Intervención" refNorma="CTE Parte I art. 2">
-            <Field id="dg-intervencion" label="Tipo de intervención">
-              <SelectInput<Intervencion>
-                id="dg-intervencion"
-                value={dg.intervencion}
-                options={INTERVENCION_OPTIONS}
-                onChange={onIntervencion}
-              />
-            </Field>
-            {dg.intervencion !== "obra_nueva" && (
-              <AsistenteAlcance
-                dg={dg}
-                edificio={edificio}
-                justificaciones={modo === "editar" ? ctx?.proyecto.justificaciones : undefined}
-                onChange={(alcance) => set("alcance", alcance)}
-              />
-            )}
-            <CheckRow
-              id="dg-piscina"
-              label="Piscina"
-              help="Márcalo si hay piscina, sea de uso colectivo o privada de una unifamiliar. El ámbito de SUA6 se limita a las colectivas y deja fuera las de vivienda unifamiliar: esa distinción la hace el motor, y en unifamiliar redacta el «no aplica» por ese motivo. Sin marcar, el anejo afirmaría que no hay piscina."
-              refText="DB-SUA 6, ámbito de aplicación"
-              checked={dg.tienePiscina}
-              onChange={(v) => set("tienePiscina", v)}
-            />
-          </CollapsibleSection>
-
-          <CollapsibleSection label="Emplazamiento normativo" refNorma="DB-HS6 y DB-HS5, apéndices B">
-            <Field
-              id="dg-zona-radon"
-              label="Zona de radón"
-              help="Zona de radón del municipio. Es una ENTRADA MANUAL: la consulta el proyectista en el Apéndice B del DB-HS6 (no se embebe el listado de municipios)."
-              refText="DB-HS6 Apéndice B"
-            >
-              <SelectInput<ZonaRadon>
-                id="dg-zona-radon"
-                value={dg.zonaRadon}
-                options={ZONA_RADON_OPTIONS}
-                onChange={(v) => set("zonaRadon", v)}
-              />
-            </Field>
-            <p className="text-text-disabled mb-1 text-[11px] leading-snug">
-              Apéndice B del DB-HS6 — consúltalo para tu municipio.
-            </p>
-            <Field
-              id="dg-zona-pluviometrica"
-              label="Zona pluviométrica"
-              sub="(HS5, opcional)"
-              help="Zona A o B del mapa de la Figura B.1 del DB-HS5. Es una ENTRADA MANUAL: el DB solo da el mapa. Sin ella, HS5 calcula los pluviales con 100 mm/h y lo avisa."
-              refText="DB-HS5 Apéndice B, Figura B.1"
-            >
-              <SelectInput<"" | ZonaPluviometrica>
-                id="dg-zona-pluviometrica"
-                value={dg.pluviometria?.zona ?? ""}
-                options={ZONA_PLUVIOMETRICA_OPTIONS}
-                onChange={onZonaPluviometrica}
-              />
-            </Field>
-            {dg.pluviometria && (
+        {/* Dos columnas en escritorio: a la izquierda lo que identifica la obra
+            (y el contexto que de ello se deriva); a la derecha las zonas que se
+            leen en los mapas del CTE y el terreno. En móvil, una sola columna. */}
+        <div className="grid grid-cols-1 gap-x-12 lg:grid-cols-2">
+          <div className="min-w-0">
+            <CollapsibleSection label="Identificación y emplazamiento" refNorma="DB-HE Anejo B">
+              <div className="py-1">
+                <InputLabel htmlFor="dg-nombre" label="Nombre del proyecto" />
+                <input
+                  id="dg-nombre"
+                  type="text"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  placeholder="p. ej. 12 viviendas en c/ Mayor"
+                  autoFocus={modo === "crear"}
+                  className={`${INPUT_CLS} mt-1`}
+                />
+                {avisoDe(errores, "nombre") !== undefined && (
+                  <p className="text-state-warn mt-0.5 text-[11px]">{avisoDe(errores, "nombre")}</p>
+                )}
+              </div>
+              {/* La provincia va PRIMERO: filtra el listado de municipios. */}
               <Field
-                id="dg-isoyeta"
-                label="Isoyeta"
-                help="La isoyeta del mapa de la Figura B.1 que pasa por el municipio."
-                refText="DB-HS5 Apéndice B, Tabla B.1"
+                id="dg-provincia"
+                label="Provincia"
+                ancho
+                help="Provincia/ciudad autónoma del emplazamiento (Tabla a-Anejo B del DB-HE). Junto con la altitud determina la zona climática y la zona térmica HS3."
+                refText="DB-HE Anejo B"
+                warning={avisoDe(errores, "provincia")}
               >
                 <SelectInput<string>
-                  id="dg-isoyeta"
-                  value={String(dg.pluviometria.isoyeta)}
-                  options={ISOYETA_OPTIONS}
-                  onChange={onIsoyeta}
+                  id="dg-provincia"
+                  value={dg.provincia}
+                  options={PROVINCIA_OPTIONS}
+                  onChange={(v) => {
+                    // Cambiar de provincia invalida el municipio elegido (y su
+                    // código INE): pertenecen a la provincia anterior.
+                    setDg((prev) => ({
+                      ...prev,
+                      provincia: v,
+                      municipio: "",
+                      municipioIne: undefined,
+                    }));
+                  }}
                 />
               </Field>
-            )}
-            {dg.pluviometria && (
-              <p className="text-text-disabled mb-1 text-[11px] leading-snug">
-                Intensidad pluviométrica: {intensidadDe(dg.pluviometria.zona, dg.pluviometria.isoyeta)} mm/h
-                (Tabla B.1).
-              </p>
-            )}
-          </CollapsibleSection>
-
-          <CollapsibleSection label="Clima y terreno" refNorma="DB-HS1, figuras 2.4 y 2.5 · DB-SUA 8, figura 1.1 · estudio geotécnico">
-            <Field
-              id="dg-zona-pluv-hs1"
-              label="Zona pluviométrica"
-              sub="(HS1)"
-              help="Zona I a V del mapa de la figura 2.4 del DB-HS1, por el índice pluviométrico anual. No es la zona A/B de HS5. ENTRADA MANUAL: el DB solo da el mapa. Sin ella, HS1 supone la zona más lluviosa y lo avisa."
-              refText="DB-HS1 2.3.1, figura 2.4"
-            >
-              <SelectInput<"" | ZonaPluviometricaHs1>
-                id="dg-zona-pluv-hs1"
-                value={dg.zonaPluviometricaHs1 ?? ""}
-                options={ZONA_PLUV_HS1_OPTIONS}
-                onChange={(v) => set("zonaPluviometricaHs1", v === "" ? undefined : v)}
-              />
-            </Field>
-            <Field
-              id="dg-zona-eolica"
-              label="Zona eólica"
-              help="Zona A, B o C del mapa de la figura 2.5 del DB-HS1 (velocidad básica del viento). ENTRADA MANUAL. Sin ella, HS1 supone la zona C y lo avisa."
-              refText="DB-HS1 2.3.1, figura 2.5"
-            >
-              <SelectInput<"" | ZonaEolica>
-                id="dg-zona-eolica"
-                value={dg.zonaEolica ?? ""}
-                options={ZONA_EOLICA_OPTIONS}
-                onChange={(v) => set("zonaEolica", v === "" ? undefined : v)}
-              />
-            </Field>
-            <Field
-              id="dg-ng"
-              label="Densidad de impactos Ng"
-              sub="(SUA 8)"
-              help="Densidad de impactos sobre el terreno, leída en el mapa de la figura 1.1 del DB-SUA para el municipio de la obra. ENTRADA MANUAL: el mapa no da un valor por provincia; si el municipio cae sobre una línea o entre dos zonas, toma el mayor. Sin ella, SUA 8 supone 6,00 (el mayor del mapa) y lo avisa si cambia el resultado."
-              refText="DB-SUA 8 ap. 1 pto 3, figura 1.1"
-            >
-              <SelectInput<string>
-                id="dg-ng"
-                value={dg.densidadImpactosNg === undefined ? "" : String(dg.densidadImpactosNg)}
-                options={NG_OPTIONS}
-                onChange={(v) => set("densidadImpactosNg", v === "" ? undefined : Number(v))}
-              />
-            </Field>
-            <Field
-              id="dg-ld"
-              label="Índice de ruido día Ld"
-              sub="(HR)"
-              help="Índice de ruido día de la zona, del mapa estratégico de ruido o de la administración competente. Si el mapa da una banda (65–70), toma su valor superior; si el edificio da a varias calles, el mayor. Sin datos oficiales, HR toma 60 dBA, el valor del DB para las áreas de predominio residencial, y lo avisa: en otras áreas acústicas hay que indicarlo."
-              refText="DB-HR ap. 2.1.1 a) iv, tabla 2.1"
-            >
-              <SelectInput<string>
-                id="dg-ld"
-                value={dg.ldZona === undefined ? "" : String(dg.ldZona)}
-                options={LD_OPTIONS}
-                onChange={(v) => set("ldZona", v === "" ? undefined : Number(v))}
-              />
-            </Field>
-            <CheckRow
-              id="dg-aeronaves"
-              label="Ruido dominante de aeronaves"
-              help="Márcalo si el edificio está en la huella acústica de un aeropuerto según los mapas de ruido: el aislamiento exigido a las fachadas sube 4 dBA y no se puede restar nada por las fachadas a patio."
-              refText="DB-HR ap. 2.1.1 a) iv"
-              checked={dg.aeronaves === true}
-              onChange={(v) => set("aeronaves", v ? true : undefined)}
-            />
-            <Field
-              id="dg-terreno-tipo"
-              label="Entorno del edificio"
-              help="Terreno tipo del DB-SE. I: borde del mar o de un lago con 5 km despejados de agua; II: rural llano sin obstáculos ni arbolado de importancia; III: rural accidentado o llano con obstáculos aislados; IV: zona urbana, industrial o forestal; V: centro de negocios de gran ciudad, con profusión de edificios en altura. Da la clase del entorno de HS1: E0 con I, II o III; E1 con IV o V. Sin él, HS1 supone E0 y lo avisa."
-              refText="DB-HS1 2.3.1 b)"
-            >
-              <SelectInput<"" | TerrenoTipo>
-                id="dg-terreno-tipo"
-                value={dg.terrenoTipo ?? ""}
-                options={TERRENO_TIPO_OPTIONS}
-                onChange={(v) => set("terrenoTipo", v === "" ? undefined : v)}
-              />
-            </Field>
-            <Field
-              id="dg-freatico"
-              label="Nivel freático"
-              help="Del estudio geotécnico: valor medio anual de la profundidad del nivel freático, medida desde la superficie del terreno. Decide la presencia de agua frente a la cara inferior del suelo en contacto con el terreno. Sin él, HS1 supone presencia alta y lo avisa."
-              refText="DB-HS1 2.1.1 pto 2 y Apéndice A"
-            >
-              <SelectInput<"" | NivelFreatico["tipo"]>
-                id="dg-freatico"
-                value={dg.nivelFreatico?.tipo ?? ""}
-                options={FREATICO_OPTIONS}
-                onChange={onFreaticoTipo}
-              />
-            </Field>
-            {dg.nivelFreatico?.tipo === "profundidad" && (
               <Field
-                id="dg-freatico-prof"
-                label="Profundidad bajo la rasante"
+                id="dg-municipio"
+                label="Municipio"
+                ancho
+                help="Se elige del listado oficial (INE) de la provincia. El código INE es lo que permite cruzar el municipio con las tablas que clasifican por municipio; escrito a mano no serviría."
+              >
+                <SelectorMunicipio
+                  provincia={dg.provincia}
+                  municipio={dg.municipio}
+                  onChange={onMunicipio}
+                />
+              </Field>
+              <Field
+                id="dg-altitud"
+                label="Altitud"
                 unit="m"
-                help="Profundidad media anual del nivel freático bajo la superficie del terreno, en positivo."
-                warning={avisoDe(errores, "freático")}
+                help="Altitud del EMPLAZAMIENTO sobre el nivel del mar. Corrige la zona climática de la capital por tramos (Tabla a-Anejo B). Al elegir municipio se propone la altitud de su núcleo: corrígela si tu parcela está a otra cota."
+                refText="DB-HE Anejo B"
+                warning={avisoDe(errores, "altitud")}
+              >
+                <NumberInput
+                  id="dg-altitud"
+                  value={dg.altitud_m}
+                  min={0}
+                  max={3500}
+                  onChange={(v) => {
+                    set("altitud_m", v);
+                    setSugerencia(null); // el usuario toma el mando
+                  }}
+                />
+              </Field>
+
+              {/* Sugerencia de altitud: se OFRECE, no se aplica sola. */}
+              {sugerencia !== null && sugerencia.altitud_m !== dg.altitud_m && (
+                <p className="text-text-secondary text-[11px] leading-snug">
+                  {sugerencia.municipio} figura a{" "}
+                  <span className="text-text-primary font-mono">{sugerencia.altitud_m} m</span>{" "}
+                  (altitud del núcleo, orientativa){" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      set("altitud_m", sugerencia.altitud_m);
+                      setSugerencia(null);
+                    }}
+                    className="text-accent hover:text-accent-hover font-medium underline"
+                  >
+                    usar este valor
+                  </button>
+                  . El DB-HE exige la altitud del emplazamiento: compruébala si tu parcela
+                  está a otra cota.
+                </p>
+              )}
+
+              {/* Aviso de borde de tramo: unos metros cambian la zona climática. */}
+              {limiteCercano !== null && (
+                <p role="note" className="text-state-warn text-[11px] leading-snug">
+                  Ojo: {dg.altitud_m} m está muy cerca del límite de tramo de{" "}
+                  <span className="font-mono">{limiteCercano.limite_m} m</span> del Anejo B
+                  (por debajo {limiteCercano.zonaDebajo}, por encima {limiteCercano.zonaEncima}).
+                  Confirma la cota real del emplazamiento: unos metros cambian la zona
+                  climática y con ella la transmitancia límite exigida.
+                </p>
+              )}
+
+              {/* Contexto derivado en vivo, junto a los datos de los que sale. */}
+              <aside
+                aria-label="Contexto derivado"
+                className="border-border-main bg-bg-surface mt-3 mb-1 rounded border px-4 py-2.5"
+              >
+                <h2 className="text-text-disabled border-border-sub mb-1 border-b pb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
+                  Contexto derivado
+                </h2>
+                {derivados === null ? (
+                  <p className="text-text-secondary py-1.5 text-[12px] leading-snug">
+                    Elige la provincia para derivar la zona climática y la zona térmica.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-3 lg:grid-cols-1">
+                    <FilaDerivado
+                      etiqueta="Zona climática"
+                      valor={derivados.zonaClimatica.valor}
+                      procedencia={derivados.zonaClimatica.procedencia}
+                    />
+                    <FilaDerivado
+                      etiqueta="Zona térmica HS3"
+                      valor={derivados.zonaTermicaHS3.valor}
+                      procedencia={derivados.zonaTermicaHS3.procedencia}
+                    />
+                    <FilaDerivado
+                      etiqueta="Altura de evacuación"
+                      valor={`${derivados.alturaEvacuacion_m.valor} m`}
+                      procedencia={derivados.alturaEvacuacion_m.procedencia}
+                    />
+                  </div>
+                )}
+              </aside>
+            </CollapsibleSection>
+
+            {modo === "crear" && (
+              <CollapsibleSection label="El edificio">
+                <fieldset className="py-1">
+                  <legend className="text-text-secondary mb-1.5 text-[12px]">
+                    Partir de un caso
+                  </legend>
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    {CASOS_EDIFICIO.map((c) => (
+                      <label
+                        key={c.key}
+                        className={[
+                          "flex cursor-pointer items-center gap-2 rounded border px-2.5 py-2 text-[13px] transition-colors",
+                          caso === c.key
+                            ? "border-accent bg-tint-accent text-text-primary"
+                            : "border-border-main text-text-secondary hover:border-text-disabled",
+                        ].join(" ")}
+                      >
+                        <input
+                          type="radio"
+                          name="dg-caso"
+                          value={c.key}
+                          checked={caso === c.key}
+                          onChange={() => elegirCaso(c.key)}
+                          className="accent-accent"
+                        />
+                        {c.etiqueta}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <p className="text-text-disabled mb-1 text-[11px] leading-snug">
+                  Al crear el proyecto se abre El edificio con este caso: plantas, zonas y
+                  viviendas tipo se ajustan allí.
+                </p>
+              </CollapsibleSection>
+            )}
+
+            <CollapsibleSection label="Intervención" refNorma="CTE Parte I art. 2">
+              <Field id="dg-intervencion" label="Tipo de intervención" ancho>
+                <SelectInput<Intervencion>
+                  id="dg-intervencion"
+                  value={dg.intervencion}
+                  options={INTERVENCION_OPTIONS}
+                  onChange={onIntervencion}
+                />
+              </Field>
+              {dg.intervencion !== "obra_nueva" && (
+                <AsistenteAlcance
+                  dg={dg}
+                  edificio={edificio}
+                  justificaciones={modo === "editar" ? ctx?.proyecto.justificaciones : undefined}
+                  onChange={(alcance) => set("alcance", alcance)}
+                />
+              )}
+              <CheckRow
+                id="dg-piscina"
+                label="Piscina"
+                help="Márcalo si hay piscina, sea de uso colectivo o privada de una unifamiliar. El ámbito de SUA6 se limita a las colectivas y deja fuera las de vivienda unifamiliar: esa distinción la hace el motor, y en unifamiliar redacta el «no aplica» por ese motivo. Sin marcar, el anejo afirmaría que no hay piscina."
+                refText="DB-SUA 6, ámbito de aplicación"
+                checked={dg.tienePiscina}
+                onChange={(v) => set("tienePiscina", v)}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection label="Suministro y saneamiento" defaultOpen={false}>
+              <Field
+                id="dg-presion"
+                label="Presión de acometida"
+                sub="(opcional)"
+                unit="kPa"
+                help="Dato de la compañía suministradora. Si se deja vacío, HS4 usa su valor propio."
+                warning={avisoDe(errores, "presión")}
               >
                 <input
-                  id="dg-freatico-prof"
-                  type="text"
+                  id="dg-presion"
+                  type="number"
                   inputMode="decimal"
-                  value={freaticoTxt}
-                  onChange={(e) => onFreaticoProfundidad(e.target.value)}
+                  min={100}
+                  max={1200}
+                  value={presionTxt}
+                  onChange={(e) => onPresionChange(e.target.value)}
                   placeholder="—"
                   className={`${INPUT_CLS} text-right tabular-nums`}
                 />
               </Field>
-            )}
-            {dg.nivelFreatico?.tipo === "no_detectado" && (
               <Field
-                id="dg-reconocimiento"
-                label="Reconocido hasta"
+                id="dg-cota-alcantarillado"
+                label="Cota del alcantarillado"
                 sub="(opcional)"
                 unit="m"
-                help="Hasta dónde llegó el reconocimiento del estudio geotécnico sin encontrar agua. «No se detecta» solo equivale a presencia baja si llegó más hondo que la cara inferior del suelo; si no se indica, HS1 lo avisa."
-                warning={avisoDe(errores, "reconocimiento")}
+                help="Cota de la red de alcantarillado en el punto de acometida, respecto a la rasante (negativa si está por debajo, p. ej. −1,20). Decide si un sótano evacua por bombeo. Si se deja vacía, HS5 supone que los sótanos quedan por debajo y lo avisa."
+                warning={avisoDe(errores, "alcantarillado")}
               >
                 <input
-                  id="dg-reconocimiento"
+                  id="dg-cota-alcantarillado"
                   type="text"
                   inputMode="decimal"
-                  value={reconocimientoTxt}
-                  onChange={(e) => onReconocimiento(e.target.value)}
+                  value={cotaTxt}
+                  onChange={(e) => onCotaChange(e.target.value)}
                   placeholder="—"
                   className={`${INPUT_CLS} text-right tabular-nums`}
                 />
               </Field>
-            )}
-            <Field
-              id="dg-ks"
-              label="Permeabilidad del terreno"
-              help="Coeficiente de permeabilidad Ks del estudio geotécnico, por las columnas de la tabla 2.1 del DB-HS1."
-              refText="DB-HS1 tablas 2.1 y 2.3"
-            >
-              <SelectInput<"" | ClaseKs>
+            </CollapsibleSection>
+          </div>
+
+          <div className="min-w-0">
+            <CollapsibleSection label="Zonas del emplazamiento" refNorma="DB-HS6 · DB-HS5 · DB-HS1 · DB-SUA 8 · DB-HR">
+              <p className="text-text-disabled mb-1 text-[11px] leading-snug">
+                El radón sale del municipio. El resto el CTE solo lo da en mapas: pulsa{" "}
+                <MapaIcon size={11} className="inline align-[-1px]" aria-label="el icono del mapa" /> para
+                abrir el de cada campo.
+              </p>
+              <Field
+                id="dg-zona-radon"
+                label="Zona de radón"
+                ancho
+                help="Se toma sola al elegir el municipio, del listado del Apéndice B del DB-HS6 (zona I, zona II o, si el municipio no figura, sin exigencia). Puedes cambiarla, pero se avisará de que no coincide con el listado."
+                refText="DB-HS6 Apéndice B"
+              >
+                <SelectInput<ZonaRadon>
+                  id="dg-zona-radon"
+                  value={dg.zonaRadon}
+                  options={ZONA_RADON_OPTIONS}
+                  onChange={(v) => set("zonaRadon", v)}
+                />
+              </Field>
+              <NotaRadon
+                municipio={dg.municipio}
+                apendice={radonApendice}
+                elegida={dg.zonaRadon}
+                onUsar={(z) => set("zonaRadon", z)}
+              />
+              <Field
+                id="dg-zona-pluviometrica"
+                label="Zona pluviométrica"
+                sub="(HS5)"
+                ancho
+                accion={<BotonMapa mapa="hs5-figB-1" />}
+                help="Zona A o B del mapa de la Figura B.1 del DB-HS5. Es una ENTRADA MANUAL: el DB solo da el mapa. Sin ella, HS5 calcula los pluviales con 100 mm/h y lo avisa."
+                refText="DB-HS5 Apéndice B, Figura B.1"
+              >
+                <SelectInput<"" | ZonaPluviometrica>
+                  id="dg-zona-pluviometrica"
+                  value={dg.pluviometria?.zona ?? ""}
+                  options={ZONA_PLUVIOMETRICA_OPTIONS}
+                  onChange={onZonaPluviometrica}
+                />
+              </Field>
+              {dg.pluviometria && (
+                <Field
+                  id="dg-isoyeta"
+                  label="Isoyeta"
+                  ancho
+                  accion={<BotonMapa mapa="hs5-figB-1" />}
+                  help="La isoyeta del mapa de la Figura B.1 que pasa por el municipio."
+                  refText="DB-HS5 Apéndice B, Tabla B.1"
+                >
+                  <SelectInput<string>
+                    id="dg-isoyeta"
+                    value={String(dg.pluviometria.isoyeta)}
+                    options={ISOYETA_OPTIONS}
+                    onChange={onIsoyeta}
+                  />
+                </Field>
+              )}
+              {dg.pluviometria && (
+                <p className="text-text-disabled mb-1 text-[11px] leading-snug">
+                  Intensidad pluviométrica: {intensidadDe(dg.pluviometria.zona, dg.pluviometria.isoyeta)} mm/h
+                  (Tabla B.1).
+                </p>
+              )}
+              <Field
+                id="dg-zona-pluv-hs1"
+                label="Zona pluviométrica"
+                sub="(HS1)"
+                ancho
+                accion={<BotonMapa mapa="hs1-fig2-4" />}
+                help="Zona I a V del mapa de la figura 2.4 del DB-HS1, por el índice pluviométrico anual. No es la zona A/B de HS5. ENTRADA MANUAL: el DB solo da el mapa. Sin ella, HS1 supone la zona más lluviosa y lo avisa."
+                refText="DB-HS1 2.3.1, figura 2.4"
+              >
+                <SelectInput<"" | ZonaPluviometricaHs1>
+                  id="dg-zona-pluv-hs1"
+                  value={dg.zonaPluviometricaHs1 ?? ""}
+                  options={ZONA_PLUV_HS1_OPTIONS}
+                  onChange={(v) => set("zonaPluviometricaHs1", v === "" ? undefined : v)}
+                />
+              </Field>
+              <Field
+                id="dg-zona-eolica"
+                label="Zona eólica"
+                ancho
+                accion={<BotonMapa mapa="hs1-fig2-5" />}
+                help="Zona A, B o C del mapa de la figura 2.5 del DB-HS1 (velocidad básica del viento). ENTRADA MANUAL. Sin ella, HS1 supone la zona C y lo avisa."
+                refText="DB-HS1 2.3.1, figura 2.5"
+              >
+                <SelectInput<"" | ZonaEolica>
+                  id="dg-zona-eolica"
+                  value={dg.zonaEolica ?? ""}
+                  options={ZONA_EOLICA_OPTIONS}
+                  onChange={(v) => set("zonaEolica", v === "" ? undefined : v)}
+                />
+              </Field>
+              <Field
+                id="dg-ng"
+                label="Densidad de impactos Ng"
+                sub="(SUA 8)"
+                ancho
+                accion={<BotonMapa mapa="sua8-fig1-1" />}
+                help="Densidad de impactos sobre el terreno, leída en el mapa de la figura 1.1 del DB-SUA para el municipio de la obra. ENTRADA MANUAL: el mapa no da un valor por provincia; si el municipio cae sobre una línea o entre dos zonas, toma el mayor. Sin ella, SUA 8 supone 6,00 (el mayor del mapa) y lo avisa si cambia el resultado."
+                refText="DB-SUA 8 ap. 1 pto 3, figura 1.1"
+              >
+                <SelectInput<string>
+                  id="dg-ng"
+                  value={dg.densidadImpactosNg === undefined ? "" : String(dg.densidadImpactosNg)}
+                  options={NG_OPTIONS}
+                  onChange={(v) => set("densidadImpactosNg", v === "" ? undefined : Number(v))}
+                />
+              </Field>
+              <Field
+                id="dg-ld"
+                label="Índice de ruido día Ld"
+                sub="(HR)"
+                ancho
+                accion={<EnlaceVisor href={SICA_URL} etiqueta="Abrir los mapas estratégicos de ruido (SICA, Ministerio para la Transición Ecológica)" />}
+                help="Índice de ruido día de la zona, del mapa estratégico de ruido o de la administración competente. Si el mapa da una banda (65–70), toma su valor superior; si el edificio da a varias calles, el mayor. Sin datos oficiales, HR toma 60 dBA, el valor del DB para las áreas de predominio residencial, y lo avisa: en otras áreas acústicas hay que indicarlo."
+                refText="DB-HR ap. 2.1.1 a) iv, tabla 2.1"
+              >
+                <SelectInput<string>
+                  id="dg-ld"
+                  value={dg.ldZona === undefined ? "" : String(dg.ldZona)}
+                  options={LD_OPTIONS}
+                  onChange={(v) => set("ldZona", v === "" ? undefined : Number(v))}
+                />
+              </Field>
+              <CheckRow
+                id="dg-aeronaves"
+                label="Ruido dominante de aeronaves"
+                help="Márcalo si el edificio está en la huella acústica de un aeropuerto según los mapas de ruido: el aislamiento exigido a las fachadas sube 4 dBA y no se puede restar nada por las fachadas a patio."
+                refText="DB-HR ap. 2.1.1 a) iv"
+                checked={dg.aeronaves === true}
+                onChange={(v) => set("aeronaves", v ? true : undefined)}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection label="Terreno" refNorma="DB-HS1 · estudio geotécnico">
+              <Field
+                id="dg-terreno-tipo"
+                label="Entorno del edificio"
+                ancho
+                help="Terreno tipo del DB-SE. I: borde del mar o de un lago con 5 km despejados de agua; II: rural llano sin obstáculos ni arbolado de importancia; III: rural accidentado o llano con obstáculos aislados; IV: zona urbana, industrial o forestal; V: centro de negocios de gran ciudad, con profusión de edificios en altura. Da la clase del entorno de HS1: E0 con I, II o III; E1 con IV o V. Sin él, HS1 supone E0 y lo avisa."
+                refText="DB-HS1 2.3.1 b)"
+              >
+                <SelectInput<"" | TerrenoTipo>
+                  id="dg-terreno-tipo"
+                  value={dg.terrenoTipo ?? ""}
+                  options={TERRENO_TIPO_OPTIONS}
+                  onChange={(v) => set("terrenoTipo", v === "" ? undefined : v)}
+                />
+              </Field>
+              <Field
+                id="dg-freatico"
+                label="Nivel freático"
+                ancho
+                help="Del estudio geotécnico: valor medio anual de la profundidad del nivel freático, medida desde la superficie del terreno. Decide la presencia de agua frente a la cara inferior del suelo en contacto con el terreno. Sin él, HS1 supone presencia alta y lo avisa."
+                refText="DB-HS1 2.1.1 pto 2 y Apéndice A"
+              >
+                <SelectInput<"" | NivelFreatico["tipo"]>
+                  id="dg-freatico"
+                  value={dg.nivelFreatico?.tipo ?? ""}
+                  options={FREATICO_OPTIONS}
+                  onChange={onFreaticoTipo}
+                />
+              </Field>
+              {dg.nivelFreatico?.tipo === "profundidad" && (
+                <Field
+                  id="dg-freatico-prof"
+                  label="Profundidad bajo la rasante"
+                  unit="m"
+                  help="Profundidad media anual del nivel freático bajo la superficie del terreno, en positivo."
+                  warning={avisoDe(errores, "freático")}
+                >
+                  <input
+                    id="dg-freatico-prof"
+                    type="text"
+                    inputMode="decimal"
+                    value={freaticoTxt}
+                    onChange={(e) => onFreaticoProfundidad(e.target.value)}
+                    placeholder="—"
+                    className={`${INPUT_CLS} text-right tabular-nums`}
+                  />
+                </Field>
+              )}
+              {dg.nivelFreatico?.tipo === "no_detectado" && (
+                <Field
+                  id="dg-reconocimiento"
+                  label="Reconocido hasta"
+                  sub="(opcional)"
+                  unit="m"
+                  help="Hasta dónde llegó el reconocimiento del estudio geotécnico sin encontrar agua. «No se detecta» solo equivale a presencia baja si llegó más hondo que la cara inferior del suelo; si no se indica, HS1 lo avisa."
+                  warning={avisoDe(errores, "reconocimiento")}
+                >
+                  <input
+                    id="dg-reconocimiento"
+                    type="text"
+                    inputMode="decimal"
+                    value={reconocimientoTxt}
+                    onChange={(e) => onReconocimiento(e.target.value)}
+                    placeholder="—"
+                    className={`${INPUT_CLS} text-right tabular-nums`}
+                  />
+                </Field>
+              )}
+              <Field
                 id="dg-ks"
-                value={dg.permeabilidadTerreno ?? ""}
-                options={KS_OPTIONS}
-                onChange={(v) => set("permeabilidadTerreno", v === "" ? undefined : v)}
-              />
-            </Field>
-          </CollapsibleSection>
+                label="Permeabilidad del terreno"
+                ancho
+                help="Coeficiente de permeabilidad Ks del estudio geotécnico, por las columnas de la tabla 2.1 del DB-HS1."
+                refText="DB-HS1 tablas 2.1 y 2.3"
+              >
+                <SelectInput<"" | ClaseKs>
+                  id="dg-ks"
+                  value={dg.permeabilidadTerreno ?? ""}
+                  options={KS_OPTIONS}
+                  onChange={(v) => set("permeabilidadTerreno", v === "" ? undefined : v)}
+                />
+              </Field>
+            </CollapsibleSection>
+          </div>
+        </div>
 
-          <CollapsibleSection label="Suministro y saneamiento" defaultOpen={false}>
-            <Field
-              id="dg-presion"
-              label="Presión de acometida"
-              sub="(opcional)"
-              unit="kPa"
-              help="Dato de la compañía suministradora. Si se deja vacío, HS4 usa su valor propio."
-              warning={avisoDe(errores, "presión")}
-            >
-              <input
-                id="dg-presion"
-                type="number"
-                inputMode="decimal"
-                min={100}
-                max={1200}
-                value={presionTxt}
-                onChange={(e) => onPresionChange(e.target.value)}
-                placeholder="—"
-                className={`${INPUT_CLS} text-right tabular-nums`}
-              />
-            </Field>
-            <Field
-              id="dg-cota-alcantarillado"
-              label="Cota del alcantarillado"
-              sub="(opcional)"
-              unit="m"
-              help="Cota de la red de alcantarillado en el punto de acometida, respecto a la rasante (negativa si está por debajo, p. ej. −1,20). Decide si un sótano evacua por bombeo. Si se deja vacía, HS5 supone que los sótanos quedan por debajo y lo avisa."
-              warning={avisoDe(errores, "alcantarillado")}
-            >
-              <input
-                id="dg-cota-alcantarillado"
-                type="text"
-                inputMode="decimal"
-                value={cotaTxt}
-                onChange={(e) => onCotaChange(e.target.value)}
-                placeholder="—"
-                className={`${INPUT_CLS} text-right tabular-nums`}
-              />
-            </Field>
-          </CollapsibleSection>
-
-          {/* Resumen de errores + submit */}
-          <div className="border-border-sub mt-4 border-t pt-4">
-            {errores.length > 0 && (
-              <div role="alert" className="mb-3">
+        {/* Barra inferior fija: errores pendientes + enviar, siempre a mano. */}
+        <div className="border-border-sub bg-bg-primary sticky bottom-0 z-10 mt-6 border-t py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {errores.length > 0 ? (
+              <div role="alert" className="min-w-0">
                 <p className="text-state-warn text-[12px] font-semibold">
                   Revisa el formulario antes de continuar:
                 </p>
-                <ul className="text-state-warn mt-1 list-disc pl-5 text-[12px] leading-snug">
+                <ul className="text-state-warn mt-0.5 list-disc pl-5 text-[12px] leading-snug">
                   {errores.map((e) => (
                     <li key={e}>{e}</li>
                   ))}
                 </ul>
               </div>
+            ) : (
+              <span />
             )}
             <button
               type="submit"
               disabled={errores.length > 0}
-              className="bg-accent hover:bg-accent-hover focus-visible:ring-accent/40 w-full cursor-pointer rounded px-4 py-2 text-[13px] font-semibold text-white transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="bg-accent hover:bg-accent-hover focus-visible:ring-accent/40 w-full shrink-0 cursor-pointer rounded px-6 py-2 text-[13px] font-semibold text-white transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               {modo === "crear" ? "Crear proyecto" : "Guardar cambios"}
             </button>
           </div>
         </div>
-
-        {/* Panel de derivados en vivo */}
-        <aside
-          aria-label="Contexto derivado"
-          className="border-border-main bg-bg-surface w-full shrink-0 rounded border px-4 py-3 lg:sticky lg:top-6 lg:w-64"
-        >
-          <h2 className="text-text-disabled border-border-sub mb-1 border-b pb-1.5 text-[10px] font-semibold tracking-[0.07em] uppercase">
-            Contexto derivado
-          </h2>
-          {derivados === null ? (
-            <p className="text-state-warn py-2 text-[12px] leading-snug">
-              Selecciona una provincia válida para derivar la zona climática y la zona térmica.
-            </p>
-          ) : (
-            <>
-              <FilaDerivado
-                etiqueta="Zona climática"
-                valor={derivados.zonaClimatica.valor}
-                procedencia={derivados.zonaClimatica.procedencia}
-              />
-              <FilaDerivado
-                etiqueta="Zona térmica HS3"
-                valor={derivados.zonaTermicaHS3.valor}
-                procedencia={derivados.zonaTermicaHS3.procedencia}
-              />
-              <FilaDerivado
-                etiqueta="Altura de evacuación"
-                valor={`${derivados.alturaEvacuacion_m.valor} m`}
-                procedencia={derivados.alturaEvacuacion_m.procedencia}
-              />
-            </>
-          )}
-        </aside>
       </form>
     </div>
   );
