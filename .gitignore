@@ -28,3 +28,6 @@ dev-dist
 # Capturas de QA (el cuaderno qa/HALLAZGOS.md sí se versiona)
 qa/capturas/*
 !qa/capturas/LEEME.txt
+
+# Memorias reales de referencia: no se versionan
+ejemplos/
