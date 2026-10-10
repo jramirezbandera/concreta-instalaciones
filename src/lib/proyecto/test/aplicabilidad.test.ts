@@ -164,10 +164,10 @@ describe("aplicabilidadBase — reglas de atributos (obra nueva)", () => {
     }
   });
 
-  it("obra nueva: HE1 va a HULC con la verificación global", () => {
+  it("obra nueva: HE1 va al programa de la verificación global", () => {
     expect(aplicabilidadBase(dg()).he1).toEqual({
       aplicabilidad: "externo",
-      nota: "Se justifica con HULC, junto con la verificación energética global.",
+      nota: "Se justifica con HULC o CE3X, junto con la verificación energética global.",
       cita: "DB-HE1",
     });
   });

@@ -4,6 +4,7 @@ import { crearProyectoDemo } from "../../proyecto/demo";
 import { resumenEdificio } from "../../edificio/derivar";
 import type { Proyecto } from "../../proyecto/tipos";
 import { filasObra, piezasDeQueEntra, recuentoObra, rotuloGrupo, textoRecuento, type FilaObra } from "../filas";
+import { verificacionDePrueba } from "../../energia/test/informeSintetico";
 
 // =============================================================================
 // «Lo que se justifica» (feature-16 §B).
@@ -43,8 +44,8 @@ describe("filasObra — el Demo", () => {
       { texto: "local · previsión", acento: true },
     ]);
     expect(textos(fila(p, "hs3"))).toEqual(["6 viviendas", "garaje", "trasteros", "local → RITE"]);
-    // HE1 va a HULC en obra nueva; forzada a «aplica», el módulo con sus partes.
-    expect(fila(p, "he1")).toMatchObject({ estado: "externo", destino: "HULC" });
+    // HE1 va al programa en obra nueva; forzada a «aplica», el módulo con sus partes.
+    expect(fila(p, "he1")).toMatchObject({ estado: "externo", destino: "HULC o CE3X" });
     expect(fila(p, "he1").ruta).toBeUndefined();
     const he1 = { ...p.justificaciones.he1!, aplicabilidadForzada: { valor: "aplica" as const } };
     const conHe1: Proyecto = { ...p, justificaciones: { ...p.justificaciones, he1 } };
@@ -94,10 +95,31 @@ describe("filasObra — el Demo", () => {
 
   it("las externas: con qué se justifican y su referencia", () => {
     const p = demo();
-    expect(fila(p, "he0he1_global").piezas).toEqual([{ texto: "HULC · adjuntar documento", acento: true }]);
-    const q: Proyecto = { ...p, justificaciones: { ...p.justificaciones, he0he1_global: { refExterna: "EXP-7" } } };
+    expect(fila(p, "he0he1_global").piezas).toEqual([{ texto: "HULC o CE3X · adjuntar documento", acento: true }]);
+    expect(textos(fila(p, "dbse"))).toEqual(["Concreta estructura · adjuntar documento"]);
+    const q: Proyecto = { ...p, justificaciones: { ...p.justificaciones, he0he1_global: { refExterna: "EXP-7", programa: "HULC" } } };
     expect(fila(q, "he0he1_global")).toMatchObject({ destino: "HULC", refExterna: "EXP-7" });
     expect(textos(fila(q, "he0he1_global"))).toEqual(["HULC · EXP-7"]);
+    // HE1 va con la global: el mismo programa y el mismo documento.
+    expect(textos(fila(q, "he1"))).toEqual(["HULC · EXP-7"]);
+  });
+
+  it("con el informe leído, el programa y lo que dice", () => {
+    const p = demo();
+    const conInforme = (v: ReturnType<typeof verificacionDePrueba>): Proyecto => ({
+      ...p,
+      justificaciones: { ...p.justificaciones, he0he1_global: { verificacion: v } },
+    });
+    // Portada «CTE 2013» y zona C3 frente a la del Demo: cumple, por revisar.
+    expect(textos(fila(conInforme(verificacionDePrueba()), "he0he1_global"))).toEqual(["CE3X v2.3 · cumple, revisar"]);
+    // HE1 lleva su veredicto; los avisos van solo en la global.
+    const limpio = { ...verificacionDePrueba(), normativa: "CTE 2019" };
+    delete limpio.zonaClimatica;
+    expect(textos(fila(conInforme(limpio), "he0he1_global"))).toEqual(["CE3X v2.3 · cumple"]);
+    expect(textos(fila(conInforme(limpio), "he1"))).toEqual(["CE3X v2.3 · cumple"]);
+    const mal = { ...limpio, K: { valor: 0.7, limite: 0.66, cumple: false } };
+    expect(textos(fila(conInforme(mal), "he0he1_global"))).toEqual(["CE3X v2.3 · no cumple"]);
+    expect(textos(fila(conInforme(mal), "he1"))).toEqual(["CE3X v2.3 · cumple"]);
   });
 
   it("HS1 publicada: sus partes salen de «Qué entra», sin el terreno", () => {

@@ -6,14 +6,17 @@ import type { EstadoObra } from "../../lib/obra/evaluar";
 import { filasObra, recuentoObra, textoRecuento, type FilaObra, type PiezaObra } from "../../lib/obra/filas";
 import { aplicabilidadPropuesta } from "../../lib/proyecto/aplicabilidad";
 import type { Proyecto } from "../../lib/proyecto/tipos";
+import { CLAVES_ENERGIA } from "../../lib/energia/verificacion";
 import { EditorAplicabilidad } from "./EditorAplicabilidad";
+import { PanelVerificacionEnergetica } from "./PanelVerificacionEnergetica";
 import { MenuAplicabilidad, type AccionesAplicabilidad, type AplicabilidadConParrafo } from "./MenuAplicabilidad";
 
 // =============================================================================
 // «Lo que se justifica» (feature-16 §B, maqueta v4 de La obra): todas las
 // justificaciones por DB, con su estado, su código, su título y las partes del
 // edificio que entran. Las publicadas llevan a su módulo; los «no aplica»
-// despliegan su párrafo; las externas piden su documento; las «pronto» solo se
+// despliegan su párrafo; las externas piden su documento (las de energía, el
+// programa y su informe, en un panel); las «pronto» solo se
 // listan. Cada fila conserva el menú ⋯ para forzar la aplicabilidad.
 // =============================================================================
 
@@ -115,6 +118,9 @@ function FilaJustificacion({
   const unica = f.claves.length === 1;
   const existente = proyecto.datosGenerales.intervencion !== "obra_nueva";
   const conParrafo = f.nota !== undefined;
+  // HE0 y HE1 en un programa: la pieza abre el panel de su informe.
+  const energia = f.estado === "externo" && unica && CLAVES_ENERGIA.includes(f.claves[0]);
+  const [panelEnergia, setPanelEnergia] = useState(false);
   const accionesFila: AccionesAplicabilidad = {
     ...acciones,
     editar: (_k, v) => {
@@ -153,14 +159,27 @@ function FilaJustificacion({
         <span className="text-text-disabled font-mono text-[11px] whitespace-nowrap">{f.codigo}</span>
         <span className="text-text-primary min-w-0 text-[13px]">{f.titulo}</span>
         <span className={PIEZAS_CELDA}>
-          <button
-            type="button"
-            onClick={() => onReferencia(f)}
-            title="Referencia del documento externo — pulsar para editarla"
-            className={`${PIEZA_ACENTO} hover:underline focus-visible:outline-accent focus-visible:outline-2`}
-          >
-            {f.piezas[0]?.texto}
-          </button>
+          {energia ? (
+            <button
+              type="button"
+              aria-expanded={panelEnergia}
+              aria-controls={`${panelId}-energia`}
+              onClick={() => setPanelEnergia((a) => !a)}
+              title="Programa, documento e informe de la verificación energética"
+              className={`${PIEZA_ACENTO} hover:underline focus-visible:outline-accent focus-visible:outline-2`}
+            >
+              {f.piezas[0]?.texto}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onReferencia(f)}
+              title="Referencia del documento externo — pulsar para editarla"
+              className={`${PIEZA_ACENTO} hover:underline focus-visible:outline-accent focus-visible:outline-2`}
+            >
+              {f.piezas[0]?.texto}
+            </button>
+          )}
         </span>
         <span className="hidden md:block" />
       </div>
@@ -205,6 +224,7 @@ function FilaJustificacion({
           onCancelar={() => setEditando(null)}
         />
       )}
+      {energia && panelEnergia && <PanelVerificacionEnergetica id={`${panelId}-energia`} />}
       {f.nota && !editando && (
         <div id={panelId} hidden={!abierta} className="text-text-secondary px-3.5 pb-3 text-[12.5px] leading-relaxed md:pl-[166px]">
           <p>{f.nota}</p>

@@ -3,6 +3,7 @@ import { crearProyectoDemo } from "../../proyecto/demo";
 import type { Proyecto } from "../../proyecto/tipos";
 import { antesDeEntregar, entregables } from "../entrega";
 import { bloquesMemoria, memoriaCte, textoPlanoMemoriaCte } from "../memoria";
+import { verificacionDePrueba } from "../../energia/test/informeSintetico";
 
 // =============================================================================
 // «Antes de entregar», los entregables y la memoria CTE (feature-16 §C–§E).
@@ -191,7 +192,43 @@ describe("memoriaCte", () => {
     const t = textoPlanoMemoriaCte(memoriaCte(demo()), "4 oct 2026");
     expect(t).toMatch(/^Memoria CTE de instalaciones\n\n/);
     expect(t).toContain("SUA 6 Seguridad frente al riesgo de ahogamiento");
-    expect(t).toContain("Se justifica con HULC. Pendiente de adjuntar el documento.");
+    expect(t).toContain("Se justifica con HULC o CE3X. Pendiente de adjuntar el documento.");
     expect(t).toContain("\t");
+  });
+});
+
+describe("la verificación energética con el informe leído", () => {
+  const conInforme = (v = verificacionDePrueba(), extra = {}): Proyecto => {
+    const p = demo();
+    return { ...p, justificaciones: { ...p.justificaciones, he0he1_global: { verificacion: v, refExterna: "HE-01", ...extra } } };
+  };
+
+  it("en la memoria: el programa, el informe y la tabla de resultados de cada apartado", () => {
+    const b = bloquesMemoria(memoriaCte(conInforme()), "4 oct 2026");
+    const i = b.findIndex((x) => x.tipo === "titulo" && x.texto === "DB-HE0 / DB-HE1 · Verificación energética global");
+    expect(b[i + 1]).toEqual({
+      tipo: "parrafo",
+      texto: "Se justifica con CE3X v2.3, según su informe de verificación de los requisitos de HE0 y HE1 de 3/5/2026, que se adjunta. Documento de referencia: HE-01. Resultados:",
+    });
+    expect(b[i + 2]).toMatchObject({ tipo: "tabla", cabecera: ["Exigencia", "Proyecto", "Límite", "Cumple"] });
+    const tabla = (x: (typeof b)[number] | undefined) => (x?.tipo === "tabla" ? x.filas : []);
+    expect(tabla(b[i + 2])[0]).toEqual(["HE0 · Energía primaria no renovable (Cep,nren)", "48,07 kWh/m²·año", "≤ 60,21 kWh/m²·año", "Sí"]);
+    const he1 = b.findIndex((x) => x.tipo === "titulo" && x.texto === "DB-HE1 · Envolvente térmica");
+    expect(tabla(b[he1 + 2]).map((f) => f[0])).toContain("HE1 · Condensaciones intersticiales");
+  });
+
+  it("lo que no cumple sale como pendiente y en «Antes de entregar»", () => {
+    const v = { ...verificacionDePrueba(), cepNren: { valor: 70, limite: 60.21, cumple: false } };
+    const b = bloquesMemoria(memoriaCte(conInforme(v)), "4 oct 2026");
+    expect(b).toContainEqual({ tipo: "pendiente", texto: "Pendiente: según el informe, el edificio no cumple todas las exigencias." });
+    const fallo = antesDeEntregar(conInforme(v)).find((x) => x.key === "he0he1_global" && x.tipo === "no_cumple");
+    expect(fallo).toMatchObject({ titulo: "HE0 · Energía primaria no renovable (Cep,nren): no cumple", detalle: "70 kWh/m²·año (límite ≤ 60,21 kWh/m²·año), según el informe de CE3X v2.3." });
+    expect(fallo!.ruta).toBeUndefined();
+  });
+
+  it("los avisos del informe, hasta marcarlos como revisados", () => {
+    const avisos = (p: Proyecto) => antesDeEntregar(p).filter((x) => x.key === "he0he1_global").map((x) => x.id);
+    expect(avisos(conInforme())).toEqual(["he0he1_global:energia-normativa", "he0he1_global:energia-zona"]);
+    expect(avisos(conInforme(undefined, { revisados: ["energia-normativa", "energia-zona"] }))).toEqual([]);
   });
 });

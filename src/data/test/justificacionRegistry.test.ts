@@ -73,8 +73,8 @@ describe("justificacionRegistry — consistencia estructural", () => {
   });
 
   it("las externas apuntan a los destinos del reconcept (§3/§10)", () => {
-    expect(getJustificacion("he0he1_global")?.externo?.destino).toBe("HULC");
-    expect(getJustificacion("he1")?.externo?.destino).toBe("HULC");
+    expect(getJustificacion("he0he1_global")?.externo?.destino).toBe("HULC o CE3X");
+    expect(getJustificacion("he1")?.externo?.destino).toBe("HULC o CE3X");
     expect(getJustificacion("dbse")?.externo?.destino).toBe("Concreta estructura");
   });
 });

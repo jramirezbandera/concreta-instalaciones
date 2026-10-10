@@ -10,8 +10,12 @@
 
 import type { FilaQueEntra } from "../../components/justificacion/QueEntra";
 import { resumenEdificio, type ResumenEdificio } from "../edificio/derivar";
-import type { Aplicabilidad, JustificacionKey, Proyecto } from "../proyecto/tipos";
+import type { Aplicabilidad, JustificacionKey, Proyecto, Veredicto } from "../proyecto/tipos";
 import { evaluarExpediente, type EstadoObra, type EvaluacionJustificacion } from "./evaluar";
+import { programaEnergia, referenciaExterna } from "../energia/verificacion";
+
+/** Lo que dice el informe externo leído, en la pieza de la fila. */
+const TEXTO_VEREDICTO: Record<Veredicto, string> = { ok: "cumple", warn: "cumple, revisar", fail: "no cumple", neutral: "leído" };
 
 /** Una parte del edificio que entra: «6 viviendas», «garaje · bombeo». */
 export interface PiezaObra {
@@ -173,10 +177,12 @@ function filaDe(ev: EvaluacionJustificacion, p: Proyecto, r: ResumenEdificio): F
       fila.piezas = [{ texto: "párrafo redactado", acento: false }];
       break;
     case "externo": {
-      const ref = p.justificaciones[ev.key]?.refExterna;
-      fila.destino = e.externo?.destino ?? "otra herramienta";
+      const ref = referenciaExterna(p, ev.key);
+      fila.destino = programaEnergia(p, ev.key);
       if (ref) fila.refExterna = ref;
-      fila.piezas = [{ texto: `${fila.destino} · ${ref ?? "adjuntar documento"}`, acento: true }];
+      // Con el informe leído, lo que dice; si no, el documento que falta.
+      const dice = ev.veredicto ? TEXTO_VEREDICTO[ev.veredicto] : (ref ?? "adjuntar documento");
+      fila.piezas = [{ texto: `${fila.destino} · ${dice}`, acento: true }];
       break;
     }
     case "pronto":

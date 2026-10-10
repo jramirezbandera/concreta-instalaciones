@@ -35,6 +35,7 @@ import type {
 import { etiquetaEdificio, procedenciaEdificio } from "../edificio/derivar";
 import { justificacionRegistry, type JustificacionEntry } from "../../data/justificacionRegistry";
 import { ENGINE_VERSION } from "../version";
+import { CLAVES_ENERGIA, programaEnergia, referenciaExterna, resultadosDe } from "../energia/verificacion";
 
 const M = 18; // margen del anejo (mm) — el mismo que renderFicha
 const CW = PAGE_W - 2 * M;
@@ -431,7 +432,8 @@ export async function renderAnejo(entrada: EntradaAnejo): Promise<AnejoResult> {
   }
   y += 4;
 
-  // 5. Externas: destino del registry + referencia aportada en el proyecto.
+  // 5. Externas: con qué programa, la referencia aportada y, si se ha leído
+  // el informe de la verificación energética, sus resultados.
   y = tituloSeccion(doc, "JUSTIFICACIONES EXTERNAS", y);
   const externas = estados.filter((e) => e.estado.aplicabilidad === "externo");
   if (externas.length === 0) {
@@ -439,8 +441,10 @@ export async function renderAnejo(entrada: EntradaAnejo): Promise<AnejoResult> {
   }
   for (const { key } of externas) {
     const entry = registry.get(key);
-    const destino = entry?.externo?.destino ?? "herramienta externa";
-    const refExterna = proyecto.justificaciones[key]?.refExterna;
+    const destino = programaEnergia(proyecto, key);
+    const refExterna = referenciaExterna(proyecto, key);
+    const informe = proyecto.justificaciones.he0he1_global?.verificacion;
+    const resultados = informe && CLAVES_ENERGIA.includes(key) ? resultadosDe(informe, key) : [];
     y = ensureSpace(doc, y, 10, M);
     y = parrafo(
       doc,
@@ -454,6 +458,14 @@ export async function renderAnejo(entrada: EntradaAnejo): Promise<AnejoResult> {
       y,
       { indent: 4, gray: refExterna ? 70 : 120, italic: !refExterna },
     );
+    for (const r of resultados) {
+      y = ensureSpace(doc, y, 6, M);
+      y = parrafo(doc, `${r.exigencia}: ${r.proyecto} (límite ${r.limite}) — ${r.cumple ? "cumple" : "NO CUMPLE"}`, y, {
+        indent: 4,
+        size: 8,
+        gray: r.cumple ? 70 : 20,
+      });
+    }
     y += 3;
   }
   y += 4;

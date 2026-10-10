@@ -144,7 +144,7 @@ describe("lo no respondido se queda en lo prudente", () => {
   it("HE1: sin saber si se renueva más del 25 % de la envolvente, va a HULC con la global", () => {
     expect(r.he1.aplicabilidad).toBe("externo");
     expect(r.he1.nota).toContain("elementos de la envolvente");
-    expect(r.he1.nota).toContain("Se justifica con HULC, junto con la verificación energética global.");
+    expect(r.he1.nota).toContain("Se justifica con HULC o CE3X, junto con la verificación energética global.");
   });
 
   it("HE1: reforma de la envolvente sin superar el 25 %, por elementos en la app", () => {

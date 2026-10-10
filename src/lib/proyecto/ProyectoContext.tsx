@@ -64,6 +64,15 @@ export interface ProyectoContextValue {
   /** `valor: null` quita el forzado y vuelve a mandar `aplicabilidadBase`. */
   forzarAplicabilidad(key: JustificacionKey, valor: Aplicabilidad | null, nota?: string, flexibilidad?: Flexibilidad): void;
   setRefExterna(key: JustificacionKey, ref: string): void;
+  /**
+   * El programa y el informe leído de la verificación energética (en
+   * `he0he1_global`, que comparte HE1). `undefined` quita el campo. Cambia el
+   * expediente → toca `modificado`.
+   */
+  setVerificacionEnergetica(
+    patch: Pick<JustificacionEnProyecto, "programa" | "verificacion">,
+    nowIso: string,
+  ): void;
   /** Marca (o desmarca) un aviso de una justificación como revisado (feature-14). */
   marcarRevisado(key: JustificacionKey, avisoId: string, revisado: boolean): void;
 }
@@ -200,6 +209,13 @@ export function ProyectoProvider(props: {
     setProyecto((prev) => conJustificacion(prev, key, { refExterna: ref !== "" ? ref : undefined }));
   }, []);
 
+  const setVerificacionEnergetica = useCallback(
+    (patch: Pick<JustificacionEnProyecto, "programa" | "verificacion">, nowIso: string) => {
+      setProyecto((prev) => conJustificacion(prev, "he0he1_global", patch, nowIso));
+    },
+    [],
+  );
+
   const marcarRevisado = useCallback((key: JustificacionKey, avisoId: string, revisado: boolean) => {
     setProyecto((prev) => {
       const actuales = prev.justificaciones[key]?.revisados ?? [];
@@ -221,6 +237,7 @@ export function ProyectoProvider(props: {
       actualizarEdificio,
       forzarAplicabilidad,
       setRefExterna,
+      setVerificacionEnergetica,
       marcarRevisado,
     }),
     [
@@ -233,6 +250,7 @@ export function ProyectoProvider(props: {
       actualizarEdificio,
       forzarAplicabilidad,
       setRefExterna,
+      setVerificacionEnergetica,
       marcarRevisado,
     ],
   );

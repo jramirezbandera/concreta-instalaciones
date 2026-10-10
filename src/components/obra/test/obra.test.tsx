@@ -8,6 +8,7 @@ import type { Proyecto } from "../../../lib/proyecto/tipos";
 import { LoQueSeJustifica } from "../LoQueSeJustifica";
 import { AntesDeEntregar } from "../AntesDeEntregar";
 import { LoQueSeEntrega } from "../LoQueSeEntrega";
+import { PAGINAS } from "../../../lib/energia/test/informeSintetico";
 
 // =============================================================================
 // Las piezas de La obra (feature-16) sobre el Demo, sin el router de la app.
@@ -17,6 +18,13 @@ const descargarBlob = vi.hoisted(() => vi.fn());
 vi.mock("../../../lib/export/descargar", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../lib/export/descargar")>()),
   descargarBlob,
+}));
+
+// pdf.js no corre en jsdom: el PDF «se lee» con el texto del informe sintético.
+const textoPdf = vi.hoisted(() => ({ paginas: [] as { n: number; texto: string }[] }));
+vi.mock("../../../lib/ai/pdfPrep", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../lib/ai/pdfPrep")>()),
+  leerPdf: async (file: File) => ({ nombre: file.name, bytes: 4, paginas: textoPdf.paginas.length, textos: textoPdf.paginas, imagenes: async () => [], cerrar: () => {} }),
 }));
 
 const demo = (): Proyecto => crearProyectoDemo("2026-10-04T10:00:00.000Z");
@@ -31,7 +39,10 @@ function montar(ui: React.ReactNode, proyecto: Proyecto = demo()) {
   );
 }
 
-beforeEach(() => descargarBlob.mockClear());
+beforeEach(() => {
+  descargarBlob.mockClear();
+  textoPdf.paginas = PAGINAS.map((pg, i) => ({ n: i + 1, texto: pg.texto }));
+});
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -61,14 +72,51 @@ describe("Lo que se justifica", () => {
 
   it("una externa guarda la referencia de su documento", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "prompt").mockReturnValue("EXP-HULC-7");
+    vi.spyOn(window, "prompt").mockReturnValue("EST-7");
     montar(<LoQueSeJustifica />);
-    // En obra nueva van a HULC HE1 y, tras ella, la verificación global (HE0).
-    const hulc = screen.getAllByRole("button", { name: "HULC · adjuntar documento" });
-    expect(hulc).toHaveLength(2);
-    await user.click(hulc[1]);
-    expect(await screen.findByRole("button", { name: "HULC · EXP-HULC-7" })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "HULC · adjuntar documento" })).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Concreta estructura · adjuntar documento" }));
+    expect(await screen.findByRole("button", { name: "Concreta estructura · EST-7" })).toBeInTheDocument();
+  });
+
+  describe("la verificación energética (HE0 y, en obra nueva, HE1)", () => {
+    it("el programa y el documento, en el panel; HE1 los comparte", async () => {
+      const user = userEvent.setup();
+      montar(<LoQueSeJustifica />);
+      const piezas = screen.getAllByRole("button", { name: "HULC o CE3X · adjuntar documento" });
+      expect(piezas).toHaveLength(2);
+      await user.click(piezas[1]!);
+      const panel = screen.getByRole("group", { name: "Documento de la verificación energética" });
+      await user.type(within(panel).getByLabelText("Programa"), "HULC");
+      await user.type(within(panel).getByLabelText("Documento de referencia"), "HE-01");
+      expect(screen.getAllByRole("button", { name: "HULC · HE-01" })).toHaveLength(2);
+    });
+
+    it("lee el informe de CE3X y enseña sus resultados", async () => {
+      const user = userEvent.setup();
+      montar(<LoQueSeJustifica />);
+      await user.click(screen.getAllByRole("button", { name: "HULC o CE3X · adjuntar documento" })[1]!);
+      const panel = screen.getByRole("group", { name: "Documento de la verificación energética" });
+      await user.upload(within(panel).getByLabelText("Informe de verificación en PDF"), new File(["%PDF"], "informe.pdf", { type: "application/pdf" }));
+      expect(await within(panel).findByRole("rowheader", { name: "HE0 · Energía primaria no renovable (Cep,nren)" })).toBeInTheDocument();
+      expect(within(panel).getByText("48,07 kWh/m²·año")).toBeInTheDocument();
+      expect(within(panel).getByLabelText("Programa")).toHaveValue("CE3X v2.3");
+      expect(within(panel).getByText(/El informe dice «CTE 2013»/)).toBeInTheDocument();
+      // Los avisos son del informe entero: HE0 y HE1 los dos «por revisar».
+      expect(screen.getAllByRole("button", { name: "CE3X v2.3 · cumple, revisar" })).toHaveLength(2);
+      await user.click(within(panel).getByRole("button", { name: "Quitar el informe" }));
+      expect(within(panel).queryByRole("table")).toBeNull();
+      expect(within(panel).getByLabelText("Programa")).toHaveValue("CE3X v2.3");
+    });
+
+    it("un PDF que no es un informe de verificación: lo dice", async () => {
+      const user = userEvent.setup();
+      textoPdf.paginas = [{ n: 1, texto: "Estudio geotécnico" }];
+      montar(<LoQueSeJustifica />);
+      await user.click(screen.getAllByRole("button", { name: "HULC o CE3X · adjuntar documento" })[1]!);
+      const panel = screen.getByRole("group", { name: "Documento de la verificación energética" });
+      await user.upload(within(panel).getByLabelText("Informe de verificación en PDF"), new File(["%PDF"], "otro.pdf", { type: "application/pdf" }));
+      expect(await within(panel).findByRole("alert")).toHaveTextContent(/No parece un informe de verificación/);
+    });
   });
 
   describe("menú ⋯ de aplicabilidad", () => {

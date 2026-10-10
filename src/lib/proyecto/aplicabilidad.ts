@@ -328,7 +328,7 @@ const KEYS_EXPEDIENTE: readonly JustificacionKey[] = justificacionRegistry
  *  3. Edificio existente con el asistente respondido → `REGLAS_EXISTENTES`.
  *  4. Resto → `aplica`; en un edificio existente sin asistente, con el aviso de
  *     alcance pendiente.
- *  5. HE 1 va a HULC si la verificación global se hace allí (`he1SegunGlobal`).
+ *  5. HE 1 va al programa de la verificación global si la hay (`he1SegunGlobal`).
  * Función pura y determinista: mismos atributos ⇒ mismo resultado.
  */
 export function aplicabilidadBase(
@@ -392,13 +392,14 @@ function propuestasSinGlobal(
 /**
  * HE 1 por elementos (el módulo de la app) solo cuando no hay verificación
  * energética global: es la reforma que no renueva más del 25 % de la envolvente.
- * Si la global se hace en HULC (obra nueva, ampliación, cambio de uso, reforma
- * de más del 25 %), HULC justifica también la envolvente elemento a elemento, y
+ * Si la global se hace con HULC o CE3X (obra nueva, ampliación, cambio de uso,
+ * reforma de más del 25 %), su informe justifica también la envolvente elemento
+ * a elemento y las condensaciones, y
  * HE 1 va con ella. El proyectista puede forzar que se aplique aquí.
  */
 function he1SegunGlobal(he1: AplicabilidadCalculada, global: Aplicabilidad): AplicabilidadCalculada {
   if (global !== "externo" || he1.aplicabilidad === "no_aplica") return he1;
-  const destino = justificacionRegistry.find((j) => j.key === "he1")?.externo?.destino ?? "HULC";
+  const destino = justificacionRegistry.find((j) => j.key === "he1")?.externo?.destino ?? "HULC o CE3X";
   const conGlobal = `Se justifica con ${destino}, junto con la verificación energética global.`;
   return {
     aplicabilidad: "externo",

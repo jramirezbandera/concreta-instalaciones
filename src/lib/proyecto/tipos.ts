@@ -5,6 +5,7 @@ import type { Isoyeta, ZonaPluviometrica } from "../../modules/hs5/tablas";
 import type { ClaseKs, NivelFreatico, TerrenoTipo, ZonaEolica, ZonaPluviometricaHs1 } from "../../modules/hs1/tipos";
 import type { Edificio, TipoCubierta } from "../edificio/tipos";
 import type { ResumenEdificio } from "../edificio/derivar";
+import type { VerificacionEnergetica } from "../energia/verificacion";
 
 // Modelo de datos del EXPEDIENTE (feature-6 §A, UX-RECONCEPT §2–§3): el producto deja de ser
 // "5 calculadoras con sidebar" y pasa a ser gestor de expedientes de justificación CTE.
@@ -315,6 +316,13 @@ export interface JustificacionEnProyecto {
   aplicabilidadForzada?: { valor: Aplicabilidad; nota?: string; flexibilidad?: Flexibilidad };
   /** Referencia de documento externo (p.ej. expediente HULC) para justificaciones `externo`. */
   refExterna?: string;
+  /**
+   * Solo en `he0he1_global`, y sirve también a HE1: el programa con que se hace
+   * la verificación energética («HULC», «CE3X v2.3») y los resultados leídos de
+   * su informe.
+   */
+  programa?: string;
+  verificacion?: VerificacionEnergetica;
   /**
    * Ids de los avisos que el proyectista ha marcado como revisados (feature-14,
    * REDISENO-V4 §3.4). Un aviso revisado deja de contar como pendiente y llega a

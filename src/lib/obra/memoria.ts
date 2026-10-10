@@ -17,6 +17,7 @@ import { textoParrafo } from "../cte/memoria";
 import type { JustificacionKey, Proyecto } from "../proyecto/tipos";
 import { notaAlcance, type NotaAlcance } from "./alcanceTexto";
 import { evaluarExpediente, type EvaluacionJustificacion } from "./evaluar";
+import { CLAVES_ENERGIA, programaEnergia, referenciaExterna, resultadosDe, type ResultadoVerificacion } from "../energia/verificacion";
 
 export const TITULO_MEMORIA = "Memoria CTE de instalaciones";
 
@@ -33,7 +34,13 @@ export type ApartadoMemoria =
   | (ApartadoBase & { tipo: "redactado"; doc: MemoriaDoc; porRevisar: number; alcance?: NotaAlcance })
   | (ApartadoBase & { tipo: "no_cumple"; doc: MemoriaDoc; motivos: string[]; alcance?: NotaAlcance })
   | (ApartadoBase & { tipo: "no_aplica"; parrafo: string; cita?: string })
-  | (ApartadoBase & { tipo: "externo"; destino: string; referencia?: string });
+  | (ApartadoBase & {
+      tipo: "externo";
+      destino: string;
+      referencia?: string;
+      /** Del informe leído (energía): cuál es y qué comprueba. */
+      informe?: { archivo: string; fecha?: string; resultados: ResultadoVerificacion[] };
+    });
 
 export interface MemoriaCte {
   titulo: string;
@@ -83,13 +90,16 @@ function apartadoDe(ev: EvaluacionJustificacion, p: Proyecto): ApartadoMemoria |
         ...(ev.cita !== undefined ? { cita: ev.cita } : {}),
       };
     case "externo": {
-      const ref = p.justificaciones[ev.key]?.refExterna;
+      const ref = referenciaExterna(p, ev.key);
+      const v = p.justificaciones.he0he1_global?.verificacion;
+      const resultados = v && CLAVES_ENERGIA.includes(ev.key) ? resultadosDe(v, ev.key) : [];
       return {
         ...base,
         encabezado: `${e.db} · ${e.label}`,
         tipo: "externo",
-        destino: e.externo?.destino ?? "otra herramienta",
+        destino: programaEnergia(p, ev.key),
         ...(ref ? { referencia: ref } : {}),
+        ...(v && resultados.length > 0 ? { informe: { archivo: v.archivo, ...(v.fecha ? { fecha: v.fecha } : {}), resultados } } : {}),
       };
     }
     default:
@@ -122,6 +132,11 @@ export type BloqueMemoria =
 
 /** El párrafo de una externa: con qué se justifica y su documento. */
 function textoExterno(a: Extract<ApartadoMemoria, { tipo: "externo" }>): string {
+  if (a.informe) {
+    const cuando = a.informe.fecha ? ` de ${a.informe.fecha}` : "";
+    const ref = a.referencia ? ` Documento de referencia: ${a.referencia}.` : "";
+    return `Se justifica con ${a.destino}, según su informe de verificación de los requisitos de HE0 y HE1${cuando}, que se adjunta.${ref} Resultados:`;
+  }
   return a.referencia
     ? `Se justifica con ${a.destino}. Documento de referencia: ${a.referencia}.`
     : `Se justifica con ${a.destino}. Pendiente de adjuntar el documento.`;
@@ -163,6 +178,16 @@ export function bloquesMemoria(m: MemoriaCte, fecha: string): BloqueMemoria[] {
         break;
       case "externo":
         b.push({ tipo: "parrafo", texto: textoExterno(a) });
+        if (a.informe) {
+          b.push({
+            tipo: "tabla",
+            cabecera: ["Exigencia", "Proyecto", "Límite", "Cumple"],
+            filas: a.informe.resultados.map((r) => [r.exigencia, r.proyecto, r.limite, r.cumple ? "Sí" : "No"]),
+          });
+          if (a.informe.resultados.some((r) => !r.cumple)) {
+            b.push({ tipo: "pendiente", texto: "Pendiente: según el informe, el edificio no cumple todas las exigencias." });
+          }
+        }
         break;
     }
   }

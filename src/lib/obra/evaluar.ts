@@ -20,6 +20,7 @@ import { contextoDe } from "../proyecto/derivar";
 import { heredadosDe, mergeInputsHeredados } from "../proyecto/herencia";
 import type { Aplicabilidad, JustificacionKey, Proyecto, Veredicto } from "../proyecto/tipos";
 import { MODULOS_OBRA, type ModuloCalculado, type TextoObra } from "./modulos";
+import { avisosVerificacion, CLAVES_ENERGIA, resultadosDe } from "../energia/verificacion";
 
 /**
  * Cómo va una justificación en La obra:
@@ -154,9 +155,37 @@ function evaluarJustificacion(p: Proyecto, entrada: JustificacionEntry): Evaluac
     incumplimientos: [],
   };
   if (ap.aplicabilidad === "no_aplica") return { ...base, estado: "no_aplica" };
-  if (ap.aplicabilidad === "externo") return { ...base, estado: "externo" };
+  if (ap.aplicabilidad === "externo") return { ...base, ...verificacionLeida(p, key), estado: "externo" };
   if (!entrada.shipped || !MODULOS_OBRA[key]) return base;
   return { ...base, ...evaluarPublicada(p, key) };
+}
+
+/**
+ * Una externa de energía con el informe del programa leído: su veredicto y,
+ * en la verificación global (que no tiene módulo al que ir), lo que no cumple
+ * y lo que hay que mirar, para «Antes de entregar».
+ */
+function verificacionLeida(
+  p: Proyecto,
+  key: JustificacionKey,
+): Pick<EvaluacionJustificacion, "veredicto" | "avisos" | "incumplimientos"> | Record<string, never> {
+  const v = p.justificaciones.he0he1_global?.verificacion;
+  if (!v || !CLAVES_ENERGIA.includes(key)) return {};
+  const resultados = resultadosDe(v, key);
+  const fallan = resultados.filter((r) => !r.cumple);
+  const revisados = p.justificaciones.he0he1_global?.revisados ?? [];
+  const avisos = avisosVerificacion(v, contextoDe(p.datosGenerales, p.edificio).zonaClimatica.valor).filter((a) => !revisados.includes(a.id));
+  const global = key === "he0he1_global";
+  return {
+    veredicto: fallan.length > 0 ? "fail" : avisos.length > 0 ? "warn" : "ok",
+    incumplimientos: global
+      ? resultadosDe(v, "he0he1_global")
+          .concat(resultadosDe(v, "he1"))
+          .filter((r) => !r.cumple)
+          .map((r) => ({ id: `energia-${r.exigencia}`, titulo: `${r.exigencia}: no cumple`, detalle: `${r.proyecto} (límite ${r.limite}), según el informe de ${v.programa}.` }))
+      : [],
+    avisos: global ? avisos : [],
+  };
 }
 
 const memo = new WeakMap<Proyecto, EvaluacionExpediente>();
