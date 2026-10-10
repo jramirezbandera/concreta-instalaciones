@@ -22,7 +22,11 @@ export function AppShell() {
 
   return (
     <DrawerContext.Provider value={{ openDrawer: () => setDrawerOpen(true) }}>
-      <div className="bg-bg-primary text-text-primary flex h-screen overflow-hidden">
+      {/* `relative` en la caja y en la columna: un overflow solo recorta a los
+          hijos absolutos (p. ej. los `sr-only`) si es su bloque contenedor. Sin
+          él escapan a su posición en la lista, estiran el documento y la ventana
+          entera se desplaza arrastrando la app. */}
+      <div className="bg-bg-primary text-text-primary relative flex h-screen overflow-hidden">
         {/* Mobile backdrop */}
         {drawerOpen && (
           <div
@@ -34,7 +38,7 @@ export function AppShell() {
 
         <Sidebar isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           <ChunkErrorBoundary>
             <Suspense fallback={<RouteFallback />}>
               <Outlet />
