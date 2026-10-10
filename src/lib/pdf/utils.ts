@@ -1,4 +1,4 @@
-﻿// Shared utilities for all Concreta Instalaciones PDF/ficha rendering.
+﻿// Shared utilities for all Concreta Memorias PDF/ficha rendering.
 // Vendored verbatim from the proven "Concreta estructura" engine (src/lib/pdf/utils.ts).
 // jsPDF helpers — imported by renderFicha and any per-module PDF code.
 //
@@ -258,7 +258,7 @@ export function drawTable<R>(doc: jsPDF, opts: DrawTableOpts<R>): number {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface PdfHeaderMeta {
-  /** Main title line, e.g. "Concreta Instalaciones - HS3 Ventilación". */
+  /** Main title line, e.g. "Concreta Memorias - HS3 Ventilación". */
   title: string;
   /** Generation timestamp. Default `new Date()`. */
   generatedAt?: Date;
@@ -353,7 +353,7 @@ export function drawHeader(doc: jsPDF, meta: PdfHeaderMeta, M: number): { conten
 }
 
 export interface PdfFooterMeta {
-  /** Left text, default 'Concreta Instalaciones'. */
+  /** Left text, default 'Concreta Memorias'. */
   leftText?: string;
   /** Engine version — printed on EVERY footer for legal traceability. */
   engineVersion?: string;
@@ -371,7 +371,7 @@ export interface PdfFooterMeta {
  * Call once after all pages are rendered.
  */
 export function drawFootersAllPages(doc: jsPDF, meta: PdfFooterMeta, M: number): void {
-  const leftText = meta.leftText ?? "Concreta Instalaciones";
+  const leftText = meta.leftText ?? "Concreta Memorias";
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);

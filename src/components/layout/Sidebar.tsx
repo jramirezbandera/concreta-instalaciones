@@ -1,6 +1,6 @@
 import { useContext, type JSX } from "react";
 import { Link, NavLink } from "react-router";
-import { ChevronsUpDown, X } from "lucide-react";
+import { Building2, ChevronsUpDown, HardHat, ScrollText, X } from "lucide-react";
 import { justificacionesPorGrupo, type JustificacionEntry } from "../../data/justificacionRegistry";
 import { ProyectoContext } from "../../lib/proyecto/ProyectoContext";
 import { estadoDe } from "../../lib/proyecto/progreso";
@@ -65,6 +65,15 @@ function navClass({ isActive }: { isActive: boolean }): string {
   return `${ITEM} ${isActive ? ITEM_ACTIVO : ITEM_INACTIVO}`;
 }
 
+/** Icono de la entrada, delante del código y del epígrafe. */
+function Icono({ icon: Icon, activo = false }: { icon: JustificacionEntry["icon"]; activo?: boolean }): JSX.Element {
+  return (
+    <span className={`flex w-4 shrink-0 justify-center ${activo ? "text-accent" : "text-text-disabled"}`} aria-hidden="true">
+      {Icon !== undefined && <Icon size={14} />}
+    </span>
+  );
+}
+
 function Codigo({ children }: { children: string }): JSX.Element {
   return (
     <span className="w-9 shrink-0 font-mono text-[10.5px] text-text-disabled">{children}</span>
@@ -86,6 +95,7 @@ function NavJustificacion(props: {
       !externa && proyecto !== null && !entrada.dev && estadoDe(proyecto, entrada.key as JustificacionKey).aplicabilidad === "no_aplica";
     return (
       <div className={`${ITEM} text-text-disabled`} title={`${entrada.codigo} — ${entrada.label}`}>
+        <Icono icon={entrada.icon} />
         <Codigo>{entrada.codigo}</Codigo>
         <span className="min-w-0 flex-1 truncate">{entrada.label}</span>
         {noAplica ? (
@@ -109,6 +119,7 @@ function NavJustificacion(props: {
     <NavLink to={to} onClick={onClose} className={navClass} title={`${entrada.codigo} — ${entrada.label}`}>
       {({ isActive }) => (
         <>
+          <Icono icon={entrada.icon} activo={isActive} />
           <span className={`w-9 shrink-0 font-mono text-[10.5px] ${isActive ? "text-accent" : "text-text-disabled"}`}>
             {entrada.codigo}
           </span>
@@ -158,16 +169,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <aside
       className={[
-        "bg-bg-surface border-border-main flex w-64 shrink-0 flex-col border-r",
+        "bg-bg-surface border-border-main flex w-68 shrink-0 flex-col border-r",
         "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:transition-transform",
         isOpen ? "max-lg:translate-x-0" : "max-lg:-translate-x-full",
       ].join(" ")}
     >
       <div className="border-border-main flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
         <Link to="/" onClick={onClose} className="flex min-w-0 items-center gap-2">
-          <span className="bg-accent h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-5 w-5 shrink-0 rounded" />
           <span className="text-text-primary truncate text-[15px] font-semibold">Concreta</span>
-          <span className="text-text-disabled truncate text-[12px]">Instalaciones</span>
+          <span className="text-text-disabled truncate text-[12px]">Memorias</span>
         </Link>
         <button
           onClick={onClose}
@@ -196,19 +207,34 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div>
             <CabeceraGrupo>Proyecto</CabeceraGrupo>
             <NavLink to={`/p/${proyecto.id}`} end onClick={onClose} className={navClass}>
-              La obra
+              {({ isActive }) => (
+                <>
+                  <Icono icon={HardHat} activo={isActive} />
+                  La obra
+                </>
+              )}
             </NavLink>
             <NavLink to={`/p/${proyecto.id}/edificio`} onClick={onClose} className={navClass}>
-              El edificio
+              {({ isActive }) => (
+                <>
+                  <Icono icon={Building2} activo={isActive} />
+                  El edificio
+                </>
+              )}
             </NavLink>
             <NavLink to={`/p/${proyecto.id}/memoria`} onClick={onClose} className={navClass}>
-              <span className="min-w-0 flex-1 truncate">Memoria CTE</span>
-              <span
-                className="text-text-disabled ml-auto font-mono text-[10.5px]"
-                title={`${memoria!.listos} de ${memoria!.total} apartados listos`}
-              >
-                {memoria!.listos}/{memoria!.total}
-              </span>
+              {({ isActive }) => (
+                <>
+                  <Icono icon={ScrollText} activo={isActive} />
+                  <span className="min-w-0 flex-1 truncate">Memoria CTE</span>
+                  <span
+                    className="text-text-disabled ml-auto font-mono text-[10.5px]"
+                    title={`${memoria!.listos} de ${memoria!.total} apartados listos`}
+                  >
+                    {memoria!.listos}/{memoria!.total}
+                  </span>
+                </>
+              )}
             </NavLink>
           </div>
         )}

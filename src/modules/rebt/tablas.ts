@@ -221,7 +221,7 @@ export const CONTADORES_REBT = tablaCTE(
  *     cos φ = 0,9.
  */
 export const CRITERIOS_REBT = tablaCTE(
-  { db: "Criterio de proyecto", edicion: "Concreta Instalaciones" },
+  { db: "Criterio de proyecto", edicion: "Concreta Memorias" },
   {
     ascensorHabitual: "ITA-3",
     tensionTrifasica_V: 400,

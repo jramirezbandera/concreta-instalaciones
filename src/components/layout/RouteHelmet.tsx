@@ -11,7 +11,7 @@ import { getJustificacionBySubruta } from "../../data/justificacionRegistry";
  * resuelve por PATRÓN de pathname, no por comparación exacta.
  */
 
-const SUFIJO = "Concreta Instalaciones";
+const SUFIJO = "Concreta Memorias";
 const DESC_GENERICA =
   "Predimensionado de instalaciones + ficha justificativa CTE para arquitectos.";
 

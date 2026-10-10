@@ -36,7 +36,7 @@ export const EXPORT_SCHEMA = "concreta-inst-proyecto";
 
 /** Mensaje al importar un expediente de la versión 1. */
 export const ERROR_VERSION_1 =
-  "Este expediente es de una versión anterior de Concreta Instalaciones y no se puede abrir en esta. " +
+  "Este expediente es de una versión anterior de Concreta Memorias y no se puede abrir en esta. " +
   "La versión 2 describe el edificio de otra forma y empieza de cero: crea el proyecto de nuevo.";
 
 // -----------------------------------------------------------------------------
@@ -284,7 +284,7 @@ export function importarProyecto(
   if (schema !== EXPORT_SCHEMA) {
     return {
       ok: false,
-      error: `El archivo no es un proyecto de Concreta Instalaciones (schema "${String(schema)}").`,
+      error: `El archivo no es un proyecto de Concreta Memorias (schema "${String(schema)}").`,
     };
   }
   if (version === "1") {

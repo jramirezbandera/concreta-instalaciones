@@ -67,7 +67,7 @@ export const DOTACION_HE6 = tablaCTE(
  * tipo ni la potencia: solo pide declararlos (ap. 4 d).
  */
 export const ESTACIONES_HE6 = tablaCTE(
-  { db: "Criterio de proyecto", edicion: "Concreta Instalaciones", articulo: "ITC-BT-52 ap. 5.4 y tabla 1" },
+  { db: "Criterio de proyecto", edicion: "Concreta Memorias", articulo: "ITC-BT-52 ap. 5.4 y tabla 1" },
   {
     habitual_W: 3680,
     opciones: [

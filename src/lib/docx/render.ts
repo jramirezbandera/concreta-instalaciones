@@ -141,9 +141,9 @@ export function documentoMemoria(bloques: BloqueMemoria[], proyecto: string): Do
     styles: ESTILOS,
     title: plan.titulo,
     subject: `Justificación del CTE · ${proyecto}`,
-    creator: "Concreta Instalaciones",
-    lastModifiedBy: "Concreta Instalaciones",
-    description: "Memoria CTE redactada a partir del cálculo con Concreta Instalaciones",
+    creator: "Concreta Memorias",
+    lastModifiedBy: "Concreta Memorias",
+    description: "Memoria CTE redactada a partir del cálculo con Concreta Memorias",
     keywords: "CTE, DB-HS, DB-HE, memoria justificativa, instalaciones",
     sections: [
       {

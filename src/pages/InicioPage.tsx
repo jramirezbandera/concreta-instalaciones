@@ -144,7 +144,7 @@ export function InicioPage(): JSX.Element {
                 Concreta
               </span>
               <span className="text-text-disabled text-[12px] leading-tight">
-                Instalaciones · CTE
+                Memorias · CTE
               </span>
             </div>
             <p className="text-text-secondary text-[12px] leading-tight">

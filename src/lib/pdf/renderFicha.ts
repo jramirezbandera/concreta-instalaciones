@@ -143,7 +143,7 @@ export async function renderFichaEnDoc(doc: jsPDF, data: FichaData): Promise<voi
   const { contentY } = drawHeader(
     doc,
     {
-      title: `Concreta Instalaciones — ${data.titulo}`,
+      title: `Concreta Memorias — ${data.titulo}`,
       engineVersion: data.engineVersion,
       inputsHash: hash,
       proyecto: data.proyecto,

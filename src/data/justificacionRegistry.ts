@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import {
   Wind, Droplets, Waves, Thermometer, FlaskConical, Radiation, CloudRain, BrickWallFire, Truck, Columns3, FireExtinguisher, Flame, DoorOpen,
   Footprints, ShieldAlert, LockKeyhole, Lightbulb, Users, Car, CloudLightning, Accessibility, Trash2,
-  ShowerHead, SolarPanel, Zap, EvCharger, Ear,
+  ShowerHead, SolarPanel, Zap, EvCharger, Ear, Gauge, Weight, LifeBuoy,
 } from "lucide-react";
 import type { JustificacionKey } from "../lib/proyecto/tipos";
 
@@ -279,7 +279,7 @@ export const justificacionRegistry: JustificacionEntry[] = [
     formato: "checker",
     shipped: true,
     route: "sua/piscinas",
-    icon: Waves,
+    icon: LifeBuoy,
     schemaVersion: "1",
   },
   {
@@ -362,6 +362,7 @@ export const justificacionRegistry: JustificacionEntry[] = [
     formato: "externo",
     shipped: false,
     externo: { destino: "HULC" },
+    icon: Gauge,
   },
   {
     key: "he4",
@@ -427,6 +428,7 @@ export const justificacionRegistry: JustificacionEntry[] = [
     formato: "externo",
     shipped: false,
     externo: { destino: "Concreta estructura" },
+    icon: Weight,
   },
   // ── Desarrollo ─────────────────────────────────────────────────────────────
   {

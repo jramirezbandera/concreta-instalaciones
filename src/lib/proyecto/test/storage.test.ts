@@ -256,7 +256,7 @@ describe("storage — exportarProyecto / importarProyecto", () => {
     const res = importarProyecto(JSON.stringify({ schema: "otra-cosa", version: "1" }));
     expect(res.ok).toBe(false);
     if (res.ok) return;
-    expect(res.error).toContain("no es un proyecto de Concreta Instalaciones");
+    expect(res.error).toContain("no es un proyecto de Concreta Memorias");
     expect(res.error).toContain("otra-cosa");
   });
 

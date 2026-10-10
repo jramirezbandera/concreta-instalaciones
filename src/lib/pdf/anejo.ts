@@ -257,7 +257,7 @@ function drawPortada(doc: jsPDF, entrada: EntradaAnejo, fingerprint: string): vo
   );
   doc.setFontSize(7);
   doc.text(
-    pdfStr("Documento generado con Concreta Instalaciones — no sustituye a la firma del técnico."),
+    pdfStr("Documento generado con Concreta Memorias — no sustituye a la firma del técnico."),
     cx,
     PAGE_H - 25,
     { align: "center" },

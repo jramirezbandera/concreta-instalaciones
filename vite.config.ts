@@ -63,8 +63,8 @@ export default defineConfig(({ mode }) => {
           maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         },
         manifest: {
-          name: "Concreta Instalaciones",
-          short_name: "Instalaciones",
+          name: "Concreta Memorias",
+          short_name: "Memorias",
           description:
             "Predimensionado de instalaciones + ficha justificativa CTE para arquitectos.",
           lang: "es",
